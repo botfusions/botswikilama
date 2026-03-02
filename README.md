@@ -1,0 +1,232 @@
+# Lemma - Persistent Memory for LLMs via MCP
+
+Lemma is a Model Context Protocol (MCP) server that provides a persistent memory layer for Large Language Models. It enables LLMs to remember facts, preferences, and context across sessions through a simple, elegant interface with automatic memory decay.
+
+## What is Lemma?
+
+Lemma acts as an external hippocampus for AI assistants. The human brain does not record everything — it synthesizes, distills, and leaves behind fragments. Frequently accessed knowledge grows stronger; unused knowledge fades and is forgotten.
+
+Lemma operates on the same principle:
+
+- **Raw conversations are never stored** — only synthesized fragments
+- **Fragments decay over time** — frequently accessed ones strengthen
+- **The LLM reads fragments at every session** and remembers who it is
+
+## How It Works
+
+### Memory Structure
+
+Each memory fragment has:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `id` | string | Unique identifier (format: `m` + 6 hex chars) |
+| `title` | string | Short title for quick scanning (auto-generated if not provided) |
+| `fragment` | string | Synthesized memory text (single sentence preferred) |
+| `confidence` | float | Reliability 0.0-1.0 (starts at 1.0, decays over time) |
+| `source` | string | `"user"` (user requested) or `"ai"` (LLM noticed) |
+| `created` | string | Creation date (YYYY-MM-DD) |
+| `accessed` | int | How many times this fragment has been accessed |
+
+### Decay Mechanism
+
+Decay is applied when memory is loaded:
+
+```
+decay_rate = max(0.0, 0.05 - (accessed * 0.005))
+confidence = confidence - decay_rate
+```
+
+- **Never accessed** (`accessed: 0`): loses 0.05 per session
+- **Accessed 10 times** (`accessed: 10`): decay = 0.0, never fades
+- **Fragments with confidence < 0.1** are automatically deleted
+
+### Memory File Location
+
+Memories are stored in JSONL format at:
+
+| OS | Path |
+|---|---|
+| **Windows** | `C:\Users\{username}\.lemma\memory.jsonl` |
+| **macOS** | `/Users/{username}/.lemma/memory.jsonl` |
+| **Linux** | `/home/{username}/.lemma/memory.jsonl` |
+
+## Installation
+
+```bash
+cd Lemma
+npm install
+```
+
+### Requirements
+
+- Node.js 18.0.0 or higher
+
+## MCP Client Configuration
+
+Add to your MCP client configuration:
+
+**Claude Desktop (macOS):** `~/Library/Application Support/Claude/claude_desktop_config.json`
+**Claude Desktop (Windows):** `%APPDATA%\Claude\claude_desktop_config.json`
+
+```json
+{
+  "mcpServers": {
+    "lemma": {
+      "command": "node",
+      "args": ["C:\\dev\\Lemma\\memory.js"]
+    }
+  }
+}
+```
+
+## System Prompt
+
+The MCP server provides a system prompt resource at `lemma://system-prompt`. MCP clients can automatically discover and load this.
+
+**Manual configuration** (if needed):
+
+```
+# Lemma — Persistent Memory System
+
+This is your persistent memory layer. It works like the human brain:
+only important fragments are kept, frequently accessed ones grow stronger,
+unused ones fade away.
+
+RULES FOR WRITING TO MEMORY:
+1. If the user explicitly asks to remember something → store it. source: "user"
+2. If you notice something important on your own → store it. source: "ai"
+3. Write the synthesized essence, not raw data. One sentence is enough.
+4. Do not store everything. Only store what genuinely matters.
+5. If a new fragment conflicts with an existing one → use update, not add.
+6. If the user asks to forget something → use forget.
+
+READING FROM MEMORY:
+- Use the fragments provided when they are relevant to the current context.
+- Trust fragments with confidence below 0.3 less.
+- You do not need to mention the fragments explicitly; just let them inform your behavior.
+
+At the start of each session: Call memory_read to load stored fragments.
+```
+
+## Available Tools
+
+### `memory_read`
+
+Read and return formatted memory fragments for LLM consumption. Applies decay automatically.
+
+**Parameters:** None
+
+**Returns:** Formatted string with confidence bars:
+
+```
+=== LEMMA MEMORY FRAGMENTS ===
+[m1a2b3] █████ (🤖 ai) Communication style
+    User prefers short and direct answers
+[m4c5d6] █████ (👤 user) Project stack
+    Project is TypeScript, Node 20
+==============================
+```
+
+### `memory_add`
+
+Add a new memory fragment.
+
+**Parameters:**
+- `fragment` (string, required): The memory text to store
+- `title` (string, optional): Short title (auto-generated from first 40 chars if not provided)
+- `source` (string, optional): "user" or "ai", default "ai"
+
+**Example:**
+```json
+{
+  "fragment": "User prefers dark mode in all applications",
+  "title": "Dark mode preference",
+  "source": "ai"
+}
+```
+
+### `memory_update`
+
+Update an existing memory fragment.
+
+**Parameters:**
+- `id` (string, required): The fragment ID to update
+- `title` (string, optional): New title text
+- `fragment` (string, optional): New fragment text
+- `confidence` (number, optional): New confidence 0.0-1.0
+
+**Example:**
+```json
+{
+  "id": "m1a2b3",
+  "title": "Updated title",
+  "fragment": "Updated information",
+  "confidence": 0.9
+}
+```
+
+### `memory_forget`
+
+Remove a memory fragment.
+
+**Parameters:**
+- `id` (string, required): The fragment ID to remove
+
+### `memory_list`
+
+List all memory fragments in JSON format.
+
+**Parameters:** None
+
+**Returns:** JSON array of all fragments
+
+## Philosophy
+
+### What Should Be Stored
+
+**User Layer:**
+- User preferences (communication style, format, language)
+- Project context (technology stack, folder structure, conventions)
+- Explicitly requested memories
+
+**Capability Layer:**
+- Successful solutions and approaches used
+- Shortcuts discovered for recurring tasks
+- Approaches that were tried and failed
+- Task types and their best-fit strategy patterns
+
+### What Should NOT Be Stored
+
+- Raw conversation content
+- One-off questions that won't recur
+- Temporary or highly context-specific information
+- Personal or sensitive data
+
+## Development
+
+### Running Tests
+
+```bash
+npm test
+```
+
+### Project Structure
+
+```
+Lemma/
+├── memory.js       # Main MCP server implementation
+├── memory-core.js  # Core memory logic (load, save, decay)
+├── test.js         # Test suite
+├── package.json    # Dependencies and metadata
+├── README.md       # This file
+└── .gitignore      # Git ignore rules
+```
+
+## Security
+
+`memory.jsonl` is a local file and is never sent anywhere. Users can inspect its contents or clear it at any time via the MCP tools.
+
+## License
+
+MIT License

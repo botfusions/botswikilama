@@ -1,0 +1,23 @@
+{
+  "name": "lemma-mcp",
+  "version": "1.0.0",
+  "description": "Persistent memory layer for LLMs via MCP",
+  "type": "module",
+  "main": "memory.js",
+  "bin": {
+    "lemma": "./memory.js"
+  },
+  "scripts": {
+    "start": "node memory.js",
+    "test": "node test.js"
+  },
+  "keywords": ["mcp", "memory", "llm", "claude", "persistent"],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.0.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
