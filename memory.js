@@ -103,7 +103,12 @@ const TOOLS = [
     description: "Read and return formatted memory fragments for LLM consumption. Applies confidence decay and reformats for optimal context.",
     inputSchema: {
       type: "object",
-      properties: {},
+      properties: {
+        project: {
+          type: "string",
+          description: "Project name to filter (optional, defaults to detected project)",
+        },
+      },
     },
   },
   {
@@ -112,9 +117,9 @@ const TOOLS = [
     inputSchema: {
       type: "object",
       properties: {
-        topic: {
+        project: {
           type: "string",
-          description: "Topic or project name to check (optional, defaults to current project)",
+          description: "Project name to check (optional, defaults to detected project)",
         },
       },
     },
@@ -266,7 +271,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
   try {
     switch (name) {
       case "memory_read": {
-        const currentProject = core.detectProject();
+        const currentProject = args?.project || core.detectProject();
         let memory = core.loadMemory();
         memory = core.decayConfidence(memory);
         memory = core.filterByProject(memory, currentProject);
@@ -278,19 +283,19 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       }
 
       case "memory_check": {
-        const topic = args?.topic || core.detectProject();
+        const project = args?.project || core.detectProject();
         const memory = core.loadMemory();
-        const filtered = core.filterByProject(memory, topic);
+        const filtered = core.filterByProject(memory, project);
 
         if (filtered.length === 0) {
           return {
-            content: [{ type: "text", text: `No memory found for: ${topic}\nProceed with analysis and save findings.` }],
+            content: [{ type: "text", text: `No memory found for: ${project}\nProceed with analysis and save findings.` }],
           };
         }
 
         const summary = filtered.map(f => `[${f.id}] ${f.title}`).join("\n");
         return {
-          content: [{ type: "text", text: `Found ${filtered.length} fragments for "${topic}":\n${summary}\n\nYou already have context. Ask user if they want re-analysis or summary.` }],
+          content: [{ type: "text", text: `Found ${filtered.length} fragments for "${project}":\n${summary}\n\nYou already have context. Ask user if they want re-analysis or summary.` }],
         };
       }
 
