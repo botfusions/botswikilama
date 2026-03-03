@@ -1,5 +1,7 @@
 # Lemma - Persistent Memory for LLMs via MCP
 
+[English](README.md) | [Türkçe](README.tr.md)
+
 Lemma is a Model Context Protocol (MCP) server that provides a persistent memory layer for Large Language Models. It enables LLMs to remember facts, preferences, and context across sessions through a simple, elegant interface with automatic memory decay.
 
 ## What is Lemma?
@@ -21,25 +23,29 @@ Each memory fragment has:
 | Field | Type | Description |
 |-------|------|-------------|
 | `id` | string | Unique identifier (format: `m` + 6 hex chars) |
-| `title` | string | Short title for quick scanning (auto-generated if not provided) |
-| `fragment` | string | Synthesized memory text (single sentence preferred) |
-| `confidence` | float | Reliability 0.0-1.0 (starts at 1.0, decays over time) |
-| `source` | string | `"user"` (user requested) or `"ai"` (LLM noticed) |
+| `title` | string | Short title for quick scanning |
+| `fragment` | string | Synthesized memory text |
+| `project` | string | Project scope (`null` for global) |
+| `confidence` | float | Reliability 0.0-1.0 (decays over time) |
+| `source` | string | `"user"` or `"ai"` |
 | `created` | string | Creation date (YYYY-MM-DD) |
-| `accessed` | int | How many times this fragment has been accessed |
+| `lastAccessed` | string | ISO timestamp of last read |
+| `accessed` | int | Access count in current decay cycle |
 
 ### Decay Mechanism
 
-Decay is applied when memory is loaded:
+Decay is applied every time memory is read. Unlike static memory, Lemma uses a biological model where frequency of access strengthens the memory, while time elapsed since last access weakens it:
 
 ```
-decay_rate = max(0.0, 0.05 - (accessed * 0.005))
-confidence = confidence - decay_rate
+modifier = max(0.005, 0.05 - (accessed * 0.005))
+time_multiplier = 1 + (days_since_last_access * 0.05)
+decay_step = modifier * time_multiplier
+confidence = confidence - decay_step
 ```
 
-- **Never accessed** (`accessed: 0`): loses 0.05 per session
-- **Accessed 10 times** (`accessed: 10`): decay = 0.0, never fades
-- **Fragments with confidence < 0.1** are automatically deleted
+- **Frequency**: Frequently accessed items reach a minimum decay rate.
+- **Recency**: Items not accessed for a long time decay faster due to the `time_multiplier`.
+- **Cleanup**: Fragments with **confidence < 0.1** are automatically purged.
 
 ### Memory File Location
 
