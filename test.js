@@ -117,13 +117,18 @@ async function test_saveMemory_createsDirectory() {
 async function test_decayConfidence_reducesCorrectly() {
   const core = await importWithOverride(path.join(tempDir, "decay1.jsonl"));
 
+  const now = new Date();
+  // Simulate memory accessed today
+  const recentTime = now.toISOString();
+
   const fragment1 = {
     id: "m000001",
     title: "Test 1",
     fragment: "Test content 1",
     confidence: 1.0,
     source: "ai",
-    created: "2026-03-01",
+    created: recentTime,
+    lastAccessed: recentTime,
     accessed: 0,
   };
 
@@ -133,17 +138,24 @@ async function test_decayConfidence_reducesCorrectly() {
     fragment: "Test content 2",
     confidence: 1.0,
     source: "ai",
-    created: "2026-03-01",
+    created: recentTime,
+    lastAccessed: recentTime,
     accessed: 5,
   };
 
   const result = core.decayConfidence([fragment1, fragment2]);
 
-  // First fragment: 1.0 - 0.05 = 0.95
-  assert.strictEqual(result[0].confidence, 0.95, "Never accessed fragment should lose 0.05");
+  // Base decay with 0 accessed = 0.05 modifier
+  // Time decay with 0 days = 1.0 multiplier
+  // Decay step: 0.05 * 1.0 = 0.05
+  // New confidence: 1.0 - 0.05 = 0.95
+  assert(Math.abs(result[0].confidence - 0.95) < 0.001, "Never accessed fragment should lose 0.05");
 
-  // Second fragment: 1.0 - 0.025 = 0.975
-  assert.strictEqual(result[1].confidence, 0.975, "5x accessed fragment should lose 0.025");
+  // Base decay with 5 accessed = 0.05 - 0.025 = 0.025 modifier
+  // Time decay with 0 days = 1.0 multiplier
+  // Decay step: 0.025 * 1.0 = 0.025
+  // New confidence: 1.0 - 0.025 = 0.975
+  assert(Math.abs(result[1].confidence - 0.975) < 0.001, "5x accessed fragment should lose 0.025");
 }
 
 // Test 5: decayConfidence - removes low fragments
@@ -241,6 +253,7 @@ async function test_createFragment_validObject() {
   assert.strictEqual(fragment.confidence, 1.0, "Should start with confidence 1.0");
   assert.strictEqual(fragment.accessed, 0, "Should start with accessed 0");
   assert(fragment.created, "Should have created date");
+  assert(fragment.lastAccessed, "Should have lastAccessed date");
   assert(fragment.id.startsWith("m"), "ID should start with 'm'");
 }
 
@@ -264,12 +277,13 @@ async function test_createFragment_autoTitle() {
 // Test 10: filterByProject - correct filtering
 async function test_filterByProject_correctFiltering() {
   const core = await importWithOverride(path.join(tempDir, "filter.jsonl"));
+  const now = new Date().toISOString();
 
   const fragments = [
-    { id: "m001", fragment: "Global 1", project: null, confidence: 1.0 },
-    { id: "m002", fragment: "Global 2", project: undefined, confidence: 1.0 },
-    { id: "m003", fragment: "Project A", project: "projectA", confidence: 1.0 },
-    { id: "m004", fragment: "Project B", project: "projectB", confidence: 1.0 },
+    { id: "m001", fragment: "Global 1", project: null, confidence: 1.0, created: now, lastAccessed: now },
+    { id: "m002", fragment: "Global 2", project: undefined, confidence: 1.0, created: now, lastAccessed: now },
+    { id: "m003", fragment: "Project A", project: "projectA", confidence: 1.0, created: now, lastAccessed: now },
+    { id: "m004", fragment: "Project B", project: "projectB", confidence: 1.0, created: now, lastAccessed: now },
   ];
 
   // Filter for projectA - should get global + projectA
@@ -284,6 +298,54 @@ async function test_filterByProject_correctFiltering() {
   // No project context - should get only global
   const filteredNone = core.filterByProject(fragments, null);
   assert.strictEqual(filteredNone.length, 2, "Should have 2 global fragments");
+}
+
+// Test 11: searchAndSortFragments - search and top-k truncating
+async function test_searchAndSortFragments_searchAndSort() {
+  const core = await importWithOverride(path.join(tempDir, "search.jsonl"));
+  const now = new Date().toISOString();
+
+  const fragments = [
+    { id: "m001", title: "Apple", fragment: "The apple is red", confidence: 1.0, created: now, lastAccessed: now },
+    { id: "m002", title: "Banana", fragment: "The banana is yellow", confidence: 1.0, created: now, lastAccessed: now },
+    { id: "m003", title: "Apple 2", fragment: "A green apple", confidence: 0.8, created: now, lastAccessed: now },
+    { id: "m004", title: "Orange", fragment: "Oranges are orange", confidence: 1.0, created: now, lastAccessed: now },
+  ];
+
+  // Empty search should return all via default TopK
+  const allResults = core.searchAndSortFragments(fragments, null, 10);
+  assert.strictEqual(allResults.length, 4, "Empty search should return all");
+
+  // Search for apple should rank apples highest
+  const appleResults = core.searchAndSortFragments(fragments, "apple", 10);
+  assert.strictEqual(appleResults.length, 2, "Should find 2 apples");
+  assert.strictEqual(appleResults[0].id, "m001", "Red apple has higher confidence so should be first");
+
+  // Limit top K
+  const top1Result = core.searchAndSortFragments(fragments, "apple", 1);
+  assert.strictEqual(top1Result.length, 1, "Should truncate to top 1");
+}
+
+// Test 12: findSimilarFragment - similarity matching
+async function test_findSimilarFragment_matching() {
+  const core = await importWithOverride(path.join(tempDir, "similarity.jsonl"));
+  const now = new Date().toISOString();
+
+  const fragments = [
+    { id: "m001", title: "Config", fragment: "User uses dark mode theme", project: null, confidence: 1.0, created: now, lastAccessed: now },
+  ];
+
+  // Exact match
+  const exact = core.findSimilarFragment(fragments, "User uses dark mode theme", null);
+  assert.strictEqual(exact.id, "m001", "Exact text should match");
+
+  // Close match
+  const close = core.findSimilarFragment(fragments, "User prefers a dark mode theme", null);
+  assert.strictEqual(close.id, "m001", "Close text should match");
+
+  // Unrelated
+  const unrelated = core.findSimilarFragment(fragments, "User likes pizza", null);
+  assert.strictEqual(unrelated, null, "Unrelated text should not match");
 }
 
 // Setup and teardown
@@ -317,6 +379,8 @@ async function runTests() {
   await runTest("createFragment - valid object", test_createFragment_validObject);
   await runTest("createFragment - auto title generation", test_createFragment_autoTitle);
   await runTest("filterByProject - correct filtering", test_filterByProject_correctFiltering);
+  await runTest("searchAndSortFragments - search and sort", test_searchAndSortFragments_searchAndSort);
+  await runTest("findSimilarFragment - matching", test_findSimilarFragment_matching);
 
   console.log("\n" + "=".repeat(50));
   console.log(`Tests passed: ${passed}`);

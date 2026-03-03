@@ -100,13 +100,17 @@ const server = new Server(
 const TOOLS = [
   {
     name: "memory_read",
-    description: "Read and return formatted memory fragments for LLM consumption. Applies confidence decay and reformats for optimal context.",
+    description: "Read and return formatted memory fragments for LLM consumption. Applies confidence decay, limits to top-K, and reformats for optimum context.",
     inputSchema: {
       type: "object",
       properties: {
         project: {
           type: "string",
           description: "Project name to filter (optional, defaults to detected project)",
+        },
+        query: {
+          type: "string",
+          description: "Optional semantic search keyword. Supply only if you are looking for specific context.",
         },
       },
     },
@@ -272,9 +276,15 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
     switch (name) {
       case "memory_read": {
         const currentProject = args?.project || core.detectProject();
+        const query = args?.query || null;
+
         let memory = core.loadMemory();
         memory = core.decayConfidence(memory);
         memory = core.filterByProject(memory, currentProject);
+
+        // Execute Search and Top-K Truncation
+        memory = core.searchAndSortFragments(memory, query, 30);
+
         const formatted = core.formatMemoryForLLM(memory, currentProject);
         core.saveMemory(core.loadMemory()); // Save decayed full memory
         return {
@@ -313,6 +323,19 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         }
 
         const memory = core.loadMemory();
+
+        // --- Duplication Prevention Feature ---
+        const similarMatch = core.findSimilarFragment(memory, fragment, project);
+        if (similarMatch && source === "ai") {
+          return {
+            content: [{
+              type: "text",
+              text: `Error: A highly similar memory already exists. Please use the 'memory_update' tool on ID [${similarMatch.id}] instead of adding a new one.\nExisting Memory Title: "${similarMatch.title}"\nExisting Content: "${similarMatch.fragment}"`
+            }],
+            isError: true,
+          };
+        }
+
         const newFragment = core.createFragment(fragment, source, title, project);
         memory.push(newFragment);
         core.saveMemory(memory);

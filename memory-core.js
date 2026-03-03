@@ -43,6 +43,8 @@ export function createFragment(fragment, source, title = null, project = null) {
   // Auto-generate title from first 40 chars if not provided
   const autoTitle = title || (fragment.length > 40 ? fragment.substring(0, 40) + "..." : fragment);
 
+  const now = new Date();
+
   return {
     id: generateId(),
     title: autoTitle,
@@ -50,9 +52,61 @@ export function createFragment(fragment, source, title = null, project = null) {
     project: project,
     confidence: 1.0,
     source: source,
-    created: new Date().toISOString().split("T")[0],
+    created: now.toISOString().split("T")[0],
+    lastAccessed: now.toISOString(),
     accessed: 0
   };
+}
+
+/**
+ * Calculate Jaccard text similarity between two strings
+ * @param {string} text1 
+ * @param {string} text2 
+ * @returns {number} Score between 0.0 and 1.0
+ */
+function calculateSimilarity(text1, text2) {
+  if (!text1 || !text2) return 0.0;
+
+  // Basic tokenization
+  const getTokens = (str) => new Set(str.toLowerCase()
+    .replace(/[^\w\s]/g, "")
+    .split(/\s+/)
+    .filter(Boolean));
+
+  const set1 = getTokens(text1);
+  const set2 = getTokens(text2);
+
+  if (set1.size === 0 && set2.size === 0) return 1.0;
+  if (set1.size === 0 || set2.size === 0) return 0.0;
+
+  const intersection = new Set([...set1].filter(x => set2.has(x)));
+  const union = new Set([...set1, ...set2]);
+
+  return intersection.size / union.size;
+}
+
+/**
+ * Look for similar existing fragments preventing duplication
+ * @param {Array<object>} fragments - Memory fragments to check against
+ * @param {string} fragmentText - The text trying to be added
+ * @param {string|null} project - Project scope (null = global, string = project-specific)
+ * @param {number} threshold - Minimum similarity score (0-1) to trigger a match
+ * @returns {object|null} The most similar fragment if similarity >= threshold, otherwise null
+ */
+export function findSimilarFragment(fragments, fragmentText, project, threshold = 0.55) {
+  const scopedFragments = filterByProject(fragments, project);
+  let bestMatch = null;
+  let highestScore = 0;
+
+  for (const frag of scopedFragments) {
+    const score = calculateSimilarity(frag.fragment, fragmentText);
+    if (score > highestScore) {
+      highestScore = score;
+      bestMatch = frag;
+    }
+  }
+
+  return highestScore >= threshold ? bestMatch : null;
 }
 
 /**
@@ -118,17 +172,36 @@ export function filterByProject(fragments, currentProject) {
 }
 
 /**
- * Apply confidence decay to memory fragments
- * Decay rate decreases as access count increases (frequently accessed memories decay slower)
+ * Apply time-based confidence decay to memory fragments
+ * Decay rate decreases as access count increases, but it also considers time elapsed 
+ * since last access. Even highly accessed items decay eventually if unused.
  * Removes fragments with confidence below 0.1
  * @param {Array<object>} fragments - Array of memory fragments
  * @returns {Array<object>} Filtered and decayed fragments
  */
 export function decayConfidence(fragments) {
+  const now = new Date();
+
   return fragments
     .map(frag => {
-      const decayRate = Math.max(0.0, 0.05 - (frag.accessed * 0.005));
-      const newConfidence = frag.confidence - decayRate;
+      // Compatibility fallback for older un-migrated memories
+      const lastAccessed = frag.lastAccessed ? new Date(frag.lastAccessed) : new Date(frag.created);
+
+      // Calculate days since last access
+      const daysSinceAccess = Math.max(0, (now - lastAccessed) / (1000 * 60 * 60 * 24));
+
+      // Base decay: lose 0.05 confidence per "session" (decay cycle)
+      // High access reduces decay magnitude
+      let accessDecayModifier = Math.max(0.005, 0.05 - (frag.accessed * 0.005));
+
+      // Time decay multiplier: if the memory hasn't been accessed in weeks, increase penalty
+      // (1 + days factor ensures old items decay even if they were accessed heavily before)
+      const timeDecayMultiplier = 1 + (daysSinceAccess * 0.05);
+
+      const sessionDecay = accessDecayModifier * timeDecayMultiplier;
+
+      const newConfidence = frag.confidence - sessionDecay;
+
       return {
         ...frag,
         confidence: Math.max(0, newConfidence)
@@ -137,8 +210,64 @@ export function decayConfidence(fragments) {
     .filter(frag => frag.confidence >= 0.1)
     .map(frag => ({
       ...frag,
-      accessed: 0 // Reset access counter after decay
+      accessed: 0 // Reset access counter for the next session
     }));
+}
+
+/**
+ * Execute search, semantic relevance matching and top-k truncating.
+ * Updates lastAccessed parameter as a reading effect.
+ * @param {Array<object>} fragments - Fetched DB fragments
+ * @param {string|null} query - User search term
+ * @param {number} topK - Max output window limit
+ * @returns {Array<object>} Array of scored/sorted fragments
+ */
+export function searchAndSortFragments(fragments, query = null, topK = 30) {
+  const nowDate = new Date().toISOString();
+
+  let results = fragments.map(frag => {
+    let relevance = frag.confidence * 10; // Default weight is confidence
+
+    if (query) {
+      // Bump score heavily if keywords appear in text
+      const queryTokens = query.toLowerCase().split(/\s+/);
+      const titleLower = frag.title.toLowerCase();
+      const fragLower = frag.fragment.toLowerCase();
+
+      let matched = false;
+      for (const token of queryTokens) {
+        if (titleLower.includes(token) || fragLower.includes(token)) {
+          relevance += 15;
+          matched = true;
+        }
+      }
+
+      // Heavily penalize disjoint results if query exists but didn't match
+      if (!matched) {
+        relevance -= 50;
+      }
+    }
+
+    return { frag, relevance };
+  });
+
+  // Exclude un-relevant search results
+  if (query) {
+    results = results.filter(r => r.relevance >= 0);
+  }
+
+  // Sort descending by calculated metric
+  results.sort((a, b) => b.relevance - a.relevance);
+
+  // Truncate to top K
+  const topResults = results.slice(0, topK).map(r => r.frag);
+
+  // Mutably update their lastAccessed metrics
+  topResults.forEach(frag => {
+    frag.lastAccessed = nowDate;
+  });
+
+  return topResults;
 }
 
 /**
