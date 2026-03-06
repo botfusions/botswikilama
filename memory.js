@@ -73,15 +73,16 @@ Examples:
 4. User asks to forget → use forget
 </writing_to_memory>
 <skill_tracking>
-## Skill Tracking
+## Skill Tracking (MANDATORY)
 Skills are different from memories. While memories store **knowledge**, skills track **experience**:
 - **Memory** = "React uses virtual DOM" (static knowledge)
 - **Skill** = "I've used React 45 times, learned useCallback prevents re-renders" (experience tracking)
-### When to Track Skills
+### When to Track Skills (REQUIRED)
 Call \`skill_practice\` when you actively use a technology/framework during work:
-- Writing React components → \`skill_practice("react", "frontend")\`
-- Debugging Node.js → \`skill_practice("nodejs", "backend")\`
-- Using Git commands → \`skill_practice("git", "tool")\`
+- Writing React components → \`skill_practice("react", "frontend", ["components"], [])\`
+- Debugging Node.js → \`skill_practice("nodejs", "backend", ["debugging"], ["console.log is useful"])\`
+- Using Git commands → \`skill_practice("git", "tool", ["commands"], [])\`
+**IMPORTANT:** contexts and learnings are REQUIRED parameters. Use empty array [] if none.
 ### Skill Categories
 | Category | Examples |
 |----------|----------|
@@ -90,10 +91,10 @@ Call \`skill_practice\` when you actively use a technology/framework during work
 | language | typescript, javascript, python, rust |
 | database | postgresql, mongodb, redis, prisma |
 | tool | git, docker, webpack, vite, jest |
-### Adding Learnings
+### Adding Learnings (REQUIRED)
 When you discover something useful while working with a skill, add it as a learning:
 \`\`\`
-skill_practice("react", "frontend", ["hooks"], ["useCallback prevents unnecessary re-renders"])
+skill_practice({ skill: "react", category: "frontend", contexts: ["hooks"], learnings: ["useCallback prevents unnecessary re-renders"] })
 \`\`\`
 ### Discovering Skills
 Use \`skill_discover\` to auto-detect skills from project dependencies (package.json, etc.)
@@ -266,7 +267,7 @@ const TOOLS = [
   },
   {
     name: "skill_practice",
-    description: "Record skill usage - increments usage count, updates last_used date, and optionally adds contexts/learnings. Call this when you use a skill during work.",
+    description: "MANDATORY: Record skill usage - increments usage count, updates last_used date, and adds contexts/learnings. Call this when you use a skill during work. Both contexts and learnings are REQUIRED.",
     inputSchema: {
       type: "object",
       properties: {
@@ -281,15 +282,15 @@ const TOOLS = [
         contexts: {
           type: "array",
           items: { type: "string" },
-          description: "Additional contexts (e.g., ['hooks', 'state']). Optional.",
+          description: "REQUIRED: Contexts where this skill was used (e.g., ['hooks', 'state']). Provide at least one context or empty array [].",
         },
         learnings: {
           type: "array",
           items: { type: "string" },
-          description: "New learnings discovered during use. Optional.",
+          description: "REQUIRED: New learnings discovered during use (e.g., ['useCallback prevents re-renders']). Provide at least one learning or empty array [].",
         },
       },
-      required: ["skill", "category"],
+      required: ["skill", "category", "contexts", "learnings"],
     },
   },
   {
