@@ -312,7 +312,8 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       case "memory_add": {
         const fragment = args?.fragment;
         const title = args?.title || null;
-        const project = args?.project !== undefined ? args.project : core.detectProject();
+        // null = global, undefined = auto-detect, string = project-specific
+        const project = args?.project === undefined ? null : args.project;
         const source = args?.source || "ai";
 
         if (!fragment || typeof fragment !== "string") {
