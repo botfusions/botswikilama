@@ -21,10 +21,50 @@ async function importWithOverride(memoryFilePath) {
 
   // Override MEMORY_FILE constant - use forward slashes for JS string
   const normalizedPath = memoryFilePath.replace(/\\/g, "/");
-  const modifiedCode = originalCode.replace(
-    /const MEMORY_FILE = path\.join\(MEMORY_DIR, "memory\.jsonl"\);/,
-    `const MEMORY_FILE = "${normalizedPath}";`
-  );
+
+  // Replace fuse.js import with inline mock for tests
+  const fuseMock = `
+// Fuse.js mock for tests
+class Fuse {
+  constructor(items, options) {
+    this.items = items;
+    this.options = options;
+  }
+  search(query, { limit } = {}) {
+    const threshold = this.options.threshold || 0.4;
+    const keys = this.options.keys || [];
+    const results = [];
+    const queryLower = query.toLowerCase();
+
+    for (const item of this.items) {
+      let score = 1;
+      let matched = false;
+
+      for (const keyDef of keys) {
+        const key = typeof keyDef === 'object' ? keyDef.name : keyDef;
+        const value = (item[key] || '').toLowerCase();
+        if (value.includes(queryLower) || queryLower.includes(value)) {
+          matched = true;
+          break;
+        }
+      }
+
+      if (matched) {
+        results.push({ item, score });
+        if (limit && results.length >= limit) break;
+      }
+    }
+    return results;
+  }
+}
+`;
+
+  const modifiedCode = originalCode
+    .replace(/import Fuse from "fuse\.js";/, fuseMock)
+    .replace(
+      /const MEMORY_FILE = path\.join\(MEMORY_DIR, "memory\.jsonl"\);/,
+      `const MEMORY_FILE = "${normalizedPath}";`
+    );
 
   await fs.writeFile(tempModulePath, modifiedCode);
 
@@ -361,10 +401,50 @@ async function importSkillsWithOverride(skillsFilePath) {
   );
 
   const normalizedPath = skillsFilePath.replace(/\\/g, "/");
-  const modifiedCode = originalCode.replace(
-    /const SKILLS_FILE = path\.join\(MEMORY_DIR, "skills\.jsonl"\);/,
-    `const SKILLS_FILE = "${normalizedPath}";`
-  );
+
+  // Fuse.js mock for tests
+  const fuseMock = `
+// Fuse.js mock for tests
+class Fuse {
+  constructor(items, options) {
+    this.items = items;
+    this.options = options;
+  }
+  search(query, { limit } = {}) {
+    const threshold = this.options.threshold || 0.4;
+    const keys = this.options.keys || [];
+    const results = [];
+    const queryLower = query.toLowerCase();
+
+    for (const item of this.items) {
+      let score = 1;
+      let matched = false;
+
+      for (const keyDef of keys) {
+        const key = typeof keyDef === 'object' ? keyDef.name : keyDef;
+        const value = (item[key] || '').toLowerCase();
+        if (value.includes(queryLower) || queryLower.includes(value)) {
+          matched = true;
+          break;
+        }
+      }
+
+      if (matched) {
+        results.push({ item, score });
+        if (limit && results.length >= limit) break;
+      }
+    }
+    return results;
+  }
+}
+`;
+
+  const modifiedCode = originalCode
+    .replace(/import Fuse from "fuse\.js";/, fuseMock)
+    .replace(
+      /const SKILLS_FILE = path\.join\(MEMORY_DIR, "skills\.jsonl"\);/,
+      `const SKILLS_FILE = "${normalizedPath}";`
+    );
 
   await fs.writeFile(tempModulePath, modifiedCode);
   return import(pathToFileURL(tempModulePath).href);
