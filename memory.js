@@ -610,8 +610,13 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 
         const isNew = updated.usage_count === 1;
         const action = isNew ? "Created" : "Updated";
+
+        // Return skill detail including description/manual so AI can read protocols
+        let response = `${action} skill "${updated.skill}" (${updated.category}): ${updated.usage_count}x usage\n\n`;
+        response += skills.formatSkillDetail(updated);
+
         return {
-          content: [{ type: "text", text: `${action} skill "${updated.skill}" (${updated.category}): ${updated.usage_count}x usage` }],
+          content: [{ type: "text", text: response }],
         };
       }
 

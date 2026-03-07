@@ -251,6 +251,49 @@ const TASK_SKILL_MAP = {
 };
 
 /**
+ * Tokenize a string into words for matching
+ * @param {string} str - String to tokenize
+ * @returns {Set<string>} Set of lowercase tokens
+ */
+function tokenize(str) {
+  if (!str) return new Set();
+  // Split by spaces, hyphens, underscores, and common separators
+  const tokens = str.toLowerCase()
+    .replace(/[-_]/g, ' ')
+    .split(/\s+/)
+    .filter(t => t.length >= 2); // Ignore single-char tokens
+  return new Set(tokens);
+}
+
+/**
+ * Check if any token from text matches any token from target
+ * Uses partial matching: "viral" matches "viral-content"
+ * @param {string} text - Source text (e.g., task description)
+ * @param {string} target - Target text (e.g., skill name or context)
+ * @returns {boolean} True if there's a token overlap
+ */
+function hasTokenMatch(text, target) {
+  const textTokens = tokenize(text);
+  const targetTokens = tokenize(target);
+
+  // Check for exact token match
+  for (const token of textTokens) {
+    if (targetTokens.has(token)) return true;
+  }
+
+  // Check for partial match (token contained in target token or vice versa)
+  for (const textToken of textTokens) {
+    for (const targetToken of targetTokens) {
+      if (textToken.includes(targetToken) || targetToken.includes(textToken)) {
+        return true;
+      }
+    }
+  }
+
+  return false;
+}
+
+/**
  * Suggest skills based on task description
  * @param {string} taskDescription - Task/query description
  * @param {Array<object>} existingSkills - Current tracked skills
@@ -268,10 +311,10 @@ export function suggestSkills(taskDescription, existingSkills = []) {
   for (const skillDef of allSkillDefs) {
     if (seen.has(skillDef.skill)) continue;
 
-    // Check if skill name or keywords match
+    // Check if skill name or keywords match (using token matching)
     const matches =
-      desc.includes(skillDef.skill) ||
-      skillDef.keywords.some(kw => desc.includes(kw));
+      hasTokenMatch(desc, skillDef.skill) ||
+      skillDef.keywords.some(kw => hasTokenMatch(desc, kw));
 
     if (matches) {
       seen.add(skillDef.skill);
@@ -288,28 +331,12 @@ export function suggestSkills(taskDescription, existingSkills = []) {
   }
 
   // Also check tracked skills that might not be in TASK_SKILL_MAP
-  // Match by skill name and contexts
+  // Match by skill name, contexts, and learnings
   for (const existing of existingSkills) {
     if (seen.has(existing.skill)) continue;
 
-    // Check if skill name matches
-    if (desc.includes(existing.skill)) {
-      seen.add(existing.skill);
-      suggestions.push({
-        skill: existing.skill,
-        category: existing.category,
-        keywords: existing.contexts, // use contexts as keywords
-        tracked: true,
-        usage_count: existing.usage_count,
-        last_used: existing.last_used,
-        learnings: existing.learnings,
-        contexts: existing.contexts,
-      });
-      continue;
-    }
-
-    // Check if any context matches
-    if (existing.contexts.some(ctx => desc.includes(ctx))) {
+    // Check if skill name matches (token-based)
+    if (hasTokenMatch(desc, existing.skill)) {
       seen.add(existing.skill);
       suggestions.push({
         skill: existing.skill,
@@ -320,6 +347,41 @@ export function suggestSkills(taskDescription, existingSkills = []) {
         last_used: existing.last_used,
         learnings: existing.learnings,
         contexts: existing.contexts,
+        description: existing.description,
+      });
+      continue;
+    }
+
+    // Check if any context matches (token-based)
+    if (existing.contexts.some(ctx => hasTokenMatch(desc, ctx))) {
+      seen.add(existing.skill);
+      suggestions.push({
+        skill: existing.skill,
+        category: existing.category,
+        keywords: existing.contexts,
+        tracked: true,
+        usage_count: existing.usage_count,
+        last_used: existing.last_used,
+        learnings: existing.learnings,
+        contexts: existing.contexts,
+        description: existing.description,
+      });
+      continue;
+    }
+
+    // Check if any learning matches (token-based)
+    if (existing.learnings.some(learning => hasTokenMatch(desc, learning))) {
+      seen.add(existing.skill);
+      suggestions.push({
+        skill: existing.skill,
+        category: existing.category,
+        keywords: existing.contexts,
+        tracked: true,
+        usage_count: existing.usage_count,
+        last_used: existing.last_used,
+        learnings: existing.learnings,
+        contexts: existing.contexts,
+        description: existing.description,
       });
     }
   }
