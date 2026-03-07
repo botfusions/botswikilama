@@ -4,6 +4,7 @@
 import os from "os";
 import path from "path";
 import fs from "fs";
+import Fuse from "fuse.js";
 
 const MEMORY_DIR = path.join(os.homedir(), ".lemma");
 const MEMORY_FILE = path.join(MEMORY_DIR, "memory.jsonl");
@@ -215,7 +216,8 @@ export function decayConfidence(fragments) {
 }
 
 /**
- * Execute search, semantic relevance matching and top-k truncating.
+ * Execute fuzzy search using Fuse.js with typo tolerance and partial matching.
+ * Falls back to confidence-based sorting when no query.
  * Updates lastAccessed parameter as a reading effect.
  * @param {Array<object>} fragments - Fetched DB fragments
  * @param {string|null} query - User search term
@@ -225,49 +227,51 @@ export function decayConfidence(fragments) {
 export function searchAndSortFragments(fragments, query = null, topK = 30) {
   const nowDate = new Date().toISOString();
 
-  let results = fragments.map(frag => {
-    let relevance = frag.confidence * 10; // Default weight is confidence
+  // No query: sort by confidence only
+  if (!query) {
+    const sorted = [...fragments]
+      .sort((a, b) => b.confidence - a.confidence)
+      .slice(0, topK);
 
-    if (query) {
-      // Bump score heavily if keywords appear in text
-      const queryTokens = query.toLowerCase().split(/\s+/);
-      const titleLower = frag.title.toLowerCase();
-      const fragLower = frag.fragment.toLowerCase();
-
-      let matched = false;
-      for (const token of queryTokens) {
-        if (titleLower.includes(token) || fragLower.includes(token)) {
-          relevance += 15;
-          matched = true;
-        }
-      }
-
-      // Heavily penalize disjoint results if query exists but didn't match
-      if (!matched) {
-        relevance -= 50;
-      }
-    }
-
-    return { frag, relevance };
-  });
-
-  // Exclude un-relevant search results
-  if (query) {
-    results = results.filter(r => r.relevance >= 0);
+    sorted.forEach(frag => { frag.lastAccessed = nowDate; });
+    return sorted;
   }
 
-  // Sort descending by calculated metric
-  results.sort((a, b) => b.relevance - a.relevance);
+  // Fuse.js configuration for fuzzy search
+  const fuseOptions = {
+    keys: [
+      { name: 'title', weight: 0.4 },
+      { name: 'fragment', weight: 0.6 }
+    ],
+    threshold: 0.3,           // Lower = stricter (0.0 = exact, 1.0 = match all)
+    distance: 100,            // Max character distance for fuzzy match
+    minMatchCharLength: 2,    // Minimum characters that must match
+    includeScore: true,
+    ignoreLocation: true,     // Search anywhere in string
+    findAllMatches: true
+  };
 
-  // Truncate to top K
-  const topResults = results.slice(0, topK).map(r => r.frag);
+  const fuse = new Fuse(fragments, fuseOptions);
+  const fuseResults = fuse.search(query, { limit: topK });
 
-  // Mutably update their lastAccessed metrics
-  topResults.forEach(frag => {
-    frag.lastAccessed = nowDate;
-  });
+  // If Fuse finds results, use them
+  if (fuseResults.length > 0) {
+    const topResults = fuseResults.map(r => r.item);
 
-  return topResults;
+    // Boost by confidence for final ranking within fuzzy results
+    topResults.sort((a, b) => b.confidence - a.confidence);
+
+    topResults.forEach(frag => { frag.lastAccessed = nowDate; });
+    return topResults;
+  }
+
+  // Fallback: confidence-based if no fuzzy matches
+  const fallback = [...fragments]
+    .sort((a, b) => b.confidence - a.confidence)
+    .slice(0, topK);
+
+  fallback.forEach(frag => { frag.lastAccessed = nowDate; });
+  return fallback;
 }
 
 /**

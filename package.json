@@ -11,11 +11,18 @@
     "start": "node memory.js",
     "test": "node test.js"
   },
-  "keywords": ["mcp", "memory", "llm", "claude", "persistent"],
+  "keywords": [
+    "mcp",
+    "memory",
+    "llm",
+    "claude",
+    "persistent"
+  ],
   "author": "",
   "license": "MIT",
   "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.0.0"
+    "@modelcontextprotocol/sdk": "^1.0.0",
+    "fuse.js": "^7.1.0"
   },
   "engines": {
     "node": ">=18.0.0"

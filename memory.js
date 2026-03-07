@@ -64,7 +64,7 @@ When learning a complex methodology (e.g., "X Viral Growth Engine", "TDD Workflo
 **Skill Practice:**
 Record usage via \`skill_practice\` to increment experience counters and save specific execution learnings.
 
-**Categories:** frontend | backend | language | database | tool
+**Categories:** frontend | backend | database | tool | language | design | security | devops | mobile
 
 **For skill suggestions:** Use skill_suggest tool (NOT file search!)
 </skill_tracking>
@@ -690,6 +690,8 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
               "webpack": { skill: "webpack", category: "tool" },
               "vite": { skill: "vite", category: "tool" },
               "docker": { skill: "docker", category: "tool" },
+              "@modelcontextprotocol/sdk": { skill: "mcp", category: "tool" },
+              "zod": { skill: "zod", category: "tool" },
             };
 
             for (const [pkgName] of Object.entries(deps)) {
@@ -701,6 +703,28 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           } catch {
             // Ignore parse errors
           }
+        }
+
+        // --- File-based Discovery Enhancement ---
+        try {
+          const files = fs.readdirSync(cwd);
+          const fileMappings = [
+            { pattern: /\.js$/, skill: "javascript", category: "language" },
+            { pattern: /\.ts$/, skill: "typescript", category: "language" },
+            { pattern: /tsconfig\.json$/, skill: "typescript", category: "language" },
+            { pattern: /\.mcp\.json$|claude_desktop_config\.json$/, skill: "mcp", category: "tool" },
+          ];
+
+          for (const mapping of fileMappings) {
+            if (files.some(f => mapping.pattern.test(f))) {
+              // Only add if not already in discovered (to avoid duplicates)
+              if (!discovered.some(d => d.skill === mapping.skill)) {
+                discovered.push({ skill: mapping.skill, category: mapping.category });
+              }
+            }
+          }
+        } catch {
+          // Ignore readdir errors
         }
 
         // Register discovered skills

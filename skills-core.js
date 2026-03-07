@@ -4,6 +4,7 @@
 import os from "os";
 import path from "path";
 import fs from "fs";
+import Fuse from "fuse.js";
 
 const MEMORY_DIR = path.join(os.homedir(), ".lemma");
 const SKILLS_FILE = path.join(MEMORY_DIR, "skills.jsonl");
@@ -294,83 +295,92 @@ function hasTokenMatch(text, target) {
 }
 
 /**
- * Suggest skills based on task description
+ * Suggest skills based on task description using fuzzy search
  * @param {string} taskDescription - Task/query description
  * @param {Array<object>} existingSkills - Current tracked skills
  * @returns {object} { suggested: [], missing: [], relevant: [] }
  */
 export function suggestSkills(taskDescription, existingSkills = []) {
-  const desc = taskDescription.toLowerCase();
   const suggestions = [];
   const seen = new Set();
 
-  // Get all skill definitions
-  const allSkillDefs = Object.values(TASK_SKILL_MAP).flat();
+  // Fuse.js configuration for skill matching
+  const fuseOptions = {
+    keys: ['skill', 'keywords', 'contexts', 'learnings', 'description'],
+    threshold: 0.45,           // Tolerate typos and partial matches
+    distance: 100,
+    minMatchCharLength: 2,
+    includeScore: true,
+    ignoreLocation: true,
+    findAllMatches: true
+  };
 
-  // Check each skill definition against task description
-  for (const skillDef of allSkillDefs) {
+  // 1. Search in TASK_SKILL_MAP using Fuse
+  const allSkillDefs = Object.values(TASK_SKILL_MAP).flat().map(def => ({
+    ...def,
+    keywords: def.keywords || []
+  }));
+
+  const staticFuse = new Fuse(allSkillDefs, {
+    ...fuseOptions,
+    keys: ['skill', 'keywords']
+  });
+
+  const staticResults = staticFuse.search(taskDescription, { limit: 20 });
+
+  for (const result of staticResults) {
+    const skillDef = result.item;
     if (seen.has(skillDef.skill)) continue;
+    seen.add(skillDef.skill);
 
-    // Check if skill name or keywords match (using token matching)
-    const matches =
-      hasTokenMatch(desc, skillDef.skill) ||
-      skillDef.keywords.some(kw => hasTokenMatch(desc, kw));
+    const existing = existingSkills.find(s => s.skill === skillDef.skill);
+    suggestions.push({
+      ...skillDef,
+      tracked: !!existing,
+      usage_count: existing?.usage_count || 0,
+      last_used: existing?.last_used || null,
+      learnings: existing?.learnings || [],
+      contexts: existing?.contexts || [],
+    });
+  }
 
-    if (matches) {
-      seen.add(skillDef.skill);
-      const existing = existingSkills.find(s => s.skill === skillDef.skill);
+  // 2. Search in tracked skills using Fuse (fuzzy on name, contexts, learnings, description)
+  if (existingSkills.length > 0) {
+    const trackedFuse = new Fuse(existingSkills, {
+      ...fuseOptions,
+      keys: ['skill', 'contexts', 'learnings', 'description']
+    });
+
+    const trackedResults = trackedFuse.search(taskDescription, { limit: 20 });
+
+    for (const result of trackedResults) {
+      const existing = result.item;
+      if (seen.has(existing.skill)) continue;
+      seen.add(existing.skill);
+
       suggestions.push({
-        ...skillDef,
-        tracked: !!existing,
-        usage_count: existing?.usage_count || 0,
-        last_used: existing?.last_used || null,
-        learnings: existing?.learnings || [],
-        contexts: existing?.contexts || [],
+        skill: existing.skill,
+        category: existing.category,
+        keywords: existing.contexts,
+        tracked: true,
+        usage_count: existing.usage_count,
+        last_used: existing.last_used,
+        learnings: existing.learnings,
+        contexts: existing.contexts,
+        description: existing.description,
       });
     }
   }
 
-  // Also check tracked skills that might not be in TASK_SKILL_MAP
-  // Match by skill name, contexts, and learnings
+  // 3. Fallback: token-based matching for anything Fuse might have missed
+  const desc = taskDescription.toLowerCase();
   for (const existing of existingSkills) {
     if (seen.has(existing.skill)) continue;
 
-    // Check if skill name matches (token-based)
-    if (hasTokenMatch(desc, existing.skill)) {
-      seen.add(existing.skill);
-      suggestions.push({
-        skill: existing.skill,
-        category: existing.category,
-        keywords: existing.contexts,
-        tracked: true,
-        usage_count: existing.usage_count,
-        last_used: existing.last_used,
-        learnings: existing.learnings,
-        contexts: existing.contexts,
-        description: existing.description,
-      });
-      continue;
-    }
-
-    // Check if any context matches (token-based)
-    if (existing.contexts.some(ctx => hasTokenMatch(desc, ctx))) {
-      seen.add(existing.skill);
-      suggestions.push({
-        skill: existing.skill,
-        category: existing.category,
-        keywords: existing.contexts,
-        tracked: true,
-        usage_count: existing.usage_count,
-        last_used: existing.last_used,
-        learnings: existing.learnings,
-        contexts: existing.contexts,
-        description: existing.description,
-      });
-      continue;
-    }
-
-    // Check if any learning matches (token-based)
-    if (existing.learnings.some(learning => hasTokenMatch(desc, learning))) {
+    // Token-based fallback
+    if (hasTokenMatch(desc, existing.skill) ||
+        existing.contexts.some(ctx => hasTokenMatch(desc, ctx)) ||
+        existing.learnings.some(l => hasTokenMatch(desc, l))) {
       seen.add(existing.skill);
       suggestions.push({
         skill: existing.skill,
