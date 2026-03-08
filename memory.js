@@ -64,7 +64,11 @@ When learning a complex methodology (e.g., "X Viral Growth Engine", "TDD Workflo
 **Skill Practice:**
 Record usage via \`skill_practice\` to increment experience counters and save specific execution learnings.
 
-**Categories:** frontend | backend | database | tool | language | design | security | devops | mobile
+**Categories:**
+- Web: web-frontend | web-backend | data-storage | dev-tool
+- Mobile: mobile-frontend
+- Game: game-frontend | game-backend | game-tool | game-design
+- Cross: app-security | ui-design | infra-devops | programming-language
 
 **For skill suggestions:** Use skill_suggest tool (NOT file search!)
 </skill_tracking>
