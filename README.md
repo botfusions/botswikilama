@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="assets/logo.png" width="200" alt="Lemma Logo">
+</p>
+
 # Lemma - Persistent Memory for LLMs via MCP
 
 [English](README.md) | [Türkçe](README.tr.md)
@@ -106,6 +110,25 @@ If you have cloned the repository locally, use this configuration:
     }
   }
 }
+```
+
+---
+
+## 🌍 Publishing & Distribution
+
+### Publish to Smithery.ai (Recommended)
+
+Smithery is the primary registry for MCP servers. To publish Lemma:
+
+1.  **Login to [Smithery.ai](https://smithery.ai)** using your GitHub account.
+2.  Click on **"Import Repository"**.
+3.  Select `xenitV1/lemma` (or your fork).
+4.  Smithery will automatically detect the project and list it for thousands of users.
+
+### NPM (Optional)
+While Lemma can be run via `npx` directly from GitHub, you can also publish to NPM if you prefer:
+```bash
+npm publish --access public
 ```
 
 **Manual configuration** (if needed):
