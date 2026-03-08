@@ -126,17 +126,6 @@ If you have cloned the repository locally, use this configuration:
 
 ---
 
-## 🌍 Publishing & Distribution
-
-### Smithery.ai
-
-Smithery is the primary registry for MCP servers. To publish or use Lemma:
-
-1.  **Login to [Smithery.ai](https://smithery.ai)** using your GitHub account.
-2.  Click on **"Import Repository"**.
-3.  Select `xenitV1/lemma` (or your fork).
-4.  Smithery will automatically analyze, Dockerize, and list the server for all users.
-
 ### NPM (Optional)
 While Lemma can be run via `npx` directly from GitHub, you can also publish to NPM if you prefer:
 ```bash

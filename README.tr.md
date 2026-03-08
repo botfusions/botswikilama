@@ -126,17 +126,6 @@ Eğer depoyu yerel olarak klonladıysanız, bu konfigürasyonu kullanın:
 
 ---
 
-## 🌍 Yayınlama ve Dağıtım
-
-### Smithery.ai
-
-Smithery, MCP sunucuları için ana merkezdir. Lemma'yı burada yayınlamak için:
-
-1.  **[Smithery.ai](https://smithery.ai)** adresine GitHub hesabınızla giriş yapın.
-2.  **"Import Repository"** butonuna tıklayın.
-3.  `xenitV1/lemma` deponuzu seçin.
-4.  Smithery projeyi otomatik olarak tarayacak ve binlerce kullanıcı için erişilebilir hale getirecektir.
-
 ### NPM (Opsiyonel)
 Lemma, `npx` ile doğrudan GitHub üzerinden çalıştırılabilse de, isterseniz NPM'de de yayınlayabilirsiniz:
 ```bash
