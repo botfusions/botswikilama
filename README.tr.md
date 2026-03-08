@@ -61,14 +61,26 @@ Bellekler JSONL formatında şu adreste saklanır:
 | **macOS** | `/Users/{kullanıcı}/.lemma/memory.jsonl` |
 | **Linux** | `/home/{kullanıcı}/.lemma/memory.jsonl` |
 
-## Hızlı Başlangıç (Kurulum Gerektirmez)
+## Hızlı Başlangıç
 
-Lemma'yı kullanmanın en kolay yolu `npx` kullanarak doğrudan GitHub üzerinden çalıştırmaktır. Depoyu (repository) indirmenize bile gerek yok!
-
-Bunu MCP istemci konfigürasyonunuza ekleyin:
+Lemma'yı kullanmanın önerilen yolu **JSR** üzerindendir. Bunu MCP istemci konfigürasyonunuza ekleyin:
 
 **Claude Desktop (Windows):** `%APPDATA%\Claude\claude_desktop_config.json`  
 **Claude Desktop (macOS):** `~/Library/Application Support/Claude/claude_desktop_config.json`
+
+```json
+{
+  "mcpServers": {
+    "lemma": {
+      "command": "npx",
+      "args": ["-y", "jsr", "@lemma/lemma"]
+    }
+  }
+}
+```
+
+### Alternatif: Doğrudan GitHub Üzerinden Çalıştırın
+JSR kullanmak istemiyorsanız, Lemma'yı doğrudan GitHub üzerinden de çalıştırabilirsiniz:
 
 ```json
 {
@@ -115,14 +127,6 @@ Eğer depoyu yerel olarak klonladıysanız, bu konfigürasyonu kullanın:
 ---
 
 ## 🌍 Yayınlama ve Dağıtım
-
-### JSR (jsr.io) (Önerilen)
-
-JSR, modern ve TypeScript öncelikli bir pakat kayıt sistemidir. Lemma'yı JSR üzerinden eklemek için:
-
-```bash
-npx jsr add @lemma/lemma
-```
 
 ### Smithery.ai
 

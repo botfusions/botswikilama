@@ -61,14 +61,26 @@ Memories are stored in JSONL format at:
 | **macOS** | `/Users/{username}/.lemma/memory.jsonl` |
 | **Linux** | `/home/{username}/.lemma/memory.jsonl` |
 
-## Quick Start (No Installation Required)
+## Quick Start
 
-The easiest way to use Lemma is to run it directly from GitHub using `npx`. You don't even need to download the repository!
-
-Add this to your MCP client configuration:
+The recommended way to use Lemma is via **JSR**. Add this to your MCP client configuration:
 
 **Claude Desktop (Windows):** `%APPDATA%\Claude\claude_desktop_config.json`  
 **Claude Desktop (macOS):** `~/Library/Application Support/Claude/claude_desktop_config.json`
+
+```json
+{
+  "mcpServers": {
+    "lemma": {
+      "command": "npx",
+      "args": ["-y", "jsr", "@lemma/lemma"]
+    }
+  }
+}
+```
+
+### Alternative: Run directly from GitHub
+If you don't want to use JSR, you can run Lemma directly from GitHub:
 
 ```json
 {
@@ -115,14 +127,6 @@ If you have cloned the repository locally, use this configuration:
 ---
 
 ## 🌍 Publishing & Distribution
-
-### JSR (jsr.io) (Recommended)
-
-JSR is a modern, TypeScript-first registry. To install Lemma via JSR:
-
-```bash
-npx jsr add @lemma/lemma
-```
 
 ### Smithery.ai
 
