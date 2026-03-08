@@ -116,20 +116,26 @@ If you have cloned the repository locally, use this configuration:
 
 ## 🌍 Publishing & Distribution
 
-### Publish to Smithery.ai (Recommended)
+### Smithery.ai (Recommended)
 
-Smithery is the primary registry for MCP servers. To publish Lemma:
+Smithery is the primary registry for MCP servers. To publish or use Lemma:
 
 1.  **Login to [Smithery.ai](https://smithery.ai)** using your GitHub account.
 2.  Click on **"Import Repository"**.
 3.  Select `xenitV1/lemma` (or your fork).
-4.  Smithery will automatically detect the project and list it for thousands of users.
+4.  Smithery will automatically analyze, Dockerize, and list the server for all users.
 
 ### NPM (Optional)
 While Lemma can be run via `npx` directly from GitHub, you can also publish to NPM if you prefer:
 ```bash
 npm publish --access public
 ```
+
+---
+
+## ⚓ System Prompt
+
+The server provides a system prompt resource at `lemma://system-prompt`. MCP clients can discover this automatically.
 
 **Manual configuration** (if needed):
 
@@ -285,6 +291,17 @@ Auto-discover skills from current project by analyzing package.json dependencies
 **Parameters:** None
 
 **Returns:** List of newly discovered and registered skills
+
+### `skill_create`
+
+**New:** Create a new skill with a detailed manual, mission, and protocols. This allows you to establish a "Manager Skill" framework rather than just tracking usage.
+
+**Parameters:**
+- `skill` (string, required): Skill name (e.g., "X Viral Growth Engine")
+- `category` (string, required): Category
+- `description` (string, required): The full manual, protocols, mission, and templates for this skill.
+- `contexts` (array, optional): Initial contexts.
+- `learnings` (array, optional): Initial learnings.
 
 ### Skill File Location
 
