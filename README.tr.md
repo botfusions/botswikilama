@@ -116,7 +116,15 @@ Eğer depoyu yerel olarak klonladıysanız, bu konfigürasyonu kullanın:
 
 ## 🌍 Yayınlama ve Dağıtım
 
-### Smithery.ai'de Yayınlayın (Önerilen)
+### JSR (jsr.io) (Önerilen)
+
+JSR, modern ve TypeScript öncelikli bir pakat kayıt sistemidir. Lemma'yı JSR üzerinden eklemek için:
+
+```bash
+npx jsr add @lemma/lemma
+```
+
+### Smithery.ai
 
 Smithery, MCP sunucuları için ana merkezdir. Lemma'yı burada yayınlamak için:
 

@@ -116,7 +116,15 @@ If you have cloned the repository locally, use this configuration:
 
 ## 🌍 Publishing & Distribution
 
-### Smithery.ai (Recommended)
+### JSR (jsr.io) (Recommended)
+
+JSR is a modern, TypeScript-first registry. To install Lemma via JSR:
+
+```bash
+npx jsr add @lemma/lemma
+```
+
+### Smithery.ai
 
 Smithery is the primary registry for MCP servers. To publish or use Lemma:
 
