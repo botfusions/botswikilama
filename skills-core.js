@@ -114,6 +114,37 @@ export function saveSkills(skills) {
 }
 
 /**
+ * Promote information from a memory fragment into a skill's learnings
+ * @param {Array<object>} skills - Array of skill objects
+ * @param {string} skillName - Target skill name
+ * @param {string} category - Skill category (if new)
+ * @param {string} knowledge - The text to add as a learning
+ * @param {string} context - Optional context of the discovery
+ * @returns {object} The updated/created skill
+ */
+export function promoteToSkill(skills, skillName, category, knowledge, context = "") {
+  let skill = findSkill(skills, skillName);
+
+  if (!skill) {
+    skill = createSkill(skillName, category, `Created via distillation from memory.`, [context], [knowledge]);
+    skills.push(skill);
+  } else {
+    // Add to learnings if not already present
+    if (!skill.learnings.includes(knowledge)) {
+      skill.learnings.push(knowledge);
+    }
+    // Add to contexts if provided and not present
+    if (context && !skill.contexts.includes(context)) {
+      skill.contexts.push(context.toLowerCase().trim());
+    }
+    skill.usage_count += 1; // Distillation counts as a "practice" of the knowledge
+    skill.last_used = getToday();
+  }
+
+  return skill;
+}
+
+/**
  * Find a skill by name (case-insensitive)
  * @param {Array<object>} skills - Array of skill objects
  * @param {string} skillName - Skill name to find

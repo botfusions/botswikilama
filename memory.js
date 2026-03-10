@@ -28,8 +28,9 @@ When you see tool names (memory_read, memory_check, skill_get, etc.) or "Lemma" 
 <core_workflow>
 ## Core Workflow (FOLLOW THIS ORDER)
 1. **Session start** → Call memory_read
-2. **Before analysis** → Call memory_check (prevents redundant work)
-3. **After analysis** → Call memory_add (save distilled findings)
+2. **Context Discovery** → Call memory_check AND skill_suggest (select appropriate protocols)
+3. **Execution** → Use chosen skills to apply previous learnings
+4. **Closure** → Call memory_add AND skill_practice (save both facts and new experience)
 </core_workflow>
 
 <scope_rules>
