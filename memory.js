@@ -309,6 +309,28 @@ const TOOLS = [
       required: ["task"],
     },
   },
+  {
+    name: "skill_distill",
+    description: "Transform a memory fragment (static fact) into a skill's learning (procedural knowledge). Use this when a learned piece of information should become part of a permanent capability.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        memory_id: {
+          type: "string",
+          description: "ID of the memory fragment to distill",
+        },
+        skill: {
+          type: "string",
+          description: "Target skill name (e.g., 'react', 'git'). If it doesn't exist, it will be created.",
+        },
+        category: {
+          type: "string",
+          description: "Category for the skill (required only if creating a new skill).",
+        },
+      },
+      required: ["memory_id", "skill"],
+    },
+  },
 ];
 
 // Register list tools handler
@@ -768,11 +790,52 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         const allSkills = skills.loadSkills();
         const result = skills.suggestSkills(task, allSkills);
         const formatted = skills.formatSuggestions(result);
-
-        return {
-          content: [{ type: "text", text: formatted }],
-        };
-      }
+ 
+         return {
+           content: [{ type: "text", text: formatted }],
+         };
+       }
+ 
+       case "skill_distill": {
+         const memoryId = args?.memory_id;
+         const skillName = args?.skill;
+         const category = args?.category || "tool"; // Default to tool if not provided
+ 
+         if (!memoryId || !skillName) {
+           return {
+             content: [{ type: "text", text: "Error: 'memory_id' and 'skill' parameters are required" }],
+             isError: true,
+           };
+         }
+ 
+         const allMemory = core.loadMemory();
+         const fragment = allMemory.find(m => m.id === memoryId);
+ 
+         if (!fragment) {
+           return {
+             content: [{ type: "text", text: `Error: Memory fragment with ID '${memoryId}' not found.` }],
+             isError: true,
+           };
+         }
+ 
+         const allSkills = skills.loadSkills();
+         const updated = skills.promoteToSkill(
+           allSkills, 
+           skillName, 
+           category, 
+           fragment.fragment, 
+           fragment.project || "global"
+         );
+         
+         skills.saveSkills(allSkills);
+ 
+         let response = `Successfully distilled memory [${memoryId}] into skill "${updated.skill}" (${updated.category}).\n\n`;
+         response += skills.formatSkillDetail(updated);
+ 
+         return {
+           content: [{ type: "text", text: response }],
+         };
+       }
 
       default:
         return {
