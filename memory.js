@@ -331,6 +331,46 @@ const TOOLS = [
       required: ["memory_id", "skill"],
     },
   },
+  {
+    name: "skill_update",
+    description: "Update an existing skill's basic properties (name, category, description).",
+    inputSchema: {
+      type: "object",
+      properties: {
+        skill: {
+          type: "string",
+          description: "Current name of the skill to update",
+        },
+        new_name: {
+          type: "string",
+          description: "New name for the skill (optional)",
+        },
+        category: {
+          type: "string",
+          description: "New category for the skill (optional)",
+        },
+        description: {
+          type: "string",
+          description: "New description/manual for the skill (optional)",
+        },
+      },
+      required: ["skill"],
+    },
+  },
+  {
+    name: "skill_forget",
+    description: "Remove a skill from the persistent database.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        skill: {
+          type: "string",
+          description: "Name of the skill to remove",
+        },
+      },
+      required: ["skill"],
+    },
+  },
 ];
 
 // Register list tools handler
@@ -642,10 +682,67 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         let response = `${action} skill "${updated.skill}" (${updated.category}): ${updated.usage_count}x usage\n\n`;
         response += skills.formatSkillDetail(updated);
 
-        return {
-          content: [{ type: "text", text: response }],
-        };
-      }
+         return {
+           content: [{ type: "text", text: response }],
+         };
+       }
+ 
+       case "skill_update": {
+         const skillName = args?.skill;
+         const updates = {
+           skill: args?.new_name,
+           category: args?.category,
+           description: args?.description
+         };
+ 
+         if (!skillName) {
+           return {
+             content: [{ type: "text", text: "Error: 'skill' parameter is required" }],
+             isError: true,
+           };
+         }
+ 
+         const allSkills = skills.loadSkills();
+         const updated = skills.updateSkill(allSkills, skillName, updates);
+ 
+         if (!updated) {
+           return {
+             content: [{ type: "text", text: `Error: Skill "${skillName}" not found.` }],
+             isError: true,
+           };
+         }
+ 
+         skills.saveSkills(allSkills);
+         return {
+           content: [{ type: "text", text: `Updated skill "${updated.skill}":\n${skills.formatSkillDetail(updated)}` }],
+         };
+       }
+ 
+       case "skill_forget": {
+         const skillName = args?.skill;
+ 
+         if (!skillName) {
+           return {
+             content: [{ type: "text", text: "Error: 'skill' parameter is required" }],
+             isError: true,
+           };
+         }
+ 
+         const allSkills = skills.loadSkills();
+         const success = skills.deleteSkill(allSkills, skillName);
+ 
+         if (!success) {
+           return {
+             content: [{ type: "text", text: `Error: Skill "${skillName}" not found.` }],
+             isError: true,
+           };
+         }
+ 
+         skills.saveSkills(allSkills);
+         return {
+           content: [{ type: "text", text: `Successfully forgot skill: ${skillName}` }],
+         };
+       }
 
       case "skill_create": {
         const skillName = args?.skill;

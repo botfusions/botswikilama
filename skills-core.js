@@ -156,6 +156,43 @@ export function findSkill(skills, skillName) {
 }
 
 /**
+ * Update an existing skill's basic fields (id, skill, category, description)
+ * @param {Array<object>} skills - Array of skill objects
+ * @param {string} skillName - Name of the skill to update
+ * @param {object} updates - Fields to update
+ * @returns {object|null} Updated skill or null if not found
+ */
+export function updateSkill(skills, skillName, updates) {
+  const skill = findSkill(skills, skillName);
+  if (!skill) return null;
+
+  if (updates.skill) skill.skill = updates.skill.toLowerCase().trim();
+  if (updates.category) skill.category = updates.category.toLowerCase().trim();
+  if (updates.description) skill.description = updates.description.trim();
+  
+  return skill;
+}
+
+/**
+ * Delete a skill by name
+ * @param {Array<object>} skills - Array of skill objects
+ * @param {string} skillName - Name of the skill to delete
+ * @returns {boolean} True if deleted, false if not found
+ */
+export function deleteSkill(skills, skillName) {
+  const normalized = skillName.toLowerCase().trim();
+  const initialLength = skills.length;
+  const filtered = skills.filter(s => s.skill !== normalized);
+  
+  if (filtered.length === initialLength) return false;
+  
+  // Update the array in place (since it's passed by reference in some contexts)
+  skills.length = 0;
+  skills.push(...filtered);
+  return true;
+}
+
+/**
  * Practice (use) a skill - increment usage, update contexts/learnings
  * @param {Array<object>} skills - Array of skill objects (will be mutated)
  * @param {string} skillName - Skill name
