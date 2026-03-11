@@ -169,7 +169,7 @@ export function updateSkill(skills, skillName, updates) {
   if (updates.skill) skill.skill = updates.skill.toLowerCase().trim();
   if (updates.category) skill.category = updates.category.toLowerCase().trim();
   if (updates.description) skill.description = updates.description.trim();
-  
+
   return skill;
 }
 
@@ -183,9 +183,9 @@ export function deleteSkill(skills, skillName) {
   const normalized = skillName.toLowerCase().trim();
   const initialLength = skills.length;
   const filtered = skills.filter(s => s.skill !== normalized);
-  
+
   if (filtered.length === initialLength) return false;
-  
+
   // Update the array in place (since it's passed by reference in some contexts)
   skills.length = 0;
   skills.push(...filtered);
@@ -606,8 +606,8 @@ export function suggestSkills(taskDescription, existingSkills = []) {
 
     // Token-based fallback
     if (hasTokenMatch(desc, existing.skill) ||
-        existing.contexts.some(ctx => hasTokenMatch(desc, ctx)) ||
-        existing.learnings.some(l => hasTokenMatch(desc, l))) {
+      existing.contexts.some(ctx => hasTokenMatch(desc, ctx)) ||
+      existing.learnings.some(l => hasTokenMatch(desc, l))) {
       seen.add(existing.skill);
       suggestions.push({
         skill: existing.skill,
