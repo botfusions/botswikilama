@@ -1,0 +1,88 @@
+# Changelog
+
+## [0.1.4] - 2025-03-12
+
+### Changed
+- **MCP Resources Refactor**: Memory fragments and skills are now exposed as individual resources instead of bulk endpoints
+  - `list_resources` returns each record with metadata (title, description, scope)
+  - `read_resource` fetches only the requested single record
+- **New URI Patterns**:
+  - `lemma://memory/{id}` - Single memory fragment by ID
+  - `lemma://skills/{name}` - Single skill by name
+- This change reduces unnecessary token consumption when working with large datasets
+
+## [0.1.3] - 2025-03-12
+
+### Added
+- **Skill Categories**: Granular and structured skill categories for better organization
+  - Web: `web-frontend`, `web-backend`, `data-storage`, `dev-tool`
+  - Mobile: `mobile-frontend`
+  - Game: `game-frontend`, `game-backend`, `game-tool`, `game-design`
+  - Cross-cutting: `app-security`, `ui-design`, `infra-devops`, `programming-language`
+- **skill_distill Tool**: Promote memory fragments into reusable skills
+- **skill_update Tool**: Update existing skill properties
+- **skill_forget Tool**: Remove skills from tracking
+- **System Prompt Resource**: LLM identity, workflow, and rules exposed via `lemma://system-prompt`
+- **JSR Installation**: Added JSR configuration and installation guide
+
+### Changed
+- Core workflow redefined to integrate skill suggestion and practice
+- Removed Smithery.ai distribution instructions
+- Prioritized JSR as primary installation method
+
+### Removed
+- Legacy memory and skills core modules and their associated tests
+
+## [0.1.2] - 2025-03-08
+
+### Added
+- **Fuzzy Search**: Skill suggestions now use Fuse.js for typo-tolerant, partial matching
+- **Documentation**: Added research papers on Agentic Memory and Self-Distillation
+- **Tests**: Inline Fuse.js mock for testing
+
+## [0.1.1] - 2025-03-07
+
+### Added
+- **skill_create Tool**: Create new skills with detailed manuals
+- **skill_suggest Tool**: Suggest relevant skills based on task description
+- **Token-based Matching**: Improved skill suggestion across names, keywords, contexts, and learnings
+- **Description Field**: Added `description` field to `skill_practice` for detailed skill management
+- **Mandatory Fields**: Made `skill_practice` contexts and learnings mandatory
+
+### Changed
+- **System Prompt**: Restructured with XML tags, condensed and optimized
+- **memory_add**: Changed project default from auto-detection to explicit global scope (null)
+
+### Fixed
+- Full skill details now provided on update
+
+## [0.1.0] - 2025-03-05
+
+### Added
+- **Initial Release**: Lemma MCP memory system with project scoping
+- **Memory Tools**:
+  - `memory_read` - Read memory fragments with optional query
+  - `memory_check` - Check if memory exists for a project
+  - `memory_add` - Add new memory fragments
+  - `memory_update` - Update existing fragments
+  - `memory_forget` - Remove fragments
+  - `memory_list` - List all fragments
+- **Project Scoping**: Memory fragments can be scoped to specific projects or global
+- **Confidence Decay**: Time-based confidence decay for memory relevance
+- **lastAccessed Field**: Track when fragments were last accessed
+- **MANDATORY Flags**: Tool descriptions include mandatory parameter flags
+- **Zero-install Method**: Support for npx and GitHub installation
+- **MIT License**
+- **Turkish Translation**: Full README in Turkish
+
+### Documentation
+- Self-Distillation Enables Continual Learning research paper
+- Tool descriptions and usage examples
+
+---
+
+[0.1.4]: https://github.com/xenitV1/lemma/compare/v0.1.3...v0.1.4
+[0.1.3]: https://github.com/xenitV1/lemma/compare/v0.1.2...v0.1.3
+[0.1.2]: https://github.com/xenitV1/lemma/compare/v0.1.1...v0.1.2
+[0.1.1]: https://github.com/xenitV1/lemma/compare/v0.1.0...v0.1.1
+[0.1.0]: https://github.com/xenitV1/lemma/releases/tag/v0.1.0
