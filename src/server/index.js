@@ -33,32 +33,48 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
 });
 
 // Register list resources handler
+// Lists individual URIs for each memory fragment and skill (metadata only)
 server.setRequestHandler(ListResourcesRequestSchema, async () => {
-  return {
-    resources: [
-      {
-        uri: "lemma://system-prompt",
-        name: "Lemma System Prompt",
-        description: "System prompt for LLM clients using Lemma memory",
-        mimeType: "text/markdown",
-      },
-      {
-        uri: "lemma://memory",
-        name: "Memory Fragments",
-        description: "Current memory fragments (raw JSON)",
-        mimeType: "application/json",
-      },
-      {
-        uri: "lemma://skills",
-        name: "Skills Database",
-        description: "Tracked skills with usage statistics (raw JSON)",
-        mimeType: "application/json",
-      },
-    ],
-  };
+  const resources = [
+    {
+      uri: "lemma://system-prompt",
+      name: "Lemma System Prompt",
+      description: "System prompt for LLM clients using Lemma memory",
+      mimeType: "text/markdown",
+    },
+  ];
+
+  // List each memory fragment as individual resource (metadata only)
+  const memory = core.loadMemory();
+  for (const frag of memory) {
+    const scopeTag = frag.project ? `[${frag.project}]` : "[global]";
+    resources.push({
+      uri: `lemma://memory/${frag.id}`,
+      name: `Memory: ${frag.title}`,
+      description: `${scopeTag} confidence: ${(frag.confidence * 100).toFixed(0)}%`,
+      mimeType: "application/json",
+    });
+  }
+
+  // List each skill as individual resource (metadata only)
+  const allSkills = skills.loadSkills();
+  for (const skill of allSkills) {
+    resources.push({
+      uri: `lemma://skills/${skill.skill}`,
+      name: `Skill: ${skill.skill}`,
+      description: `[${skill.category}] ${skill.usage_count}x usage, ${skill.learnings.length} learnings`,
+      mimeType: "application/json",
+    });
+  }
+
+  return { resources };
 });
 
 // Register read resource handler
+// Supports URI patterns:
+// - lemma://system-prompt
+// - lemma://memory/{id} - single memory fragment
+// - lemma://skills/{name} - single skill by name
 server.setRequestHandler(ReadResourceRequestSchema, async (request) => {
   const { uri } = request.params;
 
@@ -74,27 +90,43 @@ server.setRequestHandler(ReadResourceRequestSchema, async (request) => {
     };
   }
 
-  if (uri === "lemma://memory") {
+  // Single memory fragment by ID: lemma://memory/{id}
+  if (uri.startsWith("lemma://memory/")) {
+    const id = uri.replace("lemma://memory/", "");
     const memory = core.loadMemory();
+    const fragment = memory.find(f => f.id === id);
+
+    if (!fragment) {
+      throw new Error(`Memory fragment not found: ${id}`);
+    }
+
     return {
       contents: [
         {
           uri,
           mimeType: "application/json",
-          text: JSON.stringify(memory, null, 2),
+          text: JSON.stringify(fragment, null, 2),
         },
       ],
     };
   }
 
-  if (uri === "lemma://skills") {
+  // Single skill by name: lemma://skills/{name}
+  if (uri.startsWith("lemma://skills/")) {
+    const skillName = uri.replace("lemma://skills/", "").toLowerCase();
     const allSkills = skills.loadSkills();
+    const skill = allSkills.find(s => s.skill === skillName);
+
+    if (!skill) {
+      throw new Error(`Skill not found: ${skillName}`);
+    }
+
     return {
       contents: [
         {
           uri,
           mimeType: "application/json",
-          text: JSON.stringify(allSkills, null, 2),
+          text: JSON.stringify(skill, null, 2),
         },
       ],
     };
