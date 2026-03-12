@@ -1,8 +1,0 @@
-{
-  "permissions": {
-    "allow": [
-      "Bash(node \"C:/dev/Lemma/memory.js\" --help)",
-      "Bash(node test.js)"
-    ]
-  }
-}

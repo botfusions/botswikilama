@@ -1,22 +1,31 @@
 {
   "name": "lemma-mcp",
-  "version": "0.1.2",
+  "version": "0.2.0",
   "description": "Persistent memory layer for LLMs via MCP",
   "type": "module",
-  "main": "memory.js",
+  "main": "src/index.js",
   "bin": {
-    "lemma": "./memory.js"
+    "lemma": "./src/index.js"
+  },
+  "exports": {
+    ".": "./src/index.js",
+    "./memory": "./src/memory/index.js",
+    "./skills": "./src/skills/index.js",
+    "./server": "./src/server/index.js"
   },
   "scripts": {
-    "start": "node memory.js",
-    "test": "node test.js"
+    "start": "node src/index.js",
+    "test": "node tests/test.js",
+    "test:original": "node test.js"
   },
   "keywords": [
     "mcp",
     "memory",
     "llm",
     "claude",
-    "persistent"
+    "persistent",
+    "skills",
+    "context"
   ],
   "author": "",
   "license": "MIT",
@@ -26,5 +35,9 @@
   },
   "engines": {
     "node": ">=18.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/xenitV1/lemma.git"
   }
 }

@@ -1,16 +1,19 @@
 {
-    "name": "@lemma/lemma",
-    "version": "0.1.2",
-    "exports": "./memory.js",
-    "publish": {
-        "include": [
-            "memory.js",
-            "memory-core.js",
-            "skills-core.js",
-            "package.json",
-            "README.md",
-            "LICENSE",
-            "assets/logo.png"
-        ]
-    }
+  "name": "@lemma/lemma",
+  "version": "0.2.0",
+  "exports": {
+    ".": "./src/index.js",
+    "./memory": "./src/memory/index.js",
+    "./skills": "./src/skills/index.js",
+    "./server": "./src/server/index.js"
+  },
+  "publish": {
+    "include": [
+      "src/**/*.js",
+      "package.json",
+      "README.md",
+      "LICENSE",
+      "assets/logo.png"
+    ]
+  }
 }

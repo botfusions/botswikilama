@@ -15,7 +15,7 @@ async function importWithOverride(memoryFilePath) {
   // Create a temporary module that overrides the MEMORY_FILE
   const tempModulePath = path.join(tempDir, `memory-core-${Date.now()}.mjs`);
   const originalCode = await fs.readFile(
-    path.join(__dirname, "memory-core.js"),
+    path.join(__dirname, "../src/memory/core.js"),
     "utf-8"
   );
 
@@ -511,7 +511,7 @@ async function test_detectProject_returnsProjectName() {
 async function importSkillsWithOverride(skillsFilePath) {
   const tempModulePath = path.join(tempDir, `skills-core-${Date.now()}.mjs`);
   const originalCode = await fs.readFile(
-    path.join(__dirname, "skills-core.js"),
+    path.join(__dirname, "../src/skills/core.js"),
     "utf-8"
   );
 
@@ -559,8 +559,15 @@ class Fuse {
 }
 `;
 
+  // Resolve task-map.js path for import replacement
+  const taskMapPath = pathToFileURL(path.join(__dirname, "../src/skills/task-map.js")).href;
+
   const modifiedCode = originalCode
     .replace(/import Fuse from "fuse\.js";/, fuseMock)
+    .replace(
+      /import \{ TASK_SKILL_MAP \} from "\.\/task-map\.js";/,
+      `import { TASK_SKILL_MAP } from "${taskMapPath}";`
+    )
     .replace(
       /const SKILLS_FILE = path\.join\(MEMORY_DIR, "skills\.jsonl"\);/,
       `const SKILLS_FILE = "${normalizedPath}";`
