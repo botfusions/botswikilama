@@ -95,6 +95,22 @@ If you don't want to use JSR, you can run Lemma directly from GitHub:
 
 ---
 
+## 💡 Important Recommendation for New Users
+
+If you are using Lemma for the first time, please consider this advice:
+
+When you first start using the system, your **Skills** and **Memory** will be empty. For the system to use Lemma fully automatically and effectively, you need to manually seed it with some initial information and skills. 
+
+**Follow these steps to get started:**
+1. Ask an AI model to perform web research on a specific topic.
+2. Instruct it to save the findings to Lemma's memory following its core principles.
+3. Once you have some initial data, ask the system to create **Skills** based on the acquired knowledge.
+4. If you have existing `SKILL.md` files or documentation, read them into the system and ask Lemma to add them to its skill set.
+
+By doing this, the system will gradually develop its own knowledge base and skill set more effectively over time.
+
+---
+
 ## 🚀 Manual Installation (For Developers)
 
 If you want to modify Lemma or run it locally:

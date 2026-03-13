@@ -134,6 +134,22 @@ npm publish --access public
 
 ---
 
+## 💡 Yeni Kullanıcılar İçin Önemli Tavsiye
+
+Sistemi ilk kez kullanan bir kullanıcıysanız lütfen bu öneriyi dikkate alın:
+
+Sistemi ilk kullanmaya başladığınızda **Yetenekler (Skills)** ve **Bellek (Memory)** havuzunuz boş olacaktır. Sistemin Lemma'yı tam otomatik ve verimli bir şekilde kullanabilmesi için, başlangıçta belirli bilgileri ve yetenekleri manuel olarak oluşturmanız gerekir.
+
+**Başlamak için şu yolu izleyin:**
+1. Bir AI modeline belirli bir konu hakkında web araştırması yapmasını söyleyin.
+2. Elde edilen bulguları Lemma'nın temel prensiplerine uygun olarak hafızasına eklemesini isteyin.
+3. Belirli bir bilgi birikimi oluştuktan sonra, sistemden edinilen bilgilerden yola çıkarak yeni **Yetenekler (Skills)** oluşturmasını isteyin.
+4. Eğer mevcut `SKILL.md` dosyalarınız veya dokümanlarınız varsa, bunları sisteme okutun ve Lemma prensiplerine uygun şekilde yetenek setine eklemesini isteyin.
+
+Böylelikle sistem zaman geçtikçe kendi bilgi havuzunu ve yetenek setini çok daha iyi bir şekilde geliştirecektir.
+
+---
+
 ## Sistem İstemi (System Prompt)
 
 SUNUCU, `lemma://system-prompt` adresinde bir sistem istemi kaynağı sağlar. MCP istemcileri bunu otomatik olarak keşfedebilir.
