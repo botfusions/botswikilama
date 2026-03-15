@@ -288,7 +288,8 @@ async function test_formatMemoryForLLM_correctFormat() {
     {
       id: "m123abc",
       title: "Important fact",
-      fragment: "This is the detailed content of important fact",
+      description: "Short summary of important fact",
+      fragment: "This is the detailed content of important fact that is very long and should not appear in summary mode",
       confidence: 1.0,
       source: "ai",
       created: "2026-03-01",
@@ -297,7 +298,8 @@ async function test_formatMemoryForLLM_correctFormat() {
     {
       id: "m789xyz",
       title: "Another fact",
-      fragment: "This is another detailed fact content",
+      description: "Summary of another fact",
+      fragment: "This is another detailed fact content that is also very long",
       confidence: 0.4,
       source: "user",
       created: "2026-03-01",
@@ -311,7 +313,8 @@ async function test_formatMemoryForLLM_correctFormat() {
   assert(formatted.includes("█████"), "Should include full confidence bar for 1.0");
   assert(formatted.includes("██░░░"), "Should include 0.4 confidence bar");
   assert(formatted.includes("Important fact"), "Should include title");
-  assert(formatted.includes("detailed content"), "Should include fragment content");
+  assert(formatted.includes("Short summary of important fact"), "Should include description (not full fragment)");
+  assert(!formatted.includes("very long and should not appear"), "Should NOT include full fragment content");
   assert(formatted.includes("m123abc"), "Should include fragment ID");
   assert(formatted.includes("🤖"), "Should include AI icon");
   assert(formatted.includes("👤"), "Should include user icon");
@@ -358,6 +361,7 @@ async function test_createFragment_validObject() {
   assert(fragment.id, "Should have id");
   assert.strictEqual(fragment.title, "Test Title", "Should have correct title");
   assert.strictEqual(fragment.fragment, "Test content", "Should have correct fragment text");
+  assert(fragment.description, "Should have auto-generated description");
   assert.strictEqual(fragment.project, "myproject", "Should have correct project");
   assert.strictEqual(fragment.source, "user", "Should have correct source");
   assert.strictEqual(fragment.confidence, 1.0, "Should start with confidence 1.0");
@@ -375,6 +379,7 @@ async function test_createFragment_autoTitle() {
   const shortFragment = core.createFragment("Short text", "ai", null, null);
   assert.strictEqual(shortFragment.title, "Short text", "Short text should be full title");
   assert.strictEqual(shortFragment.project, null, "Should have null project");
+  assert.strictEqual(shortFragment.description, "Short text", "Short description should be full text");
 
   // Long fragment - title should be truncated
   const longText = "This is a very long fragment that exceeds the forty character limit for auto title generation";
@@ -382,6 +387,8 @@ async function test_createFragment_autoTitle() {
   assert(longFragment.title.endsWith("..."), "Long title should end with ellipsis");
   assert.strictEqual(longFragment.title.length, 43, "Long title should be 40 chars + '...'");
   assert.strictEqual(longFragment.project, "testproject", "Should have project set");
+  assert(longFragment.description, "Should have auto-generated description");
+  assert(longFragment.description.length <= 120, "Description should be max 120 chars");
 }
 
 // Test 14: filterByProject - correct filtering
@@ -396,14 +403,15 @@ async function test_filterByProject_correctFiltering() {
     { id: "m004", fragment: "Project B", project: "projectB", confidence: 1.0, created: now, lastAccessed: now },
   ];
 
-  // Filter for projectA - should get global + projectA
+  // Filter for projectA - should get ONLY projectA (STRICT ISOLATION)
   const filteredA = core.filterByProject(fragments, "projectA");
-  assert.strictEqual(filteredA.length, 3, "Should have 3 fragments for projectA");
-  assert(filteredA.every(f => f.project === null || f.project === undefined || f.project === "projectA"));
+  assert.strictEqual(filteredA.length, 1, "Should have 1 fragment for projectA (strict isolation)");
+  assert.strictEqual(filteredA[0].project, "projectA", "Should only contain projectA fragments");
 
-  // Filter for projectB - should get global + projectB
+  // Filter for projectB - should get ONLY projectB (STRICT ISOLATION)
   const filteredB = core.filterByProject(fragments, "projectB");
-  assert.strictEqual(filteredB.length, 3, "Should have 3 fragments for projectB");
+  assert.strictEqual(filteredB.length, 1, "Should have 1 fragment for projectB (strict isolation)");
+  assert.strictEqual(filteredB[0].project, "projectB", "Should only contain projectB fragments");
 
   // No project context - should get only global
   const filteredNone = core.filterByProject(fragments, null);
@@ -480,14 +488,19 @@ async function test_findSimilarFragment_projectScope() {
 
   const fragments = [
     { id: "m001", title: "Config", fragment: "User uses dark mode theme", project: null, confidence: 1.0, created: now, lastAccessed: now },
-    { id: "m002", title: "Config", fragment: "User uses dark mode theme", project: "other-project", confidence: 1.0, created: now, lastAccessed: now },
+    { id: "m002", title: "Config", fragment: "User uses dark mode theme", project: "my-project", confidence: 1.0, created: now, lastAccessed: now },
+    { id: "m003", title: "Config", fragment: "User uses dark mode theme", project: "other-project", confidence: 1.0, created: now, lastAccessed: now },
   ];
 
-  // Should find global match when searching from any project
-  const matchGlobal = core.findSimilarFragment(fragments, "User uses dark mode theme", "my-project");
-  assert.strictEqual(matchGlobal.id, "m001", "Should match global fragment");
+  // STRICT ISOLATION: Should find ONLY same-project match (not global)
+  const matchProject = core.findSimilarFragment(fragments, "User uses dark mode theme", "my-project");
+  assert.strictEqual(matchProject.id, "m002", "Should match same-project fragment (not global)");
 
-  // Should not match when both are in different projects
+  // Should find global when searching with no project context
+  const matchGlobal = core.findSimilarFragment(fragments, "User uses dark mode theme", null);
+  assert.strictEqual(matchGlobal.id, "m001", "Should match global fragment when no project context");
+
+  // Should not match when in different project (strict isolation)
   const matchOther = core.findSimilarFragment(fragments, "Different content entirely", "my-project");
   assert.strictEqual(matchOther, null, "Should not match fragment from different project");
 }
@@ -504,18 +517,120 @@ async function test_detectProject_returnsProjectName() {
 }
 
 // ============================================
-// SKILLS TESTS
+// GUIDES TESTS
 // ============================================
 
-// Import skills module with path override
-async function importSkillsWithOverride(skillsFilePath) {
-  const tempModulePath = path.join(tempDir, `skills-core-${Date.now()}.mjs`);
+// Test: createFragment - explicit description
+async function test_createFragment_explicitDescription() {
+  const core = await importWithOverride(path.join(tempDir, "create-desc.jsonl"));
+
+  const fragment = core.createFragment("Long content here that goes on and on", "ai", "Title", "proj", "Custom description");
+  assert.strictEqual(fragment.description, "Custom description", "Should use explicit description");
+
+  const autoDesc = core.createFragment("Long content here that goes on and on", "ai", "Title", "proj");
+  assert(autoDesc.description, "Should auto-generate description when not provided");
+}
+
+// Test: createFragment - description generation for short vs long text
+async function test_createFragment_descriptionGeneration() {
+  const core = await importWithOverride(path.join(tempDir, "create-desc-gen.jsonl"));
+
+  // Very short text: description should be the text itself
+  const short = core.createFragment("Brief note", "ai");
+  assert.strictEqual(short.description, "Brief note", "Short text should be used as description directly");
+
+  // Long text: description should be truncated/summarized
+  const longText = "This is a very long memory fragment that contains a lot of detailed information about various topics and should be summarized for the preview mode. The full content is much longer than what the description should show.";
+  const long = core.createFragment(longText, "ai");
+  assert(long.description.length <= 120, "Long description should be max 120 chars");
+  assert(!long.description.includes("should be summarized for the preview mode"), "Should not include later parts of long text");
+}
+
+// Test: formatMemoryDetail - shows full content
+async function test_formatMemoryDetail_fullContent() {
+  const core = await importWithOverride(path.join(tempDir, "format-detail.jsonl"));
+
+  const fragment = {
+    id: "m123abc",
+    title: "Test Memory",
+    description: "Short summary",
+    fragment: "This is the full detailed content that should appear in detail view",
+    confidence: 0.8,
+    source: "ai",
+    project: "testproj",
+    created: "2026-03-01T10:00:00.000Z",
+    accessed: 3,
+  };
+
+  const detail = core.formatMemoryDetail(fragment);
+
+  assert(detail.includes("=== MEMORY FRAGMENT DETAIL ==="), "Should include detail header");
+  assert(detail.includes("m123abc"), "Should include ID");
+  assert(detail.includes("Test Memory"), "Should include title");
+  assert(detail.includes("Short summary"), "Should include summary");
+  assert(detail.includes("This is the full detailed content"), "Should include FULL fragment content");
+  assert(detail.includes("[testproj]"), "Should include project scope");
+  assert(detail.includes("0.80"), "Should include confidence value");
+}
+
+// Test: formatMemoryDetail - null fragment
+async function test_formatMemoryDetail_null() {
+  const core = await importWithOverride(path.join(tempDir, "format-detail-null.jsonl"));
+
+  const detail = core.formatMemoryDetail(null);
+  assert(detail.includes("Fragment not found"), "Should indicate fragment not found");
+}
+
+// Test: formatMemoryDetail - global scope
+async function test_formatMemoryDetail_globalScope() {
+  const core = await importWithOverride(path.join(tempDir, "format-detail-global.jsonl"));
+
+  const fragment = {
+    id: "m999",
+    title: "Global Memory",
+    description: "A global note",
+    fragment: "Global content here",
+    confidence: 1.0,
+    source: "user",
+    project: null,
+    created: "2026-03-01",
+    accessed: 0,
+  };
+
+  const detail = core.formatMemoryDetail(fragment);
+  assert(detail.includes("[global]"), "Should show [global] for null project");
+  assert(detail.includes("👤"), "Should show user icon");
+}
+
+// Test: filterByProject - normalizes empty/whitespace strings
+async function test_filterByProject_normalizesEmptyStrings() {
+  const core = await importWithOverride(path.join(tempDir, "filter-normalize.jsonl"));
+  const now = new Date().toISOString();
+
+  const fragments = [
+    { id: "m001", fragment: "Global", project: null, confidence: 1.0, created: now, lastAccessed: now },
+    { id: "m002", fragment: "Project A", project: "projectA", confidence: 1.0, created: now, lastAccessed: now },
+  ];
+
+  // Empty string should behave like null (return only global)
+  const emptyStr = core.filterByProject(fragments, "");
+  assert.strictEqual(emptyStr.length, 1, "Empty string should return only global fragments");
+  assert.strictEqual(emptyStr[0].id, "m001", "Should return global fragment");
+
+  // Whitespace-only string should behave like null
+  const whitespace = core.filterByProject(fragments, "   ");
+  assert.strictEqual(whitespace.length, 1, "Whitespace should return only global fragments");
+}
+
+// Import guides module with path override
+async function importGuidesWithOverride(guidesFilePath) {
+  const tempModulePath = path.join(tempDir, `guides-core-${Date.now()}.mjs`);
   const originalCode = await fs.readFile(
-    path.join(__dirname, "../src/skills/core.js"),
+    path.join(__dirname, "../src/guides/core.js"),
     "utf-8"
   );
 
-  const normalizedPath = skillsFilePath.replace(/\\/g, "/");
+  const normalizedPath = guidesFilePath.replace(/\\/g, "/");
 
   // Fuse.js mock for tests
   const fuseMock = `
@@ -560,54 +675,54 @@ class Fuse {
 `;
 
   // Resolve task-map.js path for import replacement
-  const taskMapPath = pathToFileURL(path.join(__dirname, "../src/skills/task-map.js")).href;
+  const taskMapPath = pathToFileURL(path.join(__dirname, "../src/guides/task-map.js")).href;
 
   const modifiedCode = originalCode
     .replace(/import Fuse from "fuse\.js";/, fuseMock)
     .replace(
-      /import \{ TASK_SKILL_MAP \} from "\.\/task-map\.js";/,
-      `import { TASK_SKILL_MAP } from "${taskMapPath}";`
+      /import \{ TASK_GUIDE_MAP \} from "\.\/task-map\.js";/,
+      `import { TASK_GUIDE_MAP } from "${taskMapPath}";`
     )
     .replace(
-      /const SKILLS_FILE = path\.join\(MEMORY_DIR, "skills\.jsonl"\);/,
-      `const SKILLS_FILE = "${normalizedPath}";`
+      /const GUIDES_FILE = path\.join\(MEMORY_DIR, "guides\.jsonl"\);/,
+      `const GUIDES_FILE = "${normalizedPath}";`
     );
 
   await fs.writeFile(tempModulePath, modifiedCode);
   return import(pathToFileURL(tempModulePath).href);
 }
 
-// Test 20: generateSkillId - correct format
-async function test_skills_generateSkillId() {
-  const skills = await importSkillsWithOverride(path.join(tempDir, "skills-id.jsonl"));
+// Test 20: generateGuideId - correct format
+async function test_guides_generateGuideId() {
+  const guides = await importGuidesWithOverride(path.join(tempDir, "skills-id.jsonl"));
 
-  const id = skills.generateSkillId();
+  const id = guides.generateGuideId();
 
-  assert(id.startsWith("s"), "Skill ID should start with 's'");
+  assert(id.startsWith("g"), "Guide ID should start with 'g'");
   assert.strictEqual(id.length, 7, "Skill ID should be 7 characters long");
 
   const hexPart = id.slice(1);
   assert(/^[0-9a-f]{6}$/.test(hexPart), "Last 6 chars should be hexadecimal");
 }
 
-// Test 21: createSkill creates valid object
-async function test_skills_createSkill() {
-  const skills = await importSkillsWithOverride(path.join(tempDir, "skills-create.jsonl"));
-  const skill = skills.createSkill("React", "Frontend", "React library manual", ["hooks", "jsx"], ["useCallback önemli"]);
+// Test 21: createGuide creates valid object
+async function test_guides_createGuide() {
+  const guides = await importGuidesWithOverride(path.join(tempDir, "skills-create.jsonl"));
+  const guide = guides.createGuide("React", "Frontend", "React library manual", ["hooks", "jsx"], ["useCallback önemli"]);
 
-  assert.ok(skill.id.startsWith("s"), "ID should start with 's'");
-  assert.strictEqual(skill.skill, "react", "Skill name should be lowercase");
-  assert.strictEqual(skill.category, "frontend", "Category should be lowercase");
-  assert.strictEqual(skill.usage_count, 1, "Initial usage count should be 1");
-  assert.strictEqual(skill.contexts.length, 2, "Should have 2 contexts");
-  assert.strictEqual(skill.learnings.length, 1, "Should have 1 learning");
+  assert.ok(guide.id.startsWith("g"), "ID should start with 'g'");
+  assert.strictEqual(guide.guide, "react", "Skill name should be lowercase");
+  assert.strictEqual(guide.category, "frontend", "Category should be lowercase");
+  assert.strictEqual(guide.usage_count, 1, "Initial usage count should be 1");
+  assert.strictEqual(guide.contexts.length, 2, "Should have 2 contexts");
+  assert.strictEqual(guide.learnings.length, 1, "Should have 1 learning");
 }
 
-// Test 22: createSkill - normalizes inputs
-async function test_skills_createSkill_normalizesInputs() {
-  const skills = await importSkillsWithOverride(path.join(tempDir, "skills-normalize.jsonl"));
+// Test 22: createGuide - normalizes inputs
+async function test_guides_createGuide_normalizesInputs() {
+  const guides = await importGuidesWithOverride(path.join(tempDir, "skills-normalize.jsonl"));
 
-  const skill = skills.createSkill(
+  const guide = guides.createGuide(
     "  REACT  ",
     "  FRONTEND  ",
     "  Description  ",
@@ -615,38 +730,38 @@ async function test_skills_createSkill_normalizesInputs() {
     ["  Learning  ", ""]
   );
 
-  assert.strictEqual(skill.skill, "react", "Skill name should be trimmed and lowercase");
-  assert.strictEqual(skill.category, "frontend", "Category should be trimmed and lowercase");
-  assert.strictEqual(skill.description, "Description", "Description should be trimmed");
-  assert.strictEqual(skill.contexts.length, 2, "Empty contexts should be filtered");
-  assert.ok(skill.contexts.includes("hooks"), "Contexts should be lowercase");
+  assert.strictEqual(guide.guide, "react", "Skill name should be trimmed and lowercase");
+  assert.strictEqual(guide.category, "frontend", "Category should be trimmed and lowercase");
+  assert.strictEqual(guide.description, "Description", "Description should be trimmed");
+  assert.strictEqual(guide.contexts.length, 2, "Empty contexts should be filtered");
+  assert.ok(guide.contexts.includes("hooks"), "Contexts should be lowercase");
 }
 
-// Test 23: practiceSkill increments usage
-async function test_skills_practiceSkill() {
-  const skills = await importSkillsWithOverride(path.join(tempDir, "skills-practice.jsonl"));
-  const allSkills = [];
+// Test 23: practiceGuide increments usage
+async function test_guides_practiceGuide() {
+  const guides = await importGuidesWithOverride(path.join(tempDir, "skills-practice.jsonl"));
+  const allGuides = [];
 
   // First practice creates skill
-  const skill1 = skills.practiceSkill(allSkills, "React", "frontend");
+  const skill1 = guides.practiceGuide(allGuides, "React", "frontend");
   assert.strictEqual(skill1.usage_count, 1, "First practice should set usage to 1");
 
   // Second practice increments
-  const skill2 = skills.practiceSkill(allSkills, "React", "frontend");
+  const skill2 = guides.practiceGuide(allGuides, "React", "frontend");
   assert.strictEqual(skill2.usage_count, 2, "Second practice should increment to 2");
-  assert.strictEqual(allSkills.length, 1, "Should still be 1 skill");
+  assert.strictEqual(allGuides.length, 1, "Should still be 1 skill");
 }
 
-// Test 24: practiceSkill merges contexts and learnings
-async function test_skills_mergeContextsLearnings() {
-  const skills = await importSkillsWithOverride(path.join(tempDir, "skills-merge.jsonl"));
-  const allSkills = [];
+// Test 24: practiceGuide merges contexts and learnings
+async function test_guides_mergeContextsLearnings() {
+  const guides = await importGuidesWithOverride(path.join(tempDir, "skills-merge.jsonl"));
+  const allGuides = [];
 
   // Create with initial contexts/learnings
-  skills.practiceSkill(allSkills, "React", "frontend", "React manual", ["hooks"], ["learning1"]);
+  guides.practiceGuide(allGuides, "React", "frontend", "React manual", ["hooks"], ["learning1"]);
 
   // Add more contexts/learnings
-  const updated = skills.practiceSkill(allSkills, "React", "frontend", "", ["jsx", "hooks"], ["learning2"]);
+  const updated = guides.practiceGuide(allGuides, "React", "frontend", "", ["jsx", "hooks"], ["learning2"]);
 
   assert.strictEqual(updated.contexts.length, 2, "Should have 2 unique contexts");
   assert.strictEqual(updated.learnings.length, 2, "Should have 2 unique learnings");
@@ -654,93 +769,93 @@ async function test_skills_mergeContextsLearnings() {
   assert.ok(updated.contexts.includes("jsx"), "Should have jsx context");
 }
 
-// Test 25: practiceSkill - deduplicates learnings
-async function test_skills_practiceSkill_deduplicatesLearnings() {
-  const skills = await importSkillsWithOverride(path.join(tempDir, "skills-dedup.jsonl"));
-  const allSkills = [];
+// Test 25: practiceGuide - deduplicates learnings
+async function test_guides_practiceGuide_deduplicatesLearnings() {
+  const guides = await importGuidesWithOverride(path.join(tempDir, "skills-dedup.jsonl"));
+  const allGuides = [];
 
-  skills.practiceSkill(allSkills, "React", "frontend", "", [], ["useCallback prevents re-renders"]);
-  skills.practiceSkill(allSkills, "React", "frontend", "", [], ["useCallback prevents re-renders"]);
-  skills.practiceSkill(allSkills, "React", "frontend", "", [], ["useCallback prevents re-renders"]);
+  guides.practiceGuide(allGuides, "React", "frontend", "", [], ["useCallback prevents re-renders"]);
+  guides.practiceGuide(allGuides, "React", "frontend", "", [], ["useCallback prevents re-renders"]);
+  guides.practiceGuide(allGuides, "React", "frontend", "", [], ["useCallback prevents re-renders"]);
 
-  const found = skills.findSkill(allSkills, "React");
+  const found = guides.findGuide(allGuides, "React");
   assert.strictEqual(found.learnings.length, 1, "Should deduplicate identical learnings");
 }
 
-// Test 26: findSkill finds by name case insensitive
-async function test_skills_findSkill() {
-  const skills = await importSkillsWithOverride(path.join(tempDir, "skills-find.jsonl"));
-  const allSkills = [];
-  skills.practiceSkill(allSkills, "React", "frontend");
+// Test 26: findGuide finds by name case insensitive
+async function test_guides_findGuide() {
+  const guides = await importGuidesWithOverride(path.join(tempDir, "skills-find.jsonl"));
+  const allGuides = [];
+  guides.practiceGuide(allGuides, "React", "frontend");
 
-  const found1 = skills.findSkill(allSkills, "react");
+  const found1 = guides.findGuide(allGuides, "react");
   assert.ok(found1, "Should find with lowercase");
 
-  const found2 = skills.findSkill(allSkills, "REACT");
+  const found2 = guides.findGuide(allGuides, "REACT");
   assert.ok(found2, "Should find with uppercase");
 
-  const found3 = skills.findSkill(allSkills, "Vue");
+  const found3 = guides.findGuide(allGuides, "Vue");
   assert.strictEqual(found3, null, "Should not find non-existent skill");
 }
 
-// Test 27: getTopSkills sorts by usage
-async function test_skills_getTopSkills() {
-  const skills = await importSkillsWithOverride(path.join(tempDir, "skills-top.jsonl"));
-  const allSkills = [];
+// Test 27: getTopGuides sorts by usage
+async function test_guides_getTopGuides() {
+  const guides = await importGuidesWithOverride(path.join(tempDir, "skills-top.jsonl"));
+  const allGuides = [];
 
-  skills.practiceSkill(allSkills, "React", "frontend");
-  skills.practiceSkill(allSkills, "Vue", "frontend");
-  skills.practiceSkill(allSkills, "Vue", "frontend");
-  skills.practiceSkill(allSkills, "Angular", "frontend");
-  skills.practiceSkill(allSkills, "Angular", "frontend");
-  skills.practiceSkill(allSkills, "Angular", "frontend");
+  guides.practiceGuide(allGuides, "React", "frontend");
+  guides.practiceGuide(allGuides, "Vue", "frontend");
+  guides.practiceGuide(allGuides, "Vue", "frontend");
+  guides.practiceGuide(allGuides, "Angular", "frontend");
+  guides.practiceGuide(allGuides, "Angular", "frontend");
+  guides.practiceGuide(allGuides, "Angular", "frontend");
 
-  const top = skills.getTopSkills(allSkills, 10);
-  assert.strictEqual(top[0].skill, "angular", "Angular should be first (3 uses)");
-  assert.strictEqual(top[1].skill, "vue", "Vue should be second (2 uses)");
-  assert.strictEqual(top[2].skill, "react", "React should be third (1 use)");
+  const top = guides.getTopGuides(allGuides, 10);
+  assert.strictEqual(top[0].guide, "angular", "Angular should be first (3 uses)");
+  assert.strictEqual(top[1].guide, "vue", "Vue should be second (2 uses)");
+  assert.strictEqual(top[2].guide, "react", "React should be third (1 use)");
 }
 
-// Test 28: getTopSkills - respects limit
-async function test_skills_getTopSkills_respectsLimit() {
-  const skills = await importSkillsWithOverride(path.join(tempDir, "skills-limit.jsonl"));
-  const allSkills = [];
+// Test 28: getTopGuides - respects limit
+async function test_guides_getTopGuides_respectsLimit() {
+  const guides = await importGuidesWithOverride(path.join(tempDir, "skills-limit.jsonl"));
+  const allGuides = [];
 
   for (let i = 0; i < 10; i++) {
-    skills.practiceSkill(allSkills, `Skill${i}`, "frontend");
+    guides.practiceGuide(allGuides, `Skill${i}`, "frontend");
   }
 
-  const top = skills.getTopSkills(allSkills, 3);
+  const top = guides.getTopGuides(allGuides, 3);
   assert.strictEqual(top.length, 3, "Should return only 3 skills");
 }
 
-// Test 29: getSkillsByCategory - filters correctly
-async function test_skills_getSkillsByCategory() {
-  const skills = await importSkillsWithOverride(path.join(tempDir, "skills-category.jsonl"));
-  const allSkills = [];
+// Test 29: getGuidesByCategory - filters correctly
+async function test_guides_getGuidesByCategory() {
+  const guides = await importGuidesWithOverride(path.join(tempDir, "skills-category.jsonl"));
+  const allGuides = [];
 
-  skills.practiceSkill(allSkills, "React", "web-frontend");
-  skills.practiceSkill(allSkills, "Vue", "web-frontend");
-  skills.practiceSkill(allSkills, "NodeJS", "web-backend");
+  guides.practiceGuide(allGuides, "React", "web-frontend");
+  guides.practiceGuide(allGuides, "Vue", "web-frontend");
+  guides.practiceGuide(allGuides, "NodeJS", "web-backend");
 
-  const frontend = skills.getSkillsByCategory(allSkills, "web-frontend");
+  const frontend = guides.getGuidesByCategory(allGuides, "web-frontend");
   assert.strictEqual(frontend.length, 2, "Should have 2 frontend skills");
 
-  const backend = skills.getSkillsByCategory(allSkills, "web-backend");
+  const backend = guides.getGuidesByCategory(allGuides, "web-backend");
   assert.strictEqual(backend.length, 1, "Should have 1 backend skill");
 
-  const none = skills.getSkillsByCategory(allSkills, "nonexistent");
+  const none = guides.getGuidesByCategory(allGuides, "nonexistent");
   assert.strictEqual(none.length, 0, "Should return empty for nonexistent category");
 }
 
-// Test 30: updateSkill - updates fields
-async function test_skills_updateSkill() {
-  const skills = await importSkillsWithOverride(path.join(tempDir, "skills-update.jsonl"));
-  const allSkills = [];
+// Test 30: updateGuide - updates fields
+async function test_guides_updateGuide() {
+  const guides = await importGuidesWithOverride(path.join(tempDir, "skills-update.jsonl"));
+  const allGuides = [];
 
-  skills.practiceSkill(allSkills, "React", "frontend", "Old description");
+  guides.practiceGuide(allGuides, "React", "frontend", "Old description");
 
-  const updated = skills.updateSkill(allSkills, "React", {
+  const updated = guides.updateGuide(allGuides, "React", {
     skill: "ReactJS",
     category: "web-frontend",
     description: "New description"
@@ -752,45 +867,45 @@ async function test_skills_updateSkill() {
   assert.strictEqual(updated.description, "New description", "Should update description");
 }
 
-// Test 31: updateSkill - returns null for non-existent
-async function test_skills_updateSkill_notFound() {
-  const skills = await importSkillsWithOverride(path.join(tempDir, "skills-update-notfound.jsonl"));
-  const allSkills = [];
+// Test 31: updateGuide - returns null for non-existent
+async function test_guides_updateGuide_notFound() {
+  const guides = await importGuidesWithOverride(path.join(tempDir, "skills-update-notfound.jsonl"));
+  const allGuides = [];
 
-  const result = skills.updateSkill(allSkills, "NonExistent", { description: "test" });
+  const result = guides.updateGuide(allGuides, "NonExistent", { description: "test" });
   assert.strictEqual(result, null, "Should return null for non-existent skill");
 }
 
-// Test 32: deleteSkill - removes skill
-async function test_skills_deleteSkill() {
-  const skills = await importSkillsWithOverride(path.join(tempDir, "skills-delete.jsonl"));
-  const allSkills = [];
+// Test 32: deleteGuide - removes skill
+async function test_guides_deleteGuide() {
+  const guides = await importGuidesWithOverride(path.join(tempDir, "skills-delete.jsonl"));
+  const allGuides = [];
 
-  skills.practiceSkill(allSkills, "React", "frontend");
-  skills.practiceSkill(allSkills, "Vue", "frontend");
+  guides.practiceGuide(allGuides, "React", "frontend");
+  guides.practiceGuide(allGuides, "Vue", "frontend");
 
-  const result = skills.deleteSkill(allSkills, "React");
+  const result = guides.deleteGuide(allGuides, "React");
 
   assert.strictEqual(result, true, "Should return true when deleted");
-  assert.strictEqual(allSkills.length, 1, "Should have 1 skill remaining");
-  assert.strictEqual(allSkills[0].skill, "vue", "Vue should remain");
+  assert.strictEqual(allGuides.length, 1, "Should have 1 skill remaining");
+  assert.strictEqual(allGuides[0].skill, "vue", "Vue should remain");
 }
 
-// Test 33: deleteSkill - returns false for non-existent
-async function test_skills_deleteSkill_notFound() {
-  const skills = await importSkillsWithOverride(path.join(tempDir, "skills-delete-notfound.jsonl"));
-  const allSkills = [];
+// Test 33: deleteGuide - returns false for non-existent
+async function test_guides_deleteGuide_notFound() {
+  const guides = await importGuidesWithOverride(path.join(tempDir, "skills-delete-notfound.jsonl"));
+  const allGuides = [];
 
-  const result = skills.deleteSkill(allSkills, "NonExistent");
+  const result = guides.deleteGuide(allGuides, "NonExistent");
   assert.strictEqual(result, false, "Should return false for non-existent skill");
 }
 
-// Test 34: promoteToSkill - creates new skill from memory
-async function test_skills_promoteToSkill_createsNew() {
-  const skills = await importSkillsWithOverride(path.join(tempDir, "skills-promote.jsonl"));
-  const allSkills = [];
+// Test 34: promoteToGuide - creates new skill from memory
+async function test_guides_promoteToGuide_createsNew() {
+  const guides = await importGuidesWithOverride(path.join(tempDir, "skills-promote.jsonl"));
+  const allGuides = [];
 
-  const result = skills.promoteToSkill(allSkills, "React", "web-frontend", "useCallback prevents re-renders", "hooks");
+  const result = guides.promoteToGuide(allGuides, "React", "web-frontend", "useCallback prevents re-renders", "hooks");
 
   assert.ok(result, "Should return the skill");
   assert.strictEqual(result.skill, "react", "Should have correct skill name");
@@ -799,52 +914,52 @@ async function test_skills_promoteToSkill_createsNew() {
   assert.ok(result.contexts.includes("hooks"), "Should have the context");
 }
 
-// Test 35: promoteToSkill - adds to existing skill
-async function test_skills_promoteToSkill_addsToExisting() {
-  const skills = await importSkillsWithOverride(path.join(tempDir, "skills-promote-add.jsonl"));
-  const allSkills = [];
+// Test 35: promoteToGuide - adds to existing skill
+async function test_guides_promoteToGuide_addsToExisting() {
+  const guides = await importGuidesWithOverride(path.join(tempDir, "skills-promote-add.jsonl"));
+  const allGuides = [];
 
   // Create initial skill
-  skills.practiceSkill(allSkills, "React", "frontend", "Manual", ["hooks"], ["Initial learning"]);
+  guides.practiceGuide(allGuides, "React", "frontend", "Manual", ["hooks"], ["Initial learning"]);
 
   // Promote new knowledge
-  skills.promoteToSkill(allSkills, "React", "frontend", "New learning from memory", "jsx");
+  guides.promoteToGuide(allGuides, "React", "frontend", "New learning from memory", "jsx");
 
-  const found = skills.findSkill(allSkills, "React");
+  const found = guides.findGuide(allGuides, "React");
   assert.strictEqual(found.learnings.length, 2, "Should have 2 learnings");
   assert.ok(found.learnings.includes("New learning from memory"), "Should have new learning");
   assert.ok(found.contexts.includes("jsx"), "Should have new context");
 }
 
-// Test 36: promoteToSkill - deduplicates learnings
-async function test_skills_promoteToSkill_deduplicates() {
-  const skills = await importSkillsWithOverride(path.join(tempDir, "skills-promote-dedup.jsonl"));
-  const allSkills = [];
+// Test 36: promoteToGuide - deduplicates learnings
+async function test_guides_promoteToGuide_deduplicates() {
+  const guides = await importGuidesWithOverride(path.join(tempDir, "skills-promote-dedup.jsonl"));
+  const allGuides = [];
 
   // Create initial skill
-  skills.practiceSkill(allSkills, "React", "frontend", "", [], ["Same learning"]);
+  guides.practiceGuide(allGuides, "React", "frontend", "", [], ["Same learning"]);
 
   // Try to promote same learning
-  skills.promoteToSkill(allSkills, "React", "frontend", "Same learning", "");
+  guides.promoteToGuide(allGuides, "React", "frontend", "Same learning", "");
 
-  const found = skills.findSkill(allSkills, "React");
+  const found = guides.findGuide(allGuides, "React");
   assert.strictEqual(found.learnings.length, 1, "Should not duplicate learning");
 }
 
-// Test 37: loadSkills - empty file
-async function test_skills_loadSkills_emptyFile() {
-  const skillsFile = path.join(tempDir, "skills-empty.jsonl");
-  await fs.writeFile(skillsFile, "");
+// Test 37: loadGuides - empty file
+async function test_guides_loadGuides_emptyFile() {
+  const guidesFile = path.join(tempDir, "skills-empty.jsonl");
+  await fs.writeFile(guidesFile, "");
 
-  const skills = await importSkillsWithOverride(skillsFile);
-  const result = skills.loadSkills();
+  const guides = await importGuidesWithOverride(guidesFile);
+  const result = guides.loadGuides();
 
   assert.deepStrictEqual(result, [], "Empty file should return empty array");
 }
 
-// Test 38: loadSkills - with skills
-async function test_skills_loadSkills_withSkills() {
-  const skillsFile = path.join(tempDir, "skills-load.jsonl");
+// Test 38: loadGuides - with skills
+async function test_guides_loadGuides_withSkills() {
+  const guidesFile = path.join(tempDir, "skills-load.jsonl");
 
   const skill1 = {
     id: "s123abc",
@@ -856,62 +971,62 @@ async function test_skills_loadSkills_withSkills() {
     learnings: ["test"]
   };
 
-  await fs.writeFile(skillsFile, JSON.stringify(skill1) + "\n");
+  await fs.writeFile(guidesFile, JSON.stringify(skill1) + "\n");
 
-  const skills = await importSkillsWithOverride(skillsFile);
-  const result = skills.loadSkills();
+  const guides = await importGuidesWithOverride(guidesFile);
+  const result = guides.loadGuides();
 
   assert.strictEqual(result.length, 1, "Should load 1 skill");
   assert.strictEqual(result[0].skill, "react", "Should have correct skill");
 }
 
-// Test 39: saveSkills - persists to disk
-async function test_skills_saveSkills_persists() {
-  const skillsFile = path.join(tempDir, "skills-save.jsonl");
+// Test 39: saveGuides - persists to disk
+async function test_guides_saveGuides_persists() {
+  const guidesFile = path.join(tempDir, "skills-save.jsonl");
 
-  const skills = await importSkillsWithOverride(skillsFile);
-  const allSkills = [];
+  const guides = await importGuidesWithOverride(guidesFile);
+  const allGuides = [];
 
-  skills.practiceSkill(allSkills, "React", "frontend", "Manual", ["hooks"], ["Learning"]);
-  skills.saveSkills(allSkills);
+  guides.practiceGuide(allGuides, "React", "frontend", "Manual", ["hooks"], ["Learning"]);
+  guides.saveGuides(allGuides);
 
-  const content = await fs.readFile(skillsFile, "utf-8");
+  const content = await fs.readFile(guidesFile, "utf-8");
   assert(content.includes("react"), "File should contain skill");
   assert(content.includes("frontend"), "File should contain category");
 }
 
-// Test 40: formatSkillsForLLM - correct format
-async function test_skills_formatSkillsForLLM() {
-  const skills = await importSkillsWithOverride(path.join(tempDir, "skills-format.jsonl"));
-  const allSkills = [];
+// Test 40: formatGuidesForLLM - correct format
+async function test_guides_formatGuidesForLLM() {
+  const guides = await importGuidesWithOverride(path.join(tempDir, "skills-format.jsonl"));
+  const allGuides = [];
 
-  skills.practiceSkill(allSkills, "React", "web-frontend", "React manual", ["hooks", "jsx"], ["Learning 1", "Learning 2"]);
+  guides.practiceGuide(allGuides, "React", "web-frontend", "React manual", ["hooks", "jsx"], ["Learning 1", "Learning 2"]);
 
-  const formatted = skills.formatSkillsForLLM(allSkills);
+  const formatted = guides.formatGuidesForLLM(allGuides);
 
-  assert(formatted.includes("=== LEMMA SKILLS ==="), "Should include header");
+  assert(formatted.includes("=== LEMMA GUIDES ==="), "Should include header");
   assert(formatted.includes("react"), "Should include skill name");
   assert(formatted.includes("web-frontend"), "Should include category");
   assert(formatted.includes("(2 learnings)"), "Should include learning count");
 }
 
-// Test 41: formatSkillsForLLM - empty skills
-async function test_skills_formatSkillsForLLM_empty() {
-  const skills = await importSkillsWithOverride(path.join(tempDir, "skills-format-empty.jsonl"));
+// Test 41: formatGuidesForLLM - empty skills
+async function test_guides_formatGuidesForLLM_empty() {
+  const guides = await importGuidesWithOverride(path.join(tempDir, "skills-format-empty.jsonl"));
 
-  const formatted = skills.formatSkillsForLLM([]);
+  const formatted = guides.formatGuidesForLLM([]);
 
-  assert(formatted.includes("=== LEMMA SKILLS ==="), "Should include header");
-  assert(formatted.includes("(no skills tracked yet)"), "Should indicate no skills");
+  assert(formatted.includes("=== LEMMA GUIDES ==="), "Should include header");
+  assert(formatted.includes("(no guides tracked yet)"), "Should indicate no guides");
 }
 
-// Test 42: formatSkillDetail - correct format
-async function test_skills_formatSkillDetail() {
-  const skills = await importSkillsWithOverride(path.join(tempDir, "skills-detail.jsonl"));
+// Test 42: formatGuideDetail - correct format
+async function test_guides_formatGuideDetail() {
+  const guides = await importGuidesWithOverride(path.join(tempDir, "skills-detail.jsonl"));
 
-  const skill = {
-    id: "s123",
-    skill: "react",
+  const guide = {
+    id: "g123",
+    guide: "react",
     category: "web-frontend",
     usage_count: 10,
     last_used: "2026-03-01",
@@ -920,71 +1035,71 @@ async function test_skills_formatSkillDetail() {
     learnings: ["useCallback prevents re-renders", "useState for local state"]
   };
 
-  const formatted = skills.formatSkillDetail(skill);
+  const formatted = guides.formatGuideDetail(guide);
 
-  assert(formatted.includes("=== SKILL: react ==="), "Should include skill header");
+  assert(formatted.includes("=== GUIDE: react ==="), "Should include guide header");
   assert(formatted.includes("Category: web-frontend"), "Should include category");
   assert(formatted.includes("Usage Count: 10"), "Should include usage count");
   assert(formatted.includes("React is a JavaScript library"), "Should include description");
   assert(formatted.includes("useCallback prevents re-renders"), "Should include learnings");
 }
 
-// Test 43: formatSkillDetail - null skill
-async function test_skills_formatSkillDetail_null() {
-  const skills = await importSkillsWithOverride(path.join(tempDir, "skills-detail-null.jsonl"));
+// Test 43: formatGuideDetail - null skill
+async function test_guides_formatGuideDetail_null() {
+  const guides = await importGuidesWithOverride(path.join(tempDir, "skills-detail-null.jsonl"));
 
-  const formatted = skills.formatSkillDetail(null);
+  const formatted = guides.formatGuideDetail(null);
 
-  assert(formatted.includes("Skill not found"), "Should indicate skill not found");
+  assert(formatted.includes("Guide not found"), "Should indicate skill not found");
 }
 
-// Test 44: suggestSkills - finds relevant skills
-async function test_skills_suggestSkills_findsRelevant() {
-  const skills = await importSkillsWithOverride(path.join(tempDir, "skills-suggest.jsonl"));
-  const allSkills = [];
+// Test 44: suggestGuides - finds relevant skills
+async function test_guides_suggestGuides_findsRelevant() {
+  const guides = await importGuidesWithOverride(path.join(tempDir, "skills-suggest.jsonl"));
+  const allGuides = [];
 
-  skills.practiceSkill(allSkills, "React", "web-frontend", "React library", ["hooks", "jsx"], ["useCallback is important"]);
+  guides.practiceGuide(allGuides, "React", "web-frontend", "React library", ["hooks", "jsx"], ["useCallback is important"]);
 
-  const result = skills.suggestSkills("react hooks component", allSkills);
+  const result = guides.suggestGuides("react hooks component", allGuides);
 
   assert.ok(result.suggested.length > 0, "Should find suggestions");
-  assert.ok(result.summary.includes("relevant skills"), "Should include summary");
+  assert.ok(result.summary.includes("relevant guides"), "Should include summary");
 }
 
-// Test 45: suggestSkills - returns tracked and missing
-async function test_skills_suggestSkills_separatesTrackedAndMissing() {
-  const skills = await importSkillsWithOverride(path.join(tempDir, "skills-suggest-sep.jsonl"));
-  const allSkills = [];
+// Test 45: suggestGuides - returns tracked and missing
+async function test_guides_suggestGuides_separatesTrackedAndMissing() {
+  const guides = await importGuidesWithOverride(path.join(tempDir, "skills-suggest-sep.jsonl"));
+  const allGuides = [];
 
   // Only React is tracked
-  skills.practiceSkill(allSkills, "React", "web-frontend", "", [], []);
+  guides.practiceGuide(allGuides, "React", "web-frontend", "", [], []);
 
-  const result = skills.suggestSkills("react and vue components", allSkills);
+  const result = guides.suggestGuides("react and vue components", allGuides);
 
   // React should be tracked
-  const trackedReact = result.relevant.find(s => s.skill === "react");
+  const trackedReact = result.relevant.find(s => s.guide === "react");
   assert.ok(trackedReact, "React should be in tracked/relevant");
   assert.strictEqual(trackedReact.tracked, true, "React should be marked as tracked");
 }
 
 // Test 46: formatSuggestions - correct format
-async function test_skills_formatSuggestions() {
-  const skills = await importSkillsWithOverride(path.join(tempDir, "skills-format-suggest.jsonl"));
+async function test_guides_formatSuggestions() {
+  const guides = await importGuidesWithOverride(path.join(tempDir, "skills-format-suggest.jsonl"));
 
   const result = {
-    summary: "Found 2 relevant skills (1 tracked, 1 new)",
+    summary: "Found 2 relevant guides (1 tracked, 1 new)",
     relevant: [
-      { skill: "react", category: "web-frontend", usage_count: 5, last_used: "2026-03-01", learnings: ["test learning"] }
+      { guide: "react", category: "web-frontend", usage_count: 5, last_used: "2026-03-01", learnings: ["test learning"] }
     ],
     missing: [
-      { skill: "vue", category: "web-frontend", keywords: ["vue", "component"] }
+      { guide: "vue", category: "web-frontend", keywords: ["vue", "component"] }
     ],
     suggested: []
   };
 
-  const formatted = skills.formatSuggestions(result);
+  const formatted = guides.formatSuggestions(result);
 
-  assert(formatted.includes("=== SKILL SUGGESTIONS ==="), "Should include header");
+  assert(formatted.includes("=== GUIDE SUGGESTIONS ==="), "Should include header");
   assert(formatted.includes("TRACKED"), "Should include tracked section");
   assert(formatted.includes("SUGGESTED"), "Should include suggested section");
   assert(formatted.includes("react"), "Should include skill name");
@@ -992,8 +1107,8 @@ async function test_skills_formatSuggestions() {
 }
 
 // Test 47: formatSuggestions - empty results
-async function test_skills_formatSuggestions_empty() {
-  const skills = await importSkillsWithOverride(path.join(tempDir, "skills-format-suggest-empty.jsonl"));
+async function test_guides_formatSuggestions_empty() {
+  const guides = await importGuidesWithOverride(path.join(tempDir, "skills-format-suggest-empty.jsonl"));
 
   const result = {
     summary: "Found 0 relevant skills (0 tracked, 0 new)",
@@ -1002,9 +1117,9 @@ async function test_skills_formatSuggestions_empty() {
     suggested: []
   };
 
-  const formatted = skills.formatSuggestions(result);
+  const formatted = guides.formatSuggestions(result);
 
-  assert(formatted.includes("No relevant skills found"), "Should indicate no results");
+  assert(formatted.includes("No relevant guides found"), "Should indicate no results");
 }
 
 // Setup and teardown
@@ -1050,36 +1165,42 @@ async function runTests() {
   await runTest("findSimilarFragment - matching", test_findSimilarFragment_matching);
   await runTest("findSimilarFragment - project scope", test_findSimilarFragment_projectScope);
   await runTest("detectProject - returns project name", test_detectProject_returnsProjectName);
+  await runTest("createFragment - explicit description", test_createFragment_explicitDescription);
+  await runTest("createFragment - description generation", test_createFragment_descriptionGeneration);
+  await runTest("formatMemoryDetail - full content", test_formatMemoryDetail_fullContent);
+  await runTest("formatMemoryDetail - null fragment", test_formatMemoryDetail_null);
+  await runTest("formatMemoryDetail - global scope", test_formatMemoryDetail_globalScope);
+  await runTest("filterByProject - normalizes empty strings", test_filterByProject_normalizesEmptyStrings);
 
-  console.log("\n--- SKILLS TESTS ---\n");
-  await runTest("generateSkillId - correct format", test_skills_generateSkillId);
-  await runTest("createSkill - creates valid object", test_skills_createSkill);
-  await runTest("createSkill - normalizes inputs", test_skills_createSkill_normalizesInputs);
-  await runTest("practiceSkill - increments usage", test_skills_practiceSkill);
-  await runTest("practiceSkill - merges contexts and learnings", test_skills_mergeContextsLearnings);
-  await runTest("practiceSkill - deduplicates learnings", test_skills_practiceSkill_deduplicatesLearnings);
-  await runTest("findSkill - case insensitive", test_skills_findSkill);
-  await runTest("getTopSkills - sorts by usage", test_skills_getTopSkills);
-  await runTest("getTopSkills - respects limit", test_skills_getTopSkills_respectsLimit);
-  await runTest("getSkillsByCategory - filters correctly", test_skills_getSkillsByCategory);
-  await runTest("updateSkill - updates fields", test_skills_updateSkill);
-  await runTest("updateSkill - returns null for non-existent", test_skills_updateSkill_notFound);
-  await runTest("deleteSkill - removes skill", test_skills_deleteSkill);
-  await runTest("deleteSkill - returns false for non-existent", test_skills_deleteSkill_notFound);
-  await runTest("promoteToSkill - creates new skill", test_skills_promoteToSkill_createsNew);
-  await runTest("promoteToSkill - adds to existing", test_skills_promoteToSkill_addsToExisting);
-  await runTest("promoteToSkill - deduplicates learnings", test_skills_promoteToSkill_deduplicates);
-  await runTest("loadSkills - empty file", test_skills_loadSkills_emptyFile);
-  await runTest("loadSkills - with skills", test_skills_loadSkills_withSkills);
-  await runTest("saveSkills - persists to disk", test_skills_saveSkills_persists);
-  await runTest("formatSkillsForLLM - correct format", test_skills_formatSkillsForLLM);
-  await runTest("formatSkillsForLLM - empty skills", test_skills_formatSkillsForLLM_empty);
-  await runTest("formatSkillDetail - correct format", test_skills_formatSkillDetail);
-  await runTest("formatSkillDetail - null skill", test_skills_formatSkillDetail_null);
-  await runTest("suggestSkills - finds relevant", test_skills_suggestSkills_findsRelevant);
-  await runTest("suggestSkills - separates tracked and missing", test_skills_suggestSkills_separatesTrackedAndMissing);
-  await runTest("formatSuggestions - correct format", test_skills_formatSuggestions);
-  await runTest("formatSuggestions - empty results", test_skills_formatSuggestions_empty);
+  console.log("\n--- GUIDES TESTS ---\n");
+  await runTest("generateGuideId - correct format", test_guides_generateGuideId);
+  await runTest("createGuide - creates valid object", test_guides_createGuide);
+  await runTest("createGuide - normalizes inputs", test_guides_createGuide_normalizesInputs);
+  await runTest("practiceGuide - increments usage", test_guides_practiceGuide);
+  await runTest("practiceGuide - merges contexts and learnings", test_guides_mergeContextsLearnings);
+  await runTest("practiceGuide - deduplicates learnings", test_guides_practiceGuide_deduplicatesLearnings);
+  await runTest("findGuide - case insensitive", test_guides_findGuide);
+  await runTest("getTopGuides - sorts by usage", test_guides_getTopGuides);
+  await runTest("getTopGuides - respects limit", test_guides_getTopGuides_respectsLimit);
+  await runTest("getGuidesByCategory - filters correctly", test_guides_getGuidesByCategory);
+  await runTest("updateGuide - updates fields", test_guides_updateGuide);
+  await runTest("updateGuide - returns null for non-existent", test_guides_updateGuide_notFound);
+  await runTest("deleteGuide - removes skill", test_guides_deleteGuide);
+  await runTest("deleteGuide - returns false for non-existent", test_guides_deleteGuide_notFound);
+  await runTest("promoteToGuide - creates new skill", test_guides_promoteToGuide_createsNew);
+  await runTest("promoteToGuide - adds to existing", test_guides_promoteToGuide_addsToExisting);
+  await runTest("promoteToGuide - deduplicates learnings", test_guides_promoteToGuide_deduplicates);
+  await runTest("loadGuides - empty file", test_guides_loadGuides_emptyFile);
+  await runTest("loadGuides - with skills", test_guides_loadGuides_withSkills);
+  await runTest("saveGuides - persists to disk", test_guides_saveGuides_persists);
+  await runTest("formatGuidesForLLM - correct format", test_guides_formatGuidesForLLM);
+  await runTest("formatGuidesForLLM - empty skills", test_guides_formatGuidesForLLM_empty);
+  await runTest("formatGuideDetail - correct format", test_guides_formatGuideDetail);
+  await runTest("formatGuideDetail - null skill", test_guides_formatGuideDetail_null);
+  await runTest("suggestGuides - finds relevant", test_guides_suggestGuides_findsRelevant);
+  await runTest("suggestGuides - separates tracked and missing", test_guides_suggestGuides_separatesTrackedAndMissing);
+  await runTest("formatSuggestions - correct format", test_guides_formatSuggestions);
+  await runTest("formatSuggestions - empty results", test_guides_formatSuggestions_empty);
 
   console.log("\n" + "=".repeat(60));
   console.log(`Tests passed: ${passed}`);

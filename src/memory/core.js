@@ -33,22 +33,54 @@ export function detectProject() {
 }
 
 /**
+ * Generate a short description/summary from fragment content
+ * Used for LLM preview without exposing full content
+ * @param {string} fragment - The full fragment text
+ * @param {string} title - The title (for context)
+ * @returns {string} Short description (max 120 chars)
+ */
+function generateDescription(fragment, title) {
+  // If fragment is short enough, use it directly
+  if (fragment.length <= 80) {
+    return fragment;
+  }
+
+  // Try to extract key information
+  // Look for patterns like "key: value" or important keywords
+  const keywords = [];
+
+  // Extract first sentence or clause
+  const firstSentence = fragment.split(/[.!?\n]/)[0];
+  if (firstSentence && firstSentence.length <= 100) {
+    return firstSentence.trim() + (firstSentence.endsWith('.') ? '' : '...');
+  }
+
+  // Fallback: use first 80 chars
+  return fragment.substring(0, 80).trim() + '...';
+}
+
+/**
  * Create a new memory fragment object
  * @param {string} fragment - The text content of the memory
  * @param {"user"|"ai"} source - Origin of the memory
  * @param {string} title - Short title for the memory (auto-generated if not provided)
  * @param {string|null} project - Project scope (null = global, string = project-specific)
+ * @param {string} description - Optional short description (auto-generated if not provided)
  * @returns {object} Memory fragment object
  */
-export function createFragment(fragment, source, title = null, project = null) {
+export function createFragment(fragment, source, title = null, project = null, description = null) {
   // Auto-generate title from first 40 chars if not provided
   const autoTitle = title || (fragment.length > 40 ? fragment.substring(0, 40) + "..." : fragment);
+
+  // Auto-generate description if not provided
+  const autoDescription = description || generateDescription(fragment, autoTitle);
 
   const now = new Date();
 
   return {
     id: generateId(),
     title: autoTitle,
+    description: autoDescription,
     fragment: fragment,
     project: project,
     confidence: 1.0,
@@ -154,22 +186,23 @@ export function saveMemory(fragments) {
 }
 
 /**
- * Filter memory fragments by project scope
+ * Filter memory fragments by project scope (STRICT ISOLATION)
  * @param {Array<object>} fragments - Array of memory fragments
- * @param {string|null} currentProject - Current project name (null = no filtering)
- * @returns {Array<object>} Filtered fragments (global + current project)
+ * @param {string|null} currentProject - Current project name (null = global only)
+ * @returns {Array<object>} Filtered fragments (strict project isolation)
  */
 export function filterByProject(fragments, currentProject) {
-  if (!currentProject) {
+  // Normalize: treat empty string, whitespace-only, "null", "undefined" as null
+  const project = (typeof currentProject === 'string')
+    ? currentProject.trim() || null
+    : null;
+
+  if (!project) {
     // No project context, return only global fragments
     return fragments.filter(f => f.project === null || f.project === undefined);
   }
-  // Return global fragments + current project fragments
-  return fragments.filter(f =>
-    f.project === null ||
-    f.project === undefined ||
-    f.project === currentProject
-  );
+  // STRICT: Return ONLY the specified project's fragments (not global)
+  return fragments.filter(f => f.project === project);
 }
 
 /**
@@ -275,7 +308,9 @@ export function searchAndSortFragments(fragments, query = null, topK = 30) {
 }
 
 /**
- * Format memory fragments for LLM consumption
+ * Format memory fragments for LLM consumption (SUMMARY MODE)
+ * Shows only title + description, not full fragment content
+ * LLM can request full detail via memory_read with specific ID
  * @param {Array<object>} fragments - Array of memory fragments
  * @param {string|null} currentProject - Current project name for header
  * @returns {string} Formatted string with confidence bars
@@ -292,8 +327,40 @@ export function formatMemoryForLLM(fragments, currentProject = null) {
     const confidenceBar = "█".repeat(barCount) + "░".repeat(5 - barCount);
     const sourceIcon = frag.source === "ai" ? "🤖" : "👤";
     const scopeTag = frag.project ? `[${frag.project}]` : "[global]";
-    return `[${frag.id}] ${confidenceBar} (${sourceIcon}) ${scopeTag} ${frag.title}\n    ${frag.fragment}`;
+
+    // Use description (summary) instead of full fragment
+    const summary = frag.description || frag.title;
+
+    return `[${frag.id}] ${confidenceBar} (${sourceIcon}) ${scopeTag} ${frag.title}\n    ${summary}`;
   });
 
   return `=== LEMMA MEMORY FRAGMENTS${projectHeader} ===\n${lines.join("\n")}\n==============================`;
+}
+
+/**
+ * Format a single memory fragment with FULL DETAIL for LLM
+ * Use this when LLM needs to see the complete content
+ * @param {object} fragment - Single memory fragment
+ * @returns {string} Formatted detail string
+ */
+export function formatMemoryDetail(fragment) {
+  if (!fragment) {
+    return "Fragment not found.";
+  }
+
+  const barCount = Math.round(fragment.confidence / 0.2);
+  const confidenceBar = "█".repeat(barCount) + "░".repeat(5 - barCount);
+  const sourceIcon = fragment.source === "ai" ? "🤖" : "👤";
+  const scopeTag = fragment.project ? `[${fragment.project}]` : "[global]";
+
+  let detail = `=== MEMORY FRAGMENT DETAIL ===\n`;
+  detail += `ID: [${fragment.id}] ${confidenceBar} (${sourceIcon}) ${scopeTag}\n`;
+  detail += `Title: ${fragment.title}\n`;
+  if (fragment.description && fragment.description !== fragment.title) {
+    detail += `Summary: ${fragment.description}\n`;
+  }
+  detail += `Created: ${fragment.created} | Confidence: ${fragment.confidence.toFixed(2)}\n`;
+  detail += `--- CONTENT ---\n${fragment.fragment}\n==============`;
+
+  return detail;
 }

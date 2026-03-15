@@ -1,6 +1,6 @@
 // Tool handler functions for MCP server
 import * as core from "../memory/index.js";
-import * as skills from "../skills/index.js";
+import * as guides from "../guides/index.js";
 
 /**
  * Handle memory_read tool
@@ -8,9 +8,31 @@ import * as skills from "../skills/index.js";
 export async function handleMemoryRead(args) {
   const currentProject = args?.project || core.detectProject();
   const query = args?.query || null;
+  const detailId = args?.id || null; // Optional: get full detail for specific ID
 
   let memory = core.loadMemory();
   memory = core.decayConfidence(memory);
+
+  // If specific ID requested, return full detail
+  if (detailId) {
+    const fragment = memory.find(f => f.id === detailId);
+    if (!fragment) {
+      return {
+        content: [{ type: "text", text: `Error: Fragment with ID '${detailId}' not found` }],
+        isError: true,
+      };
+    }
+    // Update access
+    fragment.accessed++;
+    fragment.lastAccessed = new Date().toISOString();
+    core.saveMemory(memory);
+
+    return {
+      content: [{ type: "text", text: core.formatMemoryDetail(fragment) }],
+    };
+  }
+
+  // Normal mode: filtered summary view
   memory = core.filterByProject(memory, currentProject);
 
   // Execute Search and Top-K Truncation
@@ -49,6 +71,7 @@ export async function handleMemoryCheck(args) {
 export async function handleMemoryAdd(args) {
   const fragment = args?.fragment;
   const title = args?.title || null;
+  const description = args?.description || null;
   // null = global, undefined = auto-detect, string = project-specific
   const project = args?.project === undefined ? null : args.project;
   const source = args?.source || "ai";
@@ -74,13 +97,13 @@ export async function handleMemoryAdd(args) {
     };
   }
 
-  const newFragment = core.createFragment(fragment, source, title, project);
+  const newFragment = core.createFragment(fragment, source, title, project, description);
   memory.push(newFragment);
   core.saveMemory(memory);
 
   const scopeInfo = newFragment.project ? ` (project: ${newFragment.project})` : " (global)";
   return {
-    content: [{ type: "text", text: `Added fragment [${newFragment.id}]${scopeInfo}: "${newFragment.title}"` }],
+    content: [{ type: "text", text: `Added fragment [${newFragment.id}]${scopeInfo}: "${newFragment.title}"\nSummary: ${newFragment.description}` }],
   };
 }
 
@@ -199,59 +222,59 @@ export async function handleMemoryList(args) {
 }
 
 /**
- * Handle skill_get tool
+ * Handle guide_get tool
  */
-export async function handleSkillGet(args) {
+export async function handleGuideGet(args) {
   const category = args?.category || null;
-  const skillName = args?.skill || null;
-  const allSkills = skills.loadSkills();
+  const guideName = args?.guide || null;
+  const allGuides = guides.loadGuides();
 
-  // Get specific skill detail
-  if (skillName) {
-    const skill = skills.findSkill(allSkills, skillName);
+  // Get specific guide detail
+  if (guideName) {
+    const guide = guides.findGuide(allGuides, guideName);
     return {
-      content: [{ type: "text", text: skills.formatSkillDetail(skill) }],
+      content: [{ type: "text", text: guides.formatGuideDetail(guide) }],
     };
   }
 
   // Filter by category or get all
   const filtered = category
-    ? skills.getSkillsByCategory(allSkills, category)
-    : allSkills;
+    ? guides.getGuidesByCategory(allGuides, category)
+    : allGuides;
 
-  const formatted = skills.formatSkillsForLLM(filtered);
+  const formatted = guides.formatGuidesForLLM(filtered);
   return {
     content: [{ type: "text", text: formatted }],
   };
 }
 
 /**
- * Handle skill_practice tool
+ * Handle guide_practice tool
  */
-export async function handleSkillPractice(args) {
-  const skillName = args?.skill;
+export async function handleGuidePractice(args) {
+  const guideName = args?.guide;
   const category = args?.category;
   const description = args?.description || "";
   const contexts = args?.contexts || [];
   const learnings = args?.learnings || [];
 
-  if (!skillName || !category) {
+  if (!guideName || !category) {
     return {
-      content: [{ type: "text", text: "Error: 'skill' and 'category' parameters are required" }],
+      content: [{ type: "text", text: "Error: 'guide' and 'category' parameters are required" }],
       isError: true,
     };
   }
 
-  const allSkills = skills.loadSkills();
-  const updated = skills.practiceSkill(allSkills, skillName, category, description, contexts, learnings);
-  skills.saveSkills(allSkills);
+  const allGuides = guides.loadGuides();
+  const updated = guides.practiceGuide(allGuides, guideName, category, description, contexts, learnings);
+  guides.saveGuides(allGuides);
 
   const isNew = updated.usage_count === 1;
   const action = isNew ? "Created" : "Updated";
 
-  // Return skill detail including description/manual so AI can read protocols
-  let response = `${action} skill "${updated.skill}" (${updated.category}): ${updated.usage_count}x usage\n\n`;
-  response += skills.formatSkillDetail(updated);
+  // Return guide detail including description/manual so AI can read protocols
+  let response = `${action} guide "${updated.guide}" (${updated.category}): ${updated.usage_count}x usage\n\n`;
+  response += guides.formatGuideDetail(updated);
 
   return {
     content: [{ type: "text", text: response }],
@@ -259,109 +282,109 @@ export async function handleSkillPractice(args) {
 }
 
 /**
- * Handle skill_update tool
+ * Handle guide_update tool
  */
-export async function handleSkillUpdate(args) {
-  const skillName = args?.skill;
+export async function handleGuideUpdate(args) {
+  const guideName = args?.guide;
   const updates = {
-    skill: args?.new_name,
+    guide: args?.new_name,
     category: args?.category,
     description: args?.description
   };
 
-  if (!skillName) {
+  if (!guideName) {
     return {
-      content: [{ type: "text", text: "Error: 'skill' parameter is required" }],
+      content: [{ type: "text", text: "Error: 'guide' parameter is required" }],
       isError: true,
     };
   }
 
-  const allSkills = skills.loadSkills();
-  const updated = skills.updateSkill(allSkills, skillName, updates);
+  const allGuides = guides.loadGuides();
+  const updated = guides.updateGuide(allGuides, guideName, updates);
 
   if (!updated) {
     return {
-      content: [{ type: "text", text: `Error: Skill "${skillName}" not found.` }],
+      content: [{ type: "text", text: `Error: Guide "${guideName}" not found.` }],
       isError: true,
     };
   }
 
-  skills.saveSkills(allSkills);
+  guides.saveGuides(allGuides);
   return {
-    content: [{ type: "text", text: `Updated skill "${updated.skill}":\n${skills.formatSkillDetail(updated)}` }],
+    content: [{ type: "text", text: `Updated guide "${updated.guide}":\n${guides.formatGuideDetail(updated)}` }],
   };
 }
 
 /**
- * Handle skill_forget tool
+ * Handle guide_forget tool
  */
-export async function handleSkillForget(args) {
-  const skillName = args?.skill;
+export async function handleGuideForget(args) {
+  const guideName = args?.guide;
 
-  if (!skillName) {
+  if (!guideName) {
     return {
-      content: [{ type: "text", text: "Error: 'skill' parameter is required" }],
+      content: [{ type: "text", text: "Error: 'guide' parameter is required" }],
       isError: true,
     };
   }
 
-  const allSkills = skills.loadSkills();
-  const success = skills.deleteSkill(allSkills, skillName);
+  const allGuides = guides.loadGuides();
+  const success = guides.deleteGuide(allGuides, guideName);
 
   if (!success) {
     return {
-      content: [{ type: "text", text: `Error: Skill "${skillName}" not found.` }],
+      content: [{ type: "text", text: `Error: Guide "${guideName}" not found.` }],
       isError: true,
     };
   }
 
-  skills.saveSkills(allSkills);
+  guides.saveGuides(allGuides);
   return {
-    content: [{ type: "text", text: `Successfully forgot skill: ${skillName}` }],
+    content: [{ type: "text", text: `Successfully forgot guide: ${guideName}` }],
   };
 }
 
 /**
- * Handle skill_create tool
+ * Handle guide_create tool
  */
-export async function handleSkillCreate(args) {
-  const skillName = args?.skill;
+export async function handleGuideCreate(args) {
+  const guideName = args?.guide;
   const category = args?.category;
   const description = args?.description;
   const contexts = args?.contexts || [];
   const learnings = args?.learnings || [];
 
-  if (!skillName || !category || !description) {
+  if (!guideName || !category || !description) {
     return {
-      content: [{ type: "text", text: "Error: 'skill', 'category', and 'description' parameters are required" }],
+      content: [{ type: "text", text: "Error: 'guide', 'category', and 'description' parameters are required" }],
       isError: true,
     };
   }
 
-  const allSkills = skills.loadSkills();
-  const existing = skills.findSkill(allSkills, skillName);
+  const allGuides = guides.loadGuides();
+  const existing = guides.findGuide(allGuides, guideName);
 
   if (existing) {
     existing.description = description;
-    skills.saveSkills(allSkills);
+    guides.saveGuides(allGuides);
     return {
-      content: [{ type: "text", text: `Updated manual for existing skill "${existing.skill}" (${existing.category})` }],
+      content: [{ type: "text", text: `Updated manual for existing guide "${existing.guide}" (${existing.category})` }],
     };
   }
 
-  const newSkill = skills.createSkill(skillName, category, description, contexts, learnings);
-  allSkills.push(newSkill);
-  skills.saveSkills(allSkills);
+  const newGuide = guides.createGuide(guideName, category, description, contexts, learnings);
+  allGuides.push(newGuide);
+  guides.saveGuides(allGuides);
 
   return {
-    content: [{ type: "text", text: `Created new manager skill "${newSkill.skill}" (${newSkill.category}) with a detailed manual.` }],
+    content: [{ type: "text", text: `Created new guide "${newGuide.guide}" (${newGuide.category}) with a detailed manual.` }],
   };
 }
 
 /**
- * Handle skill_discover tool
+ * Handle guide_discover tool
  */
-export async function handleSkillDiscover() {
+export async function handleGuideDiscover() {
   const fs = await import("fs");
   const path = await import("path");
   const cwd = process.cwd();
@@ -374,35 +397,42 @@ export async function handleSkillDiscover() {
       const pkg = JSON.parse(fs.readFileSync(pkgPath, "utf-8"));
       const deps = { ...pkg.dependencies, ...pkg.devDependencies };
 
-      // Map common packages to skills
-      const packageToSkill = {
-        "react": { skill: "react", category: "frontend" },
-        "vue": { skill: "vue", category: "frontend" },
-        "angular": { skill: "angular", category: "frontend" },
-        "svelte": { skill: "svelte", category: "frontend" },
-        "next": { skill: "nextjs", category: "frontend" },
-        "express": { skill: "express", category: "backend" },
-        "fastify": { skill: "fastify", category: "backend" },
-        "nestjs": { skill: "nestjs", category: "backend" },
-        "koa": { skill: "koa", category: "backend" },
-        "typescript": { skill: "typescript", category: "language" },
-        "python": { skill: "python", category: "language" },
-        "mongoose": { skill: "mongodb", category: "database" },
-        "prisma": { skill: "prisma", category: "database" },
-        "sequelize": { skill: "sequelize", category: "database" },
-        "tailwindcss": { skill: "tailwind", category: "frontend" },
-        "jest": { skill: "jest", category: "tool" },
-        "vitest": { skill: "vitest", category: "tool" },
-        "eslint": { skill: "eslint", category: "tool" },
-        "webpack": { skill: "webpack", category: "tool" },
-        "vite": { skill: "vite", category: "tool" },
-        "docker": { skill: "docker", category: "tool" },
-        "@modelcontextprotocol/sdk": { skill: "mcp", category: "tool" },
-        "zod": { skill: "zod", category: "tool" },
+      // Map common packages to guides
+      const packageToGuide = {
+        "react": { guide: "react", category: "web-frontend" },
+        "vue": { guide: "vue", category: "web-frontend" },
+        "angular": { guide: "angular", category: "web-frontend" },
+        "svelte": { guide: "svelte", category: "web-frontend" },
+        "next": { guide: "nextjs", category: "web-frontend" },
+        "express": { guide: "express", category: "web-backend" },
+        "fastify": { guide: "fastify", category: "web-backend" },
+        "nestjs": { guide: "nestjs", category: "web-backend" },
+        "koa": { guide: "koa", category: "web-backend" },
+        "typescript": { guide: "typescript", category: "programming-language" },
+        "python": { guide: "python", category: "programming-language" },
+        "mongoose": { guide: "mongodb", category: "data-storage" },
+        "prisma": { guide: "prisma", category: "data-storage" },
+        "sequelize": { guide: "sequelize", category: "data-storage" },
+        "tailwindcss": { guide: "tailwind", category: "web-frontend" },
+        "jest": { guide: "jest", category: "dev-tool" },
+        "vitest": { guide: "vitest", category: "dev-tool" },
+        "eslint": { guide: "eslint", category: "dev-tool" },
+        "webpack": { guide: "webpack", category: "dev-tool" },
+        "vite": { guide: "vite", category: "dev-tool" },
+        "docker": { guide: "docker", category: "infra-devops" },
+        "@modelcontextprotocol/sdk": { guide: "mcp", category: "dev-tool" },
+        "zod": { guide: "zod", category: "dev-tool" },
+        "fuse.js": { guide: "fusejs", category: "dev-tool" },
+        "axios": { guide: "axios", category: "dev-tool" },
+        "lodash": { guide: "lodash", category: "dev-tool" },
+        "chalk": { guide: "chalk", category: "dev-tool" },
+        "commander": { guide: "commander", category: "dev-tool" },
+        "yaml": { guide: "yaml", category: "dev-tool" },
+        "dotenv": { guide: "dotenv", category: "dev-tool" },
       };
 
       for (const [pkgName] of Object.entries(deps)) {
-        const mapping = packageToSkill[pkgName];
+        const mapping = packageToGuide[pkgName];
         if (mapping) {
           discovered.push(mapping);
         }
@@ -416,17 +446,17 @@ export async function handleSkillDiscover() {
   try {
     const files = fs.readdirSync(cwd);
     const fileMappings = [
-      { pattern: /\.js$/, skill: "javascript", category: "language" },
-      { pattern: /\.ts$/, skill: "typescript", category: "language" },
-      { pattern: /tsconfig\.json$/, skill: "typescript", category: "language" },
-      { pattern: /\.mcp\.json$|claude_desktop_config\.json$/, skill: "mcp", category: "tool" },
+      { pattern: /\.js$/, guide: "javascript", category: "programming-language" },
+      { pattern: /\.ts$/, guide: "typescript", category: "programming-language" },
+      { pattern: /tsconfig\.json$/, guide: "typescript", category: "programming-language" },
+      { pattern: /\.mcp\.json$|claude_desktop_config\.json$/, guide: "mcp", category: "dev-tool" },
     ];
 
     for (const mapping of fileMappings) {
       if (files.some(f => mapping.pattern.test(f))) {
         // Only add if not already in discovered (to avoid duplicates)
-        if (!discovered.some(d => d.skill === mapping.skill)) {
-          discovered.push({ skill: mapping.skill, category: mapping.category });
+        if (!discovered.some(d => d.guide === mapping.guide)) {
+          discovered.push({ guide: mapping.guide, category: mapping.category });
         }
       }
     }
@@ -434,33 +464,47 @@ export async function handleSkillDiscover() {
     // Ignore readdir errors
   }
 
-  // Register discovered skills
-  const allSkills = skills.loadSkills();
+  // Register discovered guides
+  const allGuides = guides.loadGuides();
   const registered = [];
-  for (const { skill, category } of discovered) {
-    const existing = skills.findSkill(allSkills, skill);
+  const alreadyTracked = [];
+
+  for (const { guide, category } of discovered) {
+    const existing = guides.findGuide(allGuides, guide);
     if (!existing) {
-      skills.practiceSkill(allSkills, skill, category, "");
-      registered.push(`${skill} (${category})`);
+      guides.practiceGuide(allGuides, guide, category, "");
+      registered.push(`${guide} (${category})`);
+    } else {
+      alreadyTracked.push(guide);
     }
   }
 
   if (registered.length > 0) {
-    skills.saveSkills(allSkills);
-    return {
-      content: [{ type: "text", text: `Discovered and registered ${registered.length} new skills:\n${registered.join("\n")}` }],
-    };
+    guides.saveGuides(allGuides);
+  }
+
+  // Build response message
+  let message = "";
+  if (registered.length > 0) {
+    message += `✅ Discovered and registered ${registered.length} new guides:\n${registered.join("\n")}`;
+  }
+  if (alreadyTracked.length > 0) {
+    if (message) message += "\n\n";
+    message += `📌 Already tracked (${alreadyTracked.length}): ${alreadyTracked.join(", ")}`;
+  }
+  if (!message) {
+    message = "No recognizable packages found in project dependencies.";
   }
 
   return {
-    content: [{ type: "text", text: "No new skills discovered. All project dependencies are already tracked." }],
+    content: [{ type: "text", text: message }],
   };
 }
 
 /**
- * Handle skill_suggest tool
+ * Handle guide_suggest tool
  */
-export async function handleSkillSuggest(args) {
+export async function handleGuideSuggest(args) {
   const task = args?.task;
 
   if (!task) {
@@ -470,9 +514,9 @@ export async function handleSkillSuggest(args) {
     };
   }
 
-  const allSkills = skills.loadSkills();
-  const result = skills.suggestSkills(task, allSkills);
-  const formatted = skills.formatSuggestions(result);
+  const allGuides = guides.loadGuides();
+  const result = guides.suggestGuides(task, allGuides);
+  const formatted = guides.formatSuggestions(result);
 
   return {
     content: [{ type: "text", text: formatted }],
@@ -480,16 +524,16 @@ export async function handleSkillSuggest(args) {
 }
 
 /**
- * Handle skill_distill tool
+ * Handle guide_distill tool
  */
-export async function handleSkillDistill(args) {
+export async function handleGuideDistill(args) {
   const memoryId = args?.memory_id;
-  const skillName = args?.skill;
-  const category = args?.category || "tool"; // Default to tool if not provided
+  const guideName = args?.guide;
+  const category = args?.category || "dev-tool"; // Default to dev-tool if not provided
 
-  if (!memoryId || !skillName) {
+  if (!memoryId || !guideName) {
     return {
-      content: [{ type: "text", text: "Error: 'memory_id' and 'skill' parameters are required" }],
+      content: [{ type: "text", text: "Error: 'memory_id' and 'guide' parameters are required" }],
       isError: true,
     };
   }
@@ -504,19 +548,19 @@ export async function handleSkillDistill(args) {
     };
   }
 
-  const allSkills = skills.loadSkills();
-  const updated = skills.promoteToSkill(
-    allSkills,
-    skillName,
+  const allGuides = guides.loadGuides();
+  const updated = guides.promoteToGuide(
+    allGuides,
+    guideName,
     category,
     fragment.fragment,
     fragment.project || "global"
   );
 
-  skills.saveSkills(allSkills);
+  guides.saveGuides(allGuides);
 
-  let response = `Successfully distilled memory [${memoryId}] into skill "${updated.skill}" (${updated.category}).\n\n`;
-  response += skills.formatSkillDetail(updated);
+  let response = `Successfully distilled memory [${memoryId}] into guide "${updated.guide}" (${updated.category}).\n\n`;
+  response += guides.formatGuideDetail(updated);
 
   return {
     content: [{ type: "text", text: response }],
@@ -543,22 +587,22 @@ export async function handleCallTool(request) {
         return await handleMemoryForget(args);
       case "memory_list":
         return await handleMemoryList(args);
-      case "skill_get":
-        return await handleSkillGet(args);
-      case "skill_practice":
-        return await handleSkillPractice(args);
-      case "skill_update":
-        return await handleSkillUpdate(args);
-      case "skill_forget":
-        return await handleSkillForget(args);
-      case "skill_create":
-        return await handleSkillCreate(args);
-      case "skill_discover":
-        return await handleSkillDiscover();
-      case "skill_suggest":
-        return await handleSkillSuggest(args);
-      case "skill_distill":
-        return await handleSkillDistill(args);
+      case "guide_get":
+        return await handleGuideGet(args);
+      case "guide_practice":
+        return await handleGuidePractice(args);
+      case "guide_update":
+        return await handleGuideUpdate(args);
+      case "guide_forget":
+        return await handleGuideForget(args);
+      case "guide_create":
+        return await handleGuideCreate(args);
+      case "guide_discover":
+        return await handleGuideDiscover();
+      case "guide_suggest":
+        return await handleGuideSuggest(args);
+      case "guide_distill":
+        return await handleGuideDistill(args);
       default:
         return {
           content: [{ type: "text", text: `Error: Unknown tool '${name}'` }],

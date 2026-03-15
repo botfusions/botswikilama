@@ -2,7 +2,7 @@
 export const TOOLS = [
   {
     name: "memory_read",
-    description: "Read and return formatted memory fragments for LLM consumption. Applies confidence decay, limits to top-K, and reformats for optimum context.",
+    description: "Read memory fragments for LLM. SUMMARY MODE: Shows title + description only (not full content). Use id parameter to get full detail of a specific fragment.",
     inputSchema: {
       type: "object",
       properties: {
@@ -13,6 +13,10 @@ export const TOOLS = [
         query: {
           type: "string",
           description: "Optional semantic search keyword. Supply only if you are looking for specific context.",
+        },
+        id: {
+          type: "string",
+          description: "Get FULL DETAIL for a specific fragment ID. Use this after seeing the summary to read the complete content.",
         },
       },
     },
@@ -43,6 +47,10 @@ export const TOOLS = [
         title: {
           type: "string",
           description: "Short title for the memory (auto-generated if not provided)",
+        },
+        description: {
+          type: "string",
+          description: "Short description/summary (auto-generated if not provided)",
         },
         project: {
           type: "string",
@@ -112,44 +120,44 @@ export const TOOLS = [
     },
   },
   {
-    name: "skill_get",
-    description: "Get all tracked skills with usage statistics. Returns skills sorted by usage count (most used first).",
+    name: "guide_get",
+    description: "Get all tracked guides with usage statistics. Returns guides sorted by usage count (most used first).",
     inputSchema: {
       type: "object",
       properties: {
         category: {
           type: "string",
-          description: "Filter by category (frontend, backend, tool, language, database). Optional.",
+          description: "Filter by category (web-frontend, web-backend, dev-tool, etc.). Optional.",
         },
-        skill: {
+        guide: {
           type: "string",
-          description: "Get detail for a specific skill name. Optional.",
+          description: "Get detail for a specific guide name. Optional.",
         },
       },
     },
   },
   {
-    name: "skill_practice",
-    description: "MANDATORY: Record skill usage - increments usage count, updates last_used date, and adds contexts/learnings. Call this when you use a skill during work. Both contexts and learnings are REQUIRED.",
+    name: "guide_practice",
+    description: "MANDATORY: Record guide usage - increments usage count, updates last_used date, and adds contexts/learnings. Call this when you use a guide during work. Both contexts and learnings are REQUIRED.",
     inputSchema: {
       type: "object",
       properties: {
-        skill: {
+        guide: {
           type: "string",
-          description: "Skill name (e.g., 'react', 'python', 'git')",
+          description: "Guide name (e.g., 'react', 'python', 'git')",
         },
         category: {
           type: "string",
-          description: "Category: frontend, backend, tool, language, database",
+          description: "Category: web-frontend, web-backend, dev-tool, programming-language, data-storage, etc.",
         },
         description: {
           type: "string",
-          description: "Detailed description, manual, or protocols for the skill. Optional.",
+          description: "Detailed description, manual, or protocols for the guide. Optional.",
         },
         contexts: {
           type: "array",
           items: { type: "string" },
-          description: "REQUIRED: Contexts where this skill was used (e.g., ['hooks', 'state']). Provide at least one context or empty array [].",
+          description: "REQUIRED: Contexts where this guide was used (e.g., ['hooks', 'state']). Provide at least one context or empty array [].",
         },
         learnings: {
           type: "array",
@@ -157,26 +165,26 @@ export const TOOLS = [
           description: "REQUIRED: New learnings discovered during use (e.g., ['useCallback prevents re-renders']). Provide at least one learning or empty array [].",
         },
       },
-      required: ["skill", "category", "contexts", "learnings"],
+      required: ["guide", "category", "contexts", "learnings"],
     },
   },
   {
-    name: "skill_create",
-    description: "Definition mode: Create a new skill with a detailed manual, mission, and protocols. Use this to establish a reusable framework for a specific technology or methodology.",
+    name: "guide_create",
+    description: "Definition mode: Create a new guide with a detailed manual, mission, and protocols. Use this to establish a reusable framework for a specific technology or methodology.",
     inputSchema: {
       type: "object",
       properties: {
-        skill: {
+        guide: {
           type: "string",
-          description: "Skill name (e.g., 'X Viral Growth Engine', 'TDD Workflow')",
+          description: "Guide name (e.g., 'X Viral Growth Engine', 'TDD Workflow')",
         },
         category: {
           type: "string",
-          description: "Category: frontend, backend, tool, language, database",
+          description: "Category: web-frontend, web-backend, dev-tool, programming-language, data-storage, etc.",
         },
         description: {
           type: "string",
-          description: "The full manual, protocols, mission, and templates for this skill.",
+          description: "The full manual, protocols, mission, and templates for this guide.",
         },
         contexts: {
           type: "array",
@@ -189,34 +197,34 @@ export const TOOLS = [
           description: "Initial learnings (optional).",
         },
       },
-      required: ["skill", "category", "description"],
+      required: ["guide", "category", "description"],
     },
   },
   {
-    name: "skill_discover",
-    description: "Auto-discover skills from current project by analyzing package.json, config files, and file extensions.",
+    name: "guide_discover",
+    description: "Auto-discover guides from current project by analyzing package.json, config files, and file extensions.",
     inputSchema: {
       type: "object",
       properties: {},
     },
   },
   {
-    name: "skill_suggest",
-    description: "Suggest relevant skills based on a task description. Analyzes the task and returns matching skills - both tracked (with experience) and untracked (new suggestions). Use this when user asks 'hangi skiller gerekli', 'uygun skiller var mı', or starting a new task.",
+    name: "guide_suggest",
+    description: "Suggest relevant guides based on a task description. Analyzes the task and returns matching guides - both tracked (with experience) and untracked (new suggestions). Use this when user asks 'hangi guide lar gerekli', 'uygun rehberler var mı', or starting a new task.",
     inputSchema: {
       type: "object",
       properties: {
         task: {
           type: "string",
-          description: "Task description to analyze for skill suggestions (e.g., 'react component with hooks', 'nodejs api development', 'python data analysis')",
+          description: "Task description to analyze for guide suggestions (e.g., 'react component with hooks', 'nodejs api development', 'python data analysis')",
         },
       },
       required: ["task"],
     },
   },
   {
-    name: "skill_distill",
-    description: "Transform a memory fragment (static fact) into a skill's learning (procedural knowledge). Use this when a learned piece of information should become part of a permanent capability.",
+    name: "guide_distill",
+    description: "Transform a memory fragment (static fact) into a guide's learning (procedural knowledge). Use this when a learned piece of information should become part of a permanent capability.",
     inputSchema: {
       type: "object",
       properties: {
@@ -224,56 +232,56 @@ export const TOOLS = [
           type: "string",
           description: "ID of the memory fragment to distill",
         },
-        skill: {
+        guide: {
           type: "string",
-          description: "Target skill name (e.g., 'react', 'git'). If it doesn't exist, it will be created.",
+          description: "Target guide name (e.g., 'react', 'git'). If it doesn't exist, it will be created.",
         },
         category: {
           type: "string",
-          description: "Category for the skill (required only if creating a new skill).",
+          description: "Category for the guide (required only if creating a new guide).",
         },
       },
-      required: ["memory_id", "skill"],
+      required: ["memory_id", "guide"],
     },
   },
   {
-    name: "skill_update",
-    description: "Update an existing skill's basic properties (name, category, description).",
+    name: "guide_update",
+    description: "Update an existing guide's basic properties (name, category, description).",
     inputSchema: {
       type: "object",
       properties: {
-        skill: {
+        guide: {
           type: "string",
-          description: "Current name of the skill to update",
+          description: "Current name of the guide to update",
         },
         new_name: {
           type: "string",
-          description: "New name for the skill (optional)",
+          description: "New name for the guide (optional)",
         },
         category: {
           type: "string",
-          description: "New category for the skill (optional)",
+          description: "New category for the guide (optional)",
         },
         description: {
           type: "string",
-          description: "New description/manual for the skill (optional)",
+          description: "New description/manual for the guide (optional)",
         },
       },
-      required: ["skill"],
+      required: ["guide"],
     },
   },
   {
-    name: "skill_forget",
-    description: "Remove a skill from the persistent database.",
+    name: "guide_forget",
+    description: "Remove a guide from the persistent database.",
     inputSchema: {
       type: "object",
       properties: {
-        skill: {
+        guide: {
           type: "string",
-          description: "Name of the skill to remove",
+          description: "Name of the guide to remove",
         },
       },
-      required: ["skill"],
+      required: ["guide"],
     },
   },
 ];

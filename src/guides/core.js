@@ -1,22 +1,22 @@
-// Lemma Skills Core Module
-// Provides skill tracking with usage statistics and learnings for AI context
+// Lemma Guides Core Module
+// Provides guide tracking with usage statistics and learnings for AI context
 
 import os from "os";
 import path from "path";
 import fs from "fs";
 import Fuse from "fuse.js";
-import { TASK_SKILL_MAP } from "./task-map.js";
+import { TASK_GUIDE_MAP } from "./task-map.js";
 
 const MEMORY_DIR = path.join(os.homedir(), ".lemma");
-const SKILLS_FILE = path.join(MEMORY_DIR, "skills.jsonl");
+const GUIDES_FILE = path.join(MEMORY_DIR, "guides.jsonl");
 
 /**
- * Generate a unique skill ID
- * @returns {string} ID in format "s" + 6 hex characters
+ * Generate a unique guide ID
+ * @returns {string} ID in format "g" + 6 hex characters
  */
-export function generateSkillId() {
+export function generateGuideId() {
   const hexChars = Math.random().toString(16).substring(2, 8);
-  return `s${hexChars}`;
+  return `g${hexChars}`;
 }
 
 /**
@@ -28,13 +28,13 @@ export function getToday() {
 }
 
 /**
- * Create a new skill object
- * @param {string} skill - Skill name (e.g., "react", "python")
+ * Create a new guide object
+ * @param {string} guide - Guide name (e.g., "react", "python")
  * @param {string} category - Category (must be one of VALID_CATEGORIES)
- * @param {string} description - Detailed description or manual for the skill
+ * @param {string} description - Detailed description or manual for the guide
  * @param {string[]} contexts - Initial contexts (optional)
  * @param {string[]} learnings - Initial learnings (optional)
- * @returns {object} Skill object
+ * @returns {object} Guide object
  *
  * VALID CATEGORIES:
  * ─────────────────────────────────────────────────────────────
@@ -60,10 +60,10 @@ export function getToday() {
  *   programming-language → TypeScript, Python, Rust, Go, Java
  * ─────────────────────────────────────────────────────────────
  */
-export function createSkill(skill, category, description = "", contexts = [], learnings = []) {
+export function createGuide(guide, category, description = "", contexts = [], learnings = []) {
   return {
-    id: generateSkillId(),
-    skill: skill.toLowerCase().trim(),
+    id: generateGuideId(),
+    guide: guide.toLowerCase().trim(),
     category: category.toLowerCase().trim(),
     description: description.trim(),
     usage_count: 1,
@@ -74,15 +74,15 @@ export function createSkill(skill, category, description = "", contexts = [], le
 }
 
 /**
- * Load all skills from disk
- * @returns {Array<object>} Array of skill objects, empty if file doesn't exist
+ * Load all guides from disk
+ * @returns {Array<object>} Array of guide objects, empty if file doesn't exist
  */
-export function loadSkills() {
+export function loadGuides() {
   try {
-    if (!fs.existsSync(SKILLS_FILE)) {
+    if (!fs.existsSync(GUIDES_FILE)) {
       return [];
     }
-    const content = fs.readFileSync(SKILLS_FILE, "utf-8");
+    const content = fs.readFileSync(GUIDES_FILE, "utf-8");
     if (!content.trim()) {
       return [];
     }
@@ -91,206 +91,206 @@ export function loadSkills() {
       .split("\n")
       .map(line => JSON.parse(line));
   } catch (error) {
-    console.error("Error loading skills:", error.message);
+    console.error("Error loading guides:", error.message);
     return [];
   }
 }
 
 /**
- * Save skills to disk as JSONL
- * @param {Array<object>} skills - Array of skill objects to save
+ * Save guides to disk as JSONL
+ * @param {Array<object>} guides - Array of guide objects to save
  */
-export function saveSkills(skills) {
+export function saveGuides(guides) {
   try {
-    const dir = path.dirname(SKILLS_FILE);
+    const dir = path.dirname(GUIDES_FILE);
     if (!fs.existsSync(dir)) {
       fs.mkdirSync(dir, { recursive: true });
     }
-    const jsonl = skills.map(s => JSON.stringify(s)).join("\n");
-    fs.writeFileSync(SKILLS_FILE, jsonl, "utf-8");
+    const jsonl = guides.map(g => JSON.stringify(g)).join("\n");
+    fs.writeFileSync(GUIDES_FILE, jsonl, "utf-8");
   } catch (error) {
-    console.error("Error saving skills:", error.message);
+    console.error("Error saving guides:", error.message);
     throw error;
   }
 }
 
 /**
- * Promote information from a memory fragment into a skill's learnings
- * @param {Array<object>} skills - Array of skill objects
- * @param {string} skillName - Target skill name
- * @param {string} category - Skill category (if new)
+ * Promote information from a memory fragment into a guide's learnings
+ * @param {Array<object>} guides - Array of guide objects
+ * @param {string} guideName - Target guide name
+ * @param {string} category - Guide category (if new)
  * @param {string} knowledge - The text to add as a learning
  * @param {string} context - Optional context of the discovery
- * @returns {object} The updated/created skill
+ * @returns {object} The updated/created guide
  */
-export function promoteToSkill(skills, skillName, category, knowledge, context = "") {
-  let skill = findSkill(skills, skillName);
+export function promoteToGuide(guides, guideName, category, knowledge, context = "") {
+  let guide = findGuide(guides, guideName);
 
-  if (!skill) {
-    skill = createSkill(skillName, category, `Created via distillation from memory.`, [context], [knowledge]);
-    skills.push(skill);
+  if (!guide) {
+    guide = createGuide(guideName, category, `Created via distillation from memory.`, [context], [knowledge]);
+    guides.push(guide);
   } else {
     // Add to learnings if not already present
-    if (!skill.learnings.includes(knowledge)) {
-      skill.learnings.push(knowledge);
+    if (!guide.learnings.includes(knowledge)) {
+      guide.learnings.push(knowledge);
     }
     // Add to contexts if provided and not present
-    if (context && !skill.contexts.includes(context)) {
-      skill.contexts.push(context.toLowerCase().trim());
+    if (context && !guide.contexts.includes(context)) {
+      guide.contexts.push(context.toLowerCase().trim());
     }
-    skill.usage_count += 1; // Distillation counts as a "practice" of the knowledge
-    skill.last_used = getToday();
+    guide.usage_count += 1; // Distillation counts as a "practice" of the knowledge
+    guide.last_used = getToday();
   }
 
-  return skill;
+  return guide;
 }
 
 /**
- * Find a skill by name (case-insensitive)
- * @param {Array<object>} skills - Array of skill objects
- * @param {string} skillName - Skill name to find
- * @returns {object|null} Skill object or null if not found
+ * Find a guide by name (case-insensitive)
+ * @param {Array<object>} guides - Array of guide objects
+ * @param {string} guideName - Guide name to find
+ * @returns {object|null} Guide object or null if not found
  */
-export function findSkill(skills, skillName) {
-  const normalized = skillName.toLowerCase().trim();
-  return skills.find(s => s.skill === normalized) || null;
+export function findGuide(guides, guideName) {
+  const normalized = guideName.toLowerCase().trim();
+  return guides.find(g => g.guide === normalized) || null;
 }
 
 /**
- * Update an existing skill's basic fields (id, skill, category, description)
- * @param {Array<object>} skills - Array of skill objects
- * @param {string} skillName - Name of the skill to update
+ * Update an existing guide's basic fields (id, guide, category, description)
+ * @param {Array<object>} guides - Array of guide objects
+ * @param {string} guideName - Name of the guide to update
  * @param {object} updates - Fields to update
- * @returns {object|null} Updated skill or null if not found
+ * @returns {object|null} Updated guide or null if not found
  */
-export function updateSkill(skills, skillName, updates) {
-  const skill = findSkill(skills, skillName);
-  if (!skill) return null;
+export function updateGuide(guides, guideName, updates) {
+  const guide = findGuide(guides, guideName);
+  if (!guide) return null;
 
-  if (updates.skill) skill.skill = updates.skill.toLowerCase().trim();
-  if (updates.category) skill.category = updates.category.toLowerCase().trim();
-  if (updates.description) skill.description = updates.description.trim();
+  if (updates.guide) guide.guide = updates.guide.toLowerCase().trim();
+  if (updates.category) guide.category = updates.category.toLowerCase().trim();
+  if (updates.description) guide.description = updates.description.trim();
 
-  return skill;
+  return guide;
 }
 
 /**
- * Delete a skill by name
- * @param {Array<object>} skills - Array of skill objects
- * @param {string} skillName - Name of the skill to delete
+ * Delete a guide by name
+ * @param {Array<object>} guides - Array of guide objects
+ * @param {string} guideName - Name of the guide to delete
  * @returns {boolean} True if deleted, false if not found
  */
-export function deleteSkill(skills, skillName) {
-  const normalized = skillName.toLowerCase().trim();
-  const initialLength = skills.length;
-  const filtered = skills.filter(s => s.skill !== normalized);
+export function deleteGuide(guides, guideName) {
+  const normalized = guideName.toLowerCase().trim();
+  const initialLength = guides.length;
+  const filtered = guides.filter(g => g.guide !== normalized);
 
   if (filtered.length === initialLength) return false;
 
   // Update the array in place (since it's passed by reference in some contexts)
-  skills.length = 0;
-  skills.push(...filtered);
+  guides.length = 0;
+  guides.push(...filtered);
   return true;
 }
 
 /**
- * Practice (use) a skill - increment usage, update contexts/learnings
- * @param {Array<object>} skills - Array of skill objects (will be mutated)
- * @param {string} skillName - Skill name
+ * Practice (use) a guide - increment usage, update contexts/learnings
+ * @param {Array<object>} guides - Array of guide objects (will be mutated)
+ * @param {string} guideName - Guide name
  * @param {string} category - Category (only used if creating new)
  * @param {string} description - Description (only used if creating new or updating empty)
  * @param {string[]} newContexts - Additional contexts to add
  * @param {string[]} newLearnings - Additional learnings to add
- * @returns {object} The updated or created skill
+ * @returns {object} The updated or created guide
  */
-export function practiceSkill(skills, skillName, category, description = "", newContexts = [], newLearnings = []) {
-  let skill = findSkill(skills, skillName);
+export function practiceGuide(guides, guideName, category, description = "", newContexts = [], newLearnings = []) {
+  let guide = findGuide(guides, guideName);
 
-  if (!skill) {
-    // Create new skill
-    skill = createSkill(skillName, category, description, newContexts, newLearnings);
-    skills.push(skill);
-    return skill;
+  if (!guide) {
+    // Create new guide
+    guide = createGuide(guideName, category, description, newContexts, newLearnings);
+    guides.push(guide);
+    return guide;
   }
 
-  // Update existing skill
-  skill.usage_count += 1;
-  skill.last_used = getToday();
+  // Update existing guide
+  guide.usage_count += 1;
+  guide.last_used = getToday();
 
   // Update description if it was empty and new one is provided
-  if (!skill.description && description) {
-    skill.description = description.trim();
+  if (!guide.description && description) {
+    guide.description = description.trim();
   }
 
   // Merge new contexts (deduplicated, case-insensitive)
-  const existingContexts = new Set(skill.contexts.map(c => c.toLowerCase()));
+  const existingContexts = new Set(guide.contexts.map(c => c.toLowerCase()));
   for (const ctx of newContexts) {
     const normalized = ctx.toLowerCase().trim();
     if (normalized && !existingContexts.has(normalized)) {
-      skill.contexts.push(normalized);
+      guide.contexts.push(normalized);
       existingContexts.add(normalized);
     }
   }
 
   // Merge new learnings (deduplicated by exact match)
-  const existingLearnings = new Set(skill.learnings);
+  const existingLearnings = new Set(guide.learnings);
   for (const learning of newLearnings) {
     const trimmed = learning.trim();
     if (trimmed && !existingLearnings.has(trimmed)) {
-      skill.learnings.push(trimmed);
+      guide.learnings.push(trimmed);
       existingLearnings.add(trimmed);
     }
   }
 
-  return skill;
+  return guide;
 }
 
 /**
- * Get skills sorted by usage (most used first)
- * @param {Array<object>} skills - Array of skill objects
+ * Get guides sorted by usage (most used first)
+ * @param {Array<object>} guides - Array of guide objects
  * @param {number} limit - Max number to return
- * @returns {Array<object>} Sorted skills
+ * @returns {Array<object>} Sorted guides
  */
-export function getTopSkills(skills, limit = 20) {
-  return [...skills]
+export function getTopGuides(guides, limit = 20) {
+  return [...guides]
     .sort((a, b) => b.usage_count - a.usage_count)
     .slice(0, limit);
 }
 
 /**
- * Get skills filtered by category
- * @param {Array<object>} skills - Array of skill objects
+ * Get guides filtered by category
+ * @param {Array<object>} guides - Array of guide objects
  * @param {string} category - Category to filter by
- * @returns {Array<object>} Filtered skills
+ * @returns {Array<object>} Filtered guides
  */
-export function getSkillsByCategory(skills, category) {
+export function getGuidesByCategory(guides, category) {
   const normalized = category.toLowerCase().trim();
-  return skills.filter(s => s.category === normalized);
+  return guides.filter(g => g.category === normalized);
 }
 
 /**
- * Format skills for LLM consumption
- * @param {Array<object>} skills - Array of skill objects
+ * Format guides for LLM consumption
+ * @param {Array<object>} guides - Array of guide objects
  * @returns {string} Formatted string
  */
-export function formatSkillsForLLM(skills) {
-  if (skills.length === 0) {
-    return `=== LEMMA SKILLS ===\n(no skills tracked yet)\n====================`;
+export function formatGuidesForLLM(guides) {
+  if (guides.length === 0) {
+    return `=== LEMMA GUIDES ===\n(no guides tracked yet)\n====================`;
   }
 
-  const sorted = getTopSkills(skills, 30);
+  const sorted = getTopGuides(guides, 30);
 
-  const lines = sorted.map(skill => {
-    const contextsStr = skill.contexts.length > 0
-      ? ` [${skill.contexts.slice(0, 5).join(", ")}${skill.contexts.length > 5 ? "..." : ""}]`
+  const lines = sorted.map(guide => {
+    const contextsStr = guide.contexts.length > 0
+      ? ` [${guide.contexts.slice(0, 5).join(", ")}${guide.contexts.length > 5 ? "..." : ""}]`
       : "";
-    const learningsCount = skill.learnings.length > 0
-      ? ` (${skill.learnings.length} learnings)`
+    const learningsCount = guide.learnings.length > 0
+      ? ` (${guide.learnings.length} learnings)`
       : "";
-    return `[${skill.category}] ${skill.skill}: ${skill.usage_count}x (last: ${skill.last_used})${contextsStr}${learningsCount}`;
+    return `[${guide.category}] ${guide.guide}: ${guide.usage_count}x (last: ${guide.last_used})${contextsStr}${learningsCount}`;
   });
 
-  return `=== LEMMA SKILLS ===\n${lines.join("\n")}\n====================`;
+  return `=== LEMMA GUIDES ===\n${lines.join("\n")}\n====================`;
 }
 
 /**
@@ -312,7 +312,7 @@ function tokenize(str) {
  * Check if any token from text matches any token from target
  * Uses partial matching: "viral" matches "viral-content"
  * @param {string} text - Source text (e.g., task description)
- * @param {string} target - Target text (e.g., skill name or context)
+ * @param {string} target - Target text (e.g., guide name or context)
  * @returns {boolean} True if there's a token overlap
  */
 function hasTokenMatch(text, target) {
@@ -337,18 +337,18 @@ function hasTokenMatch(text, target) {
 }
 
 /**
- * Suggest skills based on task description using fuzzy search
+ * Suggest guides based on task description using fuzzy search
  * @param {string} taskDescription - Task/query description
- * @param {Array<object>} existingSkills - Current tracked skills
+ * @param {Array<object>} existingGuides - Current tracked guides
  * @returns {object} { suggested: [], missing: [], relevant: [] }
  */
-export function suggestSkills(taskDescription, existingSkills = []) {
+export function suggestGuides(taskDescription, existingGuides = []) {
   const suggestions = [];
   const seen = new Set();
 
-  // Fuse.js configuration for skill matching
+  // Fuse.js configuration for guide matching
   const fuseOptions = {
-    keys: ['skill', 'keywords', 'contexts', 'learnings', 'description'],
+    keys: ['guide', 'keywords', 'contexts', 'learnings', 'description'],
     threshold: 0.45,           // Tolerate typos and partial matches
     distance: 100,
     minMatchCharLength: 2,
@@ -357,27 +357,27 @@ export function suggestSkills(taskDescription, existingSkills = []) {
     findAllMatches: true
   };
 
-  // 1. Search in TASK_SKILL_MAP using Fuse
-  const allSkillDefs = Object.values(TASK_SKILL_MAP).flat().map(def => ({
+  // 1. Search in TASK_GUIDE_MAP using Fuse
+  const allGuideDefs = Object.values(TASK_GUIDE_MAP).flat().map(def => ({
     ...def,
     keywords: def.keywords || []
   }));
 
-  const staticFuse = new Fuse(allSkillDefs, {
+  const staticFuse = new Fuse(allGuideDefs, {
     ...fuseOptions,
-    keys: ['skill', 'keywords']
+    keys: ['guide', 'keywords']
   });
 
   const staticResults = staticFuse.search(taskDescription, { limit: 20 });
 
   for (const result of staticResults) {
-    const skillDef = result.item;
-    if (seen.has(skillDef.skill)) continue;
-    seen.add(skillDef.skill);
+    const guideDef = result.item;
+    if (seen.has(guideDef.guide)) continue;
+    seen.add(guideDef.guide);
 
-    const existing = existingSkills.find(s => s.skill === skillDef.skill);
+    const existing = existingGuides.find(g => g.guide === guideDef.guide);
     suggestions.push({
-      ...skillDef,
+      ...guideDef,
       tracked: !!existing,
       usage_count: existing?.usage_count || 0,
       last_used: existing?.last_used || null,
@@ -386,22 +386,22 @@ export function suggestSkills(taskDescription, existingSkills = []) {
     });
   }
 
-  // 2. Search in tracked skills using Fuse (fuzzy on name, contexts, learnings, description)
-  if (existingSkills.length > 0) {
-    const trackedFuse = new Fuse(existingSkills, {
+  // 2. Search in tracked guides using Fuse (fuzzy on name, contexts, learnings, description)
+  if (existingGuides.length > 0) {
+    const trackedFuse = new Fuse(existingGuides, {
       ...fuseOptions,
-      keys: ['skill', 'contexts', 'learnings', 'description']
+      keys: ['guide', 'contexts', 'learnings', 'description']
     });
 
     const trackedResults = trackedFuse.search(taskDescription, { limit: 20 });
 
     for (const result of trackedResults) {
       const existing = result.item;
-      if (seen.has(existing.skill)) continue;
-      seen.add(existing.skill);
+      if (seen.has(existing.guide)) continue;
+      seen.add(existing.guide);
 
       suggestions.push({
-        skill: existing.skill,
+        guide: existing.guide,
         category: existing.category,
         keywords: existing.contexts,
         tracked: true,
@@ -416,16 +416,16 @@ export function suggestSkills(taskDescription, existingSkills = []) {
 
   // 3. Fallback: token-based matching for anything Fuse might have missed
   const desc = taskDescription.toLowerCase();
-  for (const existing of existingSkills) {
-    if (seen.has(existing.skill)) continue;
+  for (const existing of existingGuides) {
+    if (seen.has(existing.guide)) continue;
 
     // Token-based fallback
-    if (hasTokenMatch(desc, existing.skill) ||
+    if (hasTokenMatch(desc, existing.guide) ||
       existing.contexts.some(ctx => hasTokenMatch(desc, ctx)) ||
       existing.learnings.some(l => hasTokenMatch(desc, l))) {
-      seen.add(existing.skill);
+      seen.add(existing.guide);
       suggestions.push({
-        skill: existing.skill,
+        guide: existing.guide,
         category: existing.category,
         keywords: existing.contexts,
         tracked: true,
@@ -446,23 +446,23 @@ export function suggestSkills(taskDescription, existingSkills = []) {
     relevant: tracked,
     missing: missing,
     suggested: suggestions,
-    summary: `Found ${suggestions.length} relevant skills (${tracked.length} tracked, ${missing.length} new)`,
+    summary: `Found ${suggestions.length} relevant guides (${tracked.length} tracked, ${missing.length} new)`,
   };
 }
 
 /**
- * Format skill suggestions for LLM
- * @param {object} result - Result from suggestSkills
+ * Format guide suggestions for LLM
+ * @param {object} result - Result from suggestGuides
  * @returns {string} Formatted string
  */
 export function formatSuggestions(result) {
-  let output = `=== SKILL SUGGESTIONS ===\n`;
+  let output = `=== GUIDE SUGGESTIONS ===\n`;
   output += `${result.summary}\n\n`;
 
   if (result.relevant.length > 0) {
     output += `TRACKED (you have experience):\n`;
     for (const s of result.relevant) {
-      output += `  ✓ [${s.category}] ${s.skill} (${s.usage_count}x, last: ${s.last_used || 'n/a'})\n`;
+      output += `  ✓ [${s.category}] ${s.guide} (${s.usage_count}x, last: ${s.last_used || 'n/a'})\n`;
       // Show learnings if any
       if (s.learnings && s.learnings.length > 0) {
         for (const l of s.learnings.slice(0, 3)) {
@@ -479,7 +479,7 @@ export function formatSuggestions(result) {
   if (result.missing.length > 0) {
     output += `SUGGESTED (not tracked yet):\n`;
     for (const s of result.missing) {
-      output += `  + [${s.category}] ${s.skill}\n`;
+      output += `  + [${s.category}] ${s.guide}\n`;
       // Show keywords as hints
       if (s.keywords && s.keywords.length > 0) {
         output += `      keywords: ${s.keywords.slice(0, 5).join(", ")}\n`;
@@ -489,7 +489,7 @@ export function formatSuggestions(result) {
   }
 
   if (result.suggested.length === 0) {
-    output += `No relevant skills found for this task.\n`;
+    output += `No relevant guides found for this task.\n`;
     output += `Try describing the task with more specific terms.\n`;
   }
 
@@ -498,31 +498,31 @@ export function formatSuggestions(result) {
 }
 
 /**
- * Format a single skill detail for LLM
- * @param {object} skill - Skill object
+ * Format a single guide detail for LLM
+ * @param {object} guide - Guide object
  * @returns {string} Formatted detail string
  */
-export function formatSkillDetail(skill) {
-  if (!skill) {
-    return "Skill not found.";
+export function formatGuideDetail(guide) {
+  if (!guide) {
+    return "Guide not found.";
   }
 
-  let detail = `=== SKILL: ${skill.skill} ===\n`;
-  detail += `Category: ${skill.category}\n`;
-  detail += `Usage Count: ${skill.usage_count}\n`;
-  detail += `Last Used: ${skill.last_used}\n`;
+  let detail = `=== GUIDE: ${guide.guide} ===\n`;
+  detail += `Category: ${guide.category}\n`;
+  detail += `Usage Count: ${guide.usage_count}\n`;
+  detail += `Last Used: ${guide.last_used}\n`;
 
-  if (skill.description) {
-    detail += `\n=== DESCRIPTION / PROTOCOLS ===\n${skill.description}\n===============================\n`;
+  if (guide.description) {
+    detail += `\n=== DESCRIPTION / PROTOCOLS ===\n${guide.description}\n===============================\n`;
   }
 
-  if (skill.contexts.length > 0) {
-    detail += `Contexts: ${skill.contexts.join(", ")}\n`;
+  if (guide.contexts.length > 0) {
+    detail += `Contexts: ${guide.contexts.join(", ")}\n`;
   }
 
-  if (skill.learnings.length > 0) {
+  if (guide.learnings.length > 0) {
     detail += `Learnings:\n`;
-    for (const l of skill.learnings) {
+    for (const l of guide.learnings) {
       detail += `  - ${l}\n`;
     }
   }
@@ -531,5 +531,5 @@ export function formatSkillDetail(skill) {
   return detail;
 }
 
-// Export TASK_SKILL_MAP for external use
-export { TASK_SKILL_MAP };
+// Export TASK_GUIDE_MAP for external use
+export { TASK_GUIDE_MAP };

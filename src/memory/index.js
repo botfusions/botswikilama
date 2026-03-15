@@ -9,5 +9,6 @@ export {
   filterByProject,
   decayConfidence,
   searchAndSortFragments,
-  formatMemoryForLLM
+  formatMemoryForLLM,
+  formatMemoryDetail
 } from "./core.js";
