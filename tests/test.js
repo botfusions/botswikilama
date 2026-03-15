@@ -856,13 +856,13 @@ async function test_guides_updateGuide() {
   guides.practiceGuide(allGuides, "React", "frontend", "Old description");
 
   const updated = guides.updateGuide(allGuides, "React", {
-    skill: "ReactJS",
+    guide: "ReactJS",
     category: "web-frontend",
     description: "New description"
   });
 
-  assert.ok(updated, "Should return updated skill");
-  assert.strictEqual(updated.skill, "reactjs", "Should update skill name");
+  assert.ok(updated, "Should return updated guide");
+  assert.strictEqual(updated.guide, "reactjs", "Should update guide name");
   assert.strictEqual(updated.category, "web-frontend", "Should update category");
   assert.strictEqual(updated.description, "New description", "Should update description");
 }
@@ -887,8 +887,8 @@ async function test_guides_deleteGuide() {
   const result = guides.deleteGuide(allGuides, "React");
 
   assert.strictEqual(result, true, "Should return true when deleted");
-  assert.strictEqual(allGuides.length, 1, "Should have 1 skill remaining");
-  assert.strictEqual(allGuides[0].skill, "vue", "Vue should remain");
+  assert.strictEqual(allGuides.length, 1, "Should have 1 guide remaining");
+  assert.strictEqual(allGuides[0].guide, "vue", "Vue should remain");
 }
 
 // Test 33: deleteGuide - returns false for non-existent
@@ -907,8 +907,8 @@ async function test_guides_promoteToGuide_createsNew() {
 
   const result = guides.promoteToGuide(allGuides, "React", "web-frontend", "useCallback prevents re-renders", "hooks");
 
-  assert.ok(result, "Should return the skill");
-  assert.strictEqual(result.skill, "react", "Should have correct skill name");
+  assert.ok(result, "Should return the guide");
+  assert.strictEqual(result.guide, "react", "Should have correct guide name");
   assert.strictEqual(result.learnings.length, 1, "Should have 1 learning");
   assert.ok(result.learnings.includes("useCallback prevents re-renders"), "Should have the learning");
   assert.ok(result.contexts.includes("hooks"), "Should have the context");
