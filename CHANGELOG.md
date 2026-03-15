@@ -1,5 +1,28 @@
 # Changelog
 
+## [0.2.0] - 2026-03-15
+
+### Breaking Changes
+- **Skill → Guide Rename**: Complete terminology migration across the entire codebase
+  - All tool names renamed: `skill_*` → `guide_*`
+    - `skill_get` → `guide_get`
+    - `skill_practice` → `guide_practice`
+    - `skill_create` → `guide_create`
+    - `skill_suggest` → `guide_suggest`
+    - `skill_discover` → `guide_discover`
+  - Directory renamed: `src/skills/` → `src/guides/`
+  - Export path changed: `./skills` → `./guides`
+  - URI pattern changed: `lemma://skills/` → `lemma://guides/`
+  - Data file changed: `skills.jsonl` → `guides.jsonl`
+  - ID prefix changed: `s1a2b3` → `g1a2b3`
+
+### Migration Guide
+- Rename your data file: `~/.lemma/skills.jsonl` → `~/.lemma/guides.jsonl`
+- Update any MCP client configurations referencing skill tools
+- Existing `SKILL.md` files remain compatible for import
+
+---
+
 ## [0.1.4] - 2025-03-12
 
 ### Changed
