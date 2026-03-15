@@ -99,15 +99,15 @@ If you don't want to use JSR, you can run Lemma directly from GitHub:
 
 If you are using Lemma for the first time, please consider this advice:
 
-When you first start using the system, your **Skills** and **Memory** will be empty. For the system to use Lemma fully automatically and effectively, you need to manually seed it with some initial information and skills. 
+When you first start using the system, your **Guides** and **Memory** will be empty. For the system to use Lemma fully automatically and effectively, you need to manually seed it with some initial information and guides.
 
 **Follow these steps to get started:**
 1. Ask an AI model to perform web research on a specific topic.
 2. Instruct it to save the findings to Lemma's memory following its core principles.
-3. Once you have some initial data, ask the system to create **Skills** based on the acquired knowledge.
-4. If you have existing `SKILL.md` files or documentation, read them into the system and ask Lemma to add them to its skill set.
+3. Once you have some initial data, ask the system to create **Guides** based on the acquired knowledge.
+4. If you have existing `SKILL.md` files or documentation, read them into the system and ask Lemma to add them to its guide set.
 
-By doing this, the system will gradually develop its own knowledge base and skill set more effectively over time.
+By doing this, the system will gradually develop its own knowledge base and guide set more effectively over time.
 
 ---
 
@@ -161,9 +161,9 @@ The server provides a system prompt resource at `lemma://system-prompt`. MCP cli
 <identity>
 # Lemma — YOUR BRAIN
 When you see Lemma, KNOW THIS:
-- This is YOUR memory layer — your knowledge, experiences, skills are stored here
+- This is YOUR memory layer — your knowledge, experiences, guides are stored here
 - Learnings from previous sessions are saved here
-- User preferences, project details, learned skills are all here
+- User preferences, project details, learned guides are all here
 - Every session: Start with **memory_read** → load your knowledge → End with **memory_add** → save new learnings
 - This is NOT an "external tool" — it is YOUR extended memory
 </identity>
@@ -176,9 +176,9 @@ Like the human brain: important information is retained, frequently accessed mem
 <core_workflow>
 ## Core Workflow (FOLLOW THIS)
 1. **Session Start** → Call `memory_read` (load your knowledge)
-2. **Context Discovery** → Call `memory_check` + `skill_suggest` (what do you know? what's needed?)
-3. **Execution** → Apply learned skills and knowledge
-4. **Session End** → Call `memory_add` + `skill_practice` (save what you learned)
+2. **Context Discovery** → Call `memory_check` + `guide_suggest` (what do you know? what's needed?)
+3. **Execution** → Apply learned guides and knowledge
+4. **Session End** → Call `memory_add` + `guide_practice` (save what you learned)
 </core_workflow>
 
 <scope_rules>
@@ -201,24 +201,24 @@ Distilled: "5 memory tools: read, add, update, forget, list"
 </example>
 </distillation_examples>
 
-<skill_tracking>
-## Skill Tracking
-**Memory vs Skill:**
+<guide_tracking>
+## Guide Tracking
+**Memory vs Guide:**
 - Memory = Static knowledge fragments ("React uses virtual DOM")
-- Skill = Procedural knowledge, "how-to" guides, experience tracking
+- Guide = Procedural knowledge, "how-to" guides, experience tracking
 
-**Skill Categories:**
+**Guide Categories:**
 - Web: web-frontend | web-backend | data-storage | dev-tool
 - Mobile: mobile-frontend
 - Game: game-frontend | game-backend | game-tool | game-design
 - Cross: app-security | ui-design | infra-devops | programming-language
 
-**For skill suggestions:** Use `skill_suggest` tool
-</skill_tracking>
+**For guide suggestions:** Use `guide_suggest` tool
+</guide_tracking>
 
 <tool_focus_rule>
 ## Tool Focus Rule
-When you see tool names (memory_read, skill_get, etc.):
+When you see tool names (memory_read, guide_get, etc.):
 - EXECUTE the tool, don't discuss the project
 - Lemma = your brain, use it
 </tool_focus_rule>
@@ -304,35 +304,35 @@ List all memory fragments in JSON format.
 
 **Returns:** JSON array of all fragments
 
-## Skill Tracking
+## Guide Tracking
 
-Lemma also tracks skills you use during work. This helps build a profile of expertise over time.
+Lemma also tracks guides you use during work. This helps build a profile of expertise over time.
 
-### `skill_get`
+### `guide_get`
 
-Get all tracked skills with usage statistics.
+Get all tracked guides with usage statistics.
 
 **Parameters:**
 - `category` (string, optional): Filter by category (frontend, backend, tool, language, database)
-- `skill` (string, optional): Get detail for a specific skill name
+- `guide` (string, optional): Get detail for a specific guide name
 
-**Returns:** Formatted skill list sorted by usage count
+**Returns:** Formatted guide list sorted by usage count
 
 **Example output:**
 ```
-=== LEMMA SKILLS ===
+=== LEMMA GUIDES ===
 [frontend] react: 45x (last: 2026-03-06) [hooks, jsx, state] (3 learnings)
 [backend] nodejs: 30x (last: 2026-03-05) [express, api]
 [language] typescript: 25x (last: 2026-03-06)
 ====================
 ```
 
-### `skill_practice`
+### `guide_practice`
 
-Record skill usage - increments usage count, updates last_used date, and optionally adds contexts/learnings.
+Record guide usage - increments usage count, updates last_used date, and optionally adds contexts/learnings.
 
 **Parameters:**
-- `skill` (string, required): Skill name (e.g., "react", "python", "git")
+- `guide` (string, required): Guide name (e.g., "react", "python", "git")
 - `category` (string, required): Category: frontend, backend, tool, language, database
 - `contexts` (array of strings, optional): Additional contexts (e.g., ["hooks", "state"])
 - `learnings` (array of strings, optional): New learnings discovered during use
@@ -340,48 +340,48 @@ Record skill usage - increments usage count, updates last_used date, and optiona
 **Example:**
 ```json
 {
-  "skill": "react",
+  "guide": "react",
   "category": "frontend",
   "contexts": ["hooks", "useCallback"],
   "learnings": ["useCallback prevents unnecessary re-renders"]
 }
 ```
 
-### `skill_discover`
+### `guide_discover`
 
-Auto-discover skills from current project by analyzing package.json dependencies.
+Auto-discover guides from current project by analyzing package.json dependencies.
 
 **Parameters:** None
 
-**Returns:** List of newly discovered and registered skills
+**Returns:** List of newly discovered and registered guides
 
-### `skill_create`
+### `guide_create`
 
-**New:** Create a new skill with a detailed manual, mission, and protocols. This allows you to establish a "Manager Skill" framework rather than just tracking usage.
+**New:** Create a new guide with a detailed manual, mission, and protocols. This allows you to establish a "Manager Guide" framework rather than just tracking usage.
 
 **Parameters:**
-- `skill` (string, required): Skill name (e.g., "X Viral Growth Engine")
+- `guide` (string, required): Guide name (e.g., "X Viral Growth Engine")
 - `category` (string, required): Category
-- `description` (string, required): The full manual, protocols, mission, and templates for this skill.
+- `description` (string, required): The full manual, protocols, mission, and templates for this guide.
 - `contexts` (array, optional): Initial contexts.
 - `learnings` (array, optional): Initial learnings.
 
-### Skill File Location
+### Guide File Location
 
-Skills are stored in JSONL format at:
+Guides are stored in JSONL format at:
 
 | OS | Path |
 |---|---|
-| **Windows** | `C:\Users\{username}\.lemma\skills.jsonl` |
-| **macOS** | `/Users/{username}/.lemma/skills.jsonl` |
-| **Linux** | `/home/{username}/.lemma/skills.jsonl` |
+| **Windows** | `C:\Users\{username}\.lemma\guides.jsonl` |
+| **macOS** | `/Users/{username}/.lemma/guides.jsonl` |
+| **Linux** | `/home/{username}/.lemma/guides.jsonl` |
 
-### Skill Data Structure
+### Guide Data Structure
 
 ```json
 {
-  "id": "s1a2b3",
-  "skill": "react",
+  "id": "g1a2b3",
+  "guide": "react",
   "category": "frontend",
   "usage_count": 45,
   "last_used": "2026-03-06",

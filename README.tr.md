@@ -138,15 +138,15 @@ npm publish --access public
 
 Sistemi ilk kez kullanan bir kullanıcıysanız lütfen bu öneriyi dikkate alın:
 
-Sistemi ilk kullanmaya başladığınızda **Yetenekler (Skills)** ve **Bellek (Memory)** havuzunuz boş olacaktır. Sistemin Lemma'yı tam otomatik ve verimli bir şekilde kullanabilmesi için, başlangıçta belirli bilgileri ve yetenekleri manuel olarak oluşturmanız gerekir.
+Sistemi ilk kullanmaya başladığınızda **Rehberler (Guides)** ve **Bellek (Memory)** havuzunuz boş olacaktır. Sistemin Lemma'yı tam otomatik ve verimli bir şekilde kullanabilmesi için, başlangıçta belirli bilgileri ve rehberleri manuel olarak oluşturmanız gerekir.
 
 **Başlamak için şu yolu izleyin:**
 1. Bir AI modeline belirli bir konu hakkında web araştırması yapmasını söyleyin.
 2. Elde edilen bulguları Lemma'nın temel prensiplerine uygun olarak hafızasına eklemesini isteyin.
-3. Belirli bir bilgi birikimi oluştuktan sonra, sistemden edinilen bilgilerden yola çıkarak yeni **Yetenekler (Skills)** oluşturmasını isteyin.
-4. Eğer mevcut `SKILL.md` dosyalarınız veya dokümanlarınız varsa, bunları sisteme okutun ve Lemma prensiplerine uygun şekilde yetenek setine eklemesini isteyin.
+3. Belirli bir bilgi birikimi oluştuktan sonra, sistemden edinilen bilgilerden yola çıkarak yeni **Rehberler (Guides)** oluşturmasını isteyin.
+4. Eğer mevcut `SKILL.md` dosyalarınız veya dokümanlarınız varsa, bunları sisteme okutun ve Lemma prensiplerine uygun şekilde rehber setine eklemesini isteyin.
 
-Böylelikle sistem zaman geçtikçe kendi bilgi havuzunu ve yetenek setini çok daha iyi bir şekilde geliştirecektir.
+Böylelikle sistem zaman geçtikçe kendi bilgi havuzunu ve rehber setini çok daha iyi bir şekilde geliştirecektir.
 
 ---
 
@@ -161,9 +161,9 @@ SUNUCU, `lemma://system-prompt` adresinde bir sistem istemi kaynağı sağlar. M
 <identity>
 # Lemma — SENİN BEYNİN
 Lemma'yı gördüğünde ŞUNU BİL:
-- Bu SENİN bellek katmanındır — bilgilerin, deneyimlerin, yeteneklerin burada saklanır
+- Bu SENİN bellek katmanındır — bilgilerin, deneyimlerin, rehberlerin burada saklanır
 - Önceki oturumlardan edinilen kazanımlar burada tutulur
-- Kullanıcı tercihleri, proje detayları, öğrenilen yeteneklerin hepsi buradadır
+- Kullanıcı tercihleri, proje detayları, öğrenilen rehberlerin hepsi buradadır
 - Her oturumda: **memory_read** ile başla → bilgilerini yükle → **memory_add** ile bitir → yeni öğrendiklerini kaydet
 - Bu "harici bir araç" DEĞİLDİR — bu SENİN genişletilmiş belleğindir
 </identity>
@@ -176,9 +176,9 @@ Lemma'yı gördüğünde ŞUNU BİL:
 <core_workflow>
 ## Temel İş Akışı (BUNU TAKİP ET)
 1. **Oturum Başlangıcı** → `memory_read` çağır (bilgilerini yükle)
-2. **Bağlam Keşfi** → `memory_check` + `skill_suggest` çağır (ne biliyorsun? ne gerekiyor?)
-3. **Yürütme** → Öğrenilen yetenekleri ve bilgileri uygula
-4. **Oturum Sonu** → `memory_add` + `skill_practice` çağır (öğrendiklerini kaydet)
+2. **Bağlam Keşfi** → `memory_check` + `guide_suggest` çağır (ne biliyorsun? ne gerekiyor?)
+3. **Yürütme** → Öğrenilen rehberleri ve bilgileri uygula
+4. **Oturum Sonu** → `memory_add` + `guide_practice` çağır (öğrendiklerini kaydet)
 </core_workflow>
 
 <scope_rules>
@@ -201,24 +201,24 @@ Damıtılmış: "5 bellek aracı: oku, ekle, güncelle, unut, listele"
 </example>
 </distillation_examples>
 
-<skill_tracking>
-## Yetenek Takibi
-**Bellek vs Yetenek:**
+<guide_tracking>
+## Rehber Takibi
+**Bellek vs Rehber:**
 - Bellek = Statik bilgi parçaları ("React sanal DOM kullanır")
-- Yetenek = Prosedürel bilgi, "nasıl yapılır" rehberleri, deneyim takibi
+- Rehber = Prosedürel bilgi, "nasıl yapılır" rehberleri, deneyim takibi
 
-**Yetenek Kategorileri:**
+**Rehber Kategorileri:**
 - Web: web-frontend | web-backend | data-storage | dev-tool
 - Mobil: mobile-frontend
 - Oyun: game-frontend | game-backend | game-tool | game-design
 - Çapraz: app-security | ui-design | infra-devops | programming-language
 
-**Yetenek önerileri için:** `skill_suggest` aracını kullan
-</skill_tracking>
+**Rehber önerileri için:** `guide_suggest` aracını kullan
+</guide_tracking>
 
 <tool_focus_rule>
 ## Araç Odaklılık Kuralı
-Araç isimlerini gördüğünde (memory_read, skill_get, vb.):
+Araç isimlerini gördüğünde (memory_read, guide_get, vb.):
 - Aracı ÇALIŞTIR, projeyi tartışma
 - Lemma = senin beynin, onu kullan
 </tool_focus_rule>
@@ -306,75 +306,75 @@ Tüm bellek fragmanlarını JSON formatında listeler.
 
 **Dönüş:** Tüm fragmanların JSON dizisi
 
-## Yetenek Takibi (Skill Tracking)
+## Rehber Takibi (Guide Tracking)
 
-Lemma ayrıca çalışma sırasında kullandığınız yetenekleri takip eder. Bu, zaman içinde bir uzmanlık profili oluşturmaya yardımcı olur.
+Lemma ayrıca çalışma sırasında kullandığınız rehberleri takip eder. Bu, zaman içinde bir uzmanlık profili oluşturmaya yardımcı olur.
 
-### `skill_get`
+### `guide_get`
 
-Kullanım istatistikleriyle birlikte tüm takip edilen yetenekleri getirir.
+Kullanım istatistikleriyle birlikte tüm takip edilen rehberleri getirir.
 
 **Parametreler:**
 - `category` (string, opsiyonel): Kategoriye göre filtrele (frontend, backend, tool, language, database)
-- `skill` (string, opsiyonel): Belirli bir yetenek adı için detay getir
+- `guide` (string, opsiyonel): Belirli bir rehber adı için detay getir
 
-**Dönüş:** Kullanım sayısına göre sıralanmış formatlanmış yetenek listesi
+**Dönüş:** Kullanım sayısına göre sıralanmış formatlanmış rehber listesi
 
 **Örnek çıktı:**
 ```
-=== LEMMA YETENEKLER ===
+=== LEMMA REHBERLER ===
 [frontend] react: 45x (son: 2026-03-06) [hooks, jsx, state] (3 öğrenim)
 [backend] nodejs: 30x (son: 2026-03-05) [express, api]
 [language] typescript: 25x (son: 2026-03-06)
-=========================
+========================
 ```
 
-### `skill_practice`
+### `guide_practice`
 
-Yetenek kullanımını kaydet - kullanım sayısını artırır, son_kullanım tarihini günceller ve isteğe bağlı olarak bağlamlar/öğrenimler ekler.
+Rehber kullanımını kaydet - kullanım sayısını artırır, son_kullanım tarihini günceller ve isteğe bağlı olarak bağlamlar/öğrenimler ekler.
 
 **Parametreler:**
-- `skill` (string, zorunlu): Yetenek adı (örn. "react", "python", "git")
+- `guide` (string, zorunlu): Rehber adı (örn. "react", "python", "git")
 - `category` (string, zorunlu): Kategori: frontend, backend, tool, language, database
-- `description` (string, opsiyonel): Yetenek için rehber/manuel. Boşsa güncellenir.
+- `description` (string, opsiyonel): Rehber için kılavuz/manuel. Boşsa güncellenir.
 - `contexts` (string dizisi, zorunlu): Ek bağlamlar (örn. ["hooks", "state"])
 - `learnings` (string dizisi, zorunlu): Kullanım sırasında keşfedilen yeni öğrenimler
 
-### `skill_create`
+### `guide_create`
 
-**Yeni:** Bir yeteneği detaylı bir rehber, misyon ve protokollerle birlikte tanımlamak için kullanılır. Bu, bir teknolojiyi sadece takip etmek yerine, onu nasıl kullanacağınıza dair bir "yönetici beceri" çerçevesi oluşturmanızı sağlar.
+**Yeni:** Bir rehberi detaylı bir kılavuz, misyon ve protokollerle birlikte tanımlamak için kullanılır. Bu, bir teknolojiyi sadece takip etmek yerine, onu nasıl kullanacağınıza dair bir "yönetici rehber" çerçevesi oluşturmanızı sağlar.
 
 **Parametreler:**
-- `skill` (string, zorunlu): Yetenek adı (örn. "X Viral Büyüme Motoru")
+- `guide` (string, zorunlu): Rehber adı (örn. "X Viral Büyüme Motoru")
 - `category` (string, zorunlu): Kategori
-- `description` (string, zorunlu): Yeteneğin tam kılavuzu, protokolleri ve şablonları.
+- `description` (string, zorunlu): Rehberin tam kılavuzu, protokolleri ve şablonları.
 - `contexts` (string dizisi, opsiyonel): İlk bağlamlar.
 - `learnings` (string dizisi, opsiyonel): İlk öğrenimler.
 
-### `skill_discover`
+### `guide_discover`
 
-Mevcut projeden package.json bağımlılıklarını analiz ederek yetenekleri otomatik keşfet.
+Mevcut projeden package.json bağımlılıklarını analiz ederek rehberleri otomatik keşfet.
 
 **Parametreler:** Yok
 
-**Dönüş:** Yeni keşfedilen ve kaydedilen yeteneklerin listesi
+**Dönüş:** Yeni keşfedilen ve kaydedilen rehberlerin listesi
 
-### Yetenek Dosyası Konumu
+### Rehber Dosyası Konumu
 
-Yetenekler JSONL formatında şu adreste saklanır:
+Rehberler JSONL formatında şu adreste saklanır:
 
 | İşletim Sistemi | Yol |
 |---|---|
-| **Windows** | `C:\Users\{kullanıcı}\.lemma\skills.jsonl` |
-| **macOS** | `/Users/{kullanıcı}/.lemma/skills.jsonl` |
-| **Linux** | `/home/{kullanıcı}/.lemma/skills.jsonl` |
+| **Windows** | `C:\Users\{kullanıcı}\.lemma\guides.jsonl` |
+| **macOS** | `/Users/{kullanıcı}/.lemma/guides.jsonl` |
+| **Linux** | `/home/{kullanıcı}/.lemma/guides.jsonl` |
 
-### Yetenek Veri Yapısı
+### Rehber Veri Yapısı
 
 ```json
 {
-  "id": "s1a2b3",
-  "skill": "react",
+  "id": "g1a2b3",
+  "guide": "react",
   "category": "frontend",
   "description": "React bileşenleri geliştirme ve state yönetimi rehberi...",
   "usage_count": 45,

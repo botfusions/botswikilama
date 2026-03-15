@@ -8,7 +8,7 @@ import {
   ReadResourceRequestSchema,
 } from "@modelcontextprotocol/sdk/types.js";
 import * as core from "../memory/index.js";
-import * as skills from "../skills/index.js";
+import * as guides from "../guides/index.js";
 import { SYSTEM_PROMPT } from "./system-prompt.js";
 import { TOOLS } from "./tools.js";
 import { handleCallTool } from "./handlers.js";
@@ -33,7 +33,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
 });
 
 // Register list resources handler
-// Lists individual URIs for each memory fragment and skill (metadata only)
+// Lists individual URIs for each memory fragment and guide (metadata only)
 server.setRequestHandler(ListResourcesRequestSchema, async () => {
   const resources = [
     {
@@ -56,13 +56,13 @@ server.setRequestHandler(ListResourcesRequestSchema, async () => {
     });
   }
 
-  // List each skill as individual resource (metadata only)
-  const allSkills = skills.loadSkills();
-  for (const skill of allSkills) {
+  // List each guide as individual resource (metadata only)
+  const allGuides = guides.loadGuides();
+  for (const guide of allGuides) {
     resources.push({
-      uri: `lemma://skills/${skill.skill}`,
-      name: `Skill: ${skill.skill}`,
-      description: `[${skill.category}] ${skill.usage_count}x usage, ${skill.learnings.length} learnings`,
+      uri: `lemma://guides/${guide.guide}`,
+      name: `Guide: ${guide.guide}`,
+      description: `[${guide.category}] ${guide.usage_count}x usage, ${guide.learnings.length} learnings`,
       mimeType: "application/json",
     });
   }
@@ -74,7 +74,7 @@ server.setRequestHandler(ListResourcesRequestSchema, async () => {
 // Supports URI patterns:
 // - lemma://system-prompt
 // - lemma://memory/{id} - single memory fragment
-// - lemma://skills/{name} - single skill by name
+// - lemma://guides/{name} - single guide by name
 server.setRequestHandler(ReadResourceRequestSchema, async (request) => {
   const { uri } = request.params;
 
@@ -111,14 +111,14 @@ server.setRequestHandler(ReadResourceRequestSchema, async (request) => {
     };
   }
 
-  // Single skill by name: lemma://skills/{name}
-  if (uri.startsWith("lemma://skills/")) {
-    const skillName = uri.replace("lemma://skills/", "").toLowerCase();
-    const allSkills = skills.loadSkills();
-    const skill = allSkills.find(s => s.skill === skillName);
+  // Single guide by name: lemma://guides/{name}
+  if (uri.startsWith("lemma://guides/")) {
+    const guideName = uri.replace("lemma://guides/", "").toLowerCase();
+    const allGuides = guides.loadGuides();
+    const guide = allGuides.find(g => g.guide === guideName);
 
-    if (!skill) {
-      throw new Error(`Skill not found: ${skillName}`);
+    if (!guide) {
+      throw new Error(`Guide not found: ${guideName}`);
     }
 
     return {
@@ -126,7 +126,7 @@ server.setRequestHandler(ReadResourceRequestSchema, async (request) => {
         {
           uri,
           mimeType: "application/json",
-          text: JSON.stringify(skill, null, 2),
+          text: JSON.stringify(guide, null, 2),
         },
       ],
     };

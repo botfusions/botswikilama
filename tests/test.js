@@ -694,12 +694,12 @@ class Fuse {
 
 // Test 20: generateGuideId - correct format
 async function test_guides_generateGuideId() {
-  const guides = await importGuidesWithOverride(path.join(tempDir, "skills-id.jsonl"));
+  const guides = await importGuidesWithOverride(path.join(tempDir, "guides-id.jsonl"));
 
   const id = guides.generateGuideId();
 
   assert(id.startsWith("g"), "Guide ID should start with 'g'");
-  assert.strictEqual(id.length, 7, "Skill ID should be 7 characters long");
+  assert.strictEqual(id.length, 7, "Guide ID should be 7 characters long");
 
   const hexPart = id.slice(1);
   assert(/^[0-9a-f]{6}$/.test(hexPart), "Last 6 chars should be hexadecimal");
@@ -707,11 +707,11 @@ async function test_guides_generateGuideId() {
 
 // Test 21: createGuide creates valid object
 async function test_guides_createGuide() {
-  const guides = await importGuidesWithOverride(path.join(tempDir, "skills-create.jsonl"));
+  const guides = await importGuidesWithOverride(path.join(tempDir, "guides-create.jsonl"));
   const guide = guides.createGuide("React", "Frontend", "React library manual", ["hooks", "jsx"], ["useCallback önemli"]);
 
   assert.ok(guide.id.startsWith("g"), "ID should start with 'g'");
-  assert.strictEqual(guide.guide, "react", "Skill name should be lowercase");
+  assert.strictEqual(guide.guide, "react", "Guide name should be lowercase");
   assert.strictEqual(guide.category, "frontend", "Category should be lowercase");
   assert.strictEqual(guide.usage_count, 1, "Initial usage count should be 1");
   assert.strictEqual(guide.contexts.length, 2, "Should have 2 contexts");
@@ -720,7 +720,7 @@ async function test_guides_createGuide() {
 
 // Test 22: createGuide - normalizes inputs
 async function test_guides_createGuide_normalizesInputs() {
-  const guides = await importGuidesWithOverride(path.join(tempDir, "skills-normalize.jsonl"));
+  const guides = await importGuidesWithOverride(path.join(tempDir, "guides-normalize.jsonl"));
 
   const guide = guides.createGuide(
     "  REACT  ",
@@ -730,7 +730,7 @@ async function test_guides_createGuide_normalizesInputs() {
     ["  Learning  ", ""]
   );
 
-  assert.strictEqual(guide.guide, "react", "Skill name should be trimmed and lowercase");
+  assert.strictEqual(guide.guide, "react", "Guide name should be trimmed and lowercase");
   assert.strictEqual(guide.category, "frontend", "Category should be trimmed and lowercase");
   assert.strictEqual(guide.description, "Description", "Description should be trimmed");
   assert.strictEqual(guide.contexts.length, 2, "Empty contexts should be filtered");
@@ -739,22 +739,22 @@ async function test_guides_createGuide_normalizesInputs() {
 
 // Test 23: practiceGuide increments usage
 async function test_guides_practiceGuide() {
-  const guides = await importGuidesWithOverride(path.join(tempDir, "skills-practice.jsonl"));
+  const guides = await importGuidesWithOverride(path.join(tempDir, "guides-practice.jsonl"));
   const allGuides = [];
 
-  // First practice creates skill
-  const skill1 = guides.practiceGuide(allGuides, "React", "frontend");
-  assert.strictEqual(skill1.usage_count, 1, "First practice should set usage to 1");
+  // First practice creates guide
+  const guide1 = guides.practiceGuide(allGuides, "React", "frontend");
+  assert.strictEqual(guide1.usage_count, 1, "First practice should set usage to 1");
 
   // Second practice increments
-  const skill2 = guides.practiceGuide(allGuides, "React", "frontend");
-  assert.strictEqual(skill2.usage_count, 2, "Second practice should increment to 2");
-  assert.strictEqual(allGuides.length, 1, "Should still be 1 skill");
+  const guide2 = guides.practiceGuide(allGuides, "React", "frontend");
+  assert.strictEqual(guide2.usage_count, 2, "Second practice should increment to 2");
+  assert.strictEqual(allGuides.length, 1, "Should still be 1 guide");
 }
 
 // Test 24: practiceGuide merges contexts and learnings
 async function test_guides_mergeContextsLearnings() {
-  const guides = await importGuidesWithOverride(path.join(tempDir, "skills-merge.jsonl"));
+  const guides = await importGuidesWithOverride(path.join(tempDir, "guides-merge.jsonl"));
   const allGuides = [];
 
   // Create with initial contexts/learnings
@@ -771,7 +771,7 @@ async function test_guides_mergeContextsLearnings() {
 
 // Test 25: practiceGuide - deduplicates learnings
 async function test_guides_practiceGuide_deduplicatesLearnings() {
-  const guides = await importGuidesWithOverride(path.join(tempDir, "skills-dedup.jsonl"));
+  const guides = await importGuidesWithOverride(path.join(tempDir, "guides-dedup.jsonl"));
   const allGuides = [];
 
   guides.practiceGuide(allGuides, "React", "frontend", "", [], ["useCallback prevents re-renders"]);
@@ -784,7 +784,7 @@ async function test_guides_practiceGuide_deduplicatesLearnings() {
 
 // Test 26: findGuide finds by name case insensitive
 async function test_guides_findGuide() {
-  const guides = await importGuidesWithOverride(path.join(tempDir, "skills-find.jsonl"));
+  const guides = await importGuidesWithOverride(path.join(tempDir, "guides-find.jsonl"));
   const allGuides = [];
   guides.practiceGuide(allGuides, "React", "frontend");
 
@@ -795,12 +795,12 @@ async function test_guides_findGuide() {
   assert.ok(found2, "Should find with uppercase");
 
   const found3 = guides.findGuide(allGuides, "Vue");
-  assert.strictEqual(found3, null, "Should not find non-existent skill");
+  assert.strictEqual(found3, null, "Should not find non-existent guide");
 }
 
 // Test 27: getTopGuides sorts by usage
 async function test_guides_getTopGuides() {
-  const guides = await importGuidesWithOverride(path.join(tempDir, "skills-top.jsonl"));
+  const guides = await importGuidesWithOverride(path.join(tempDir, "guides-top.jsonl"));
   const allGuides = [];
 
   guides.practiceGuide(allGuides, "React", "frontend");
@@ -818,20 +818,20 @@ async function test_guides_getTopGuides() {
 
 // Test 28: getTopGuides - respects limit
 async function test_guides_getTopGuides_respectsLimit() {
-  const guides = await importGuidesWithOverride(path.join(tempDir, "skills-limit.jsonl"));
+  const guides = await importGuidesWithOverride(path.join(tempDir, "guides-limit.jsonl"));
   const allGuides = [];
 
   for (let i = 0; i < 10; i++) {
-    guides.practiceGuide(allGuides, `Skill${i}`, "frontend");
+    guides.practiceGuide(allGuides, `Guide${i}`, "frontend");
   }
 
   const top = guides.getTopGuides(allGuides, 3);
-  assert.strictEqual(top.length, 3, "Should return only 3 skills");
+  assert.strictEqual(top.length, 3, "Should return only 3 guides");
 }
 
 // Test 29: getGuidesByCategory - filters correctly
 async function test_guides_getGuidesByCategory() {
-  const guides = await importGuidesWithOverride(path.join(tempDir, "skills-category.jsonl"));
+  const guides = await importGuidesWithOverride(path.join(tempDir, "guides-category.jsonl"));
   const allGuides = [];
 
   guides.practiceGuide(allGuides, "React", "web-frontend");
@@ -839,10 +839,10 @@ async function test_guides_getGuidesByCategory() {
   guides.practiceGuide(allGuides, "NodeJS", "web-backend");
 
   const frontend = guides.getGuidesByCategory(allGuides, "web-frontend");
-  assert.strictEqual(frontend.length, 2, "Should have 2 frontend skills");
+  assert.strictEqual(frontend.length, 2, "Should have 2 frontend guides");
 
   const backend = guides.getGuidesByCategory(allGuides, "web-backend");
-  assert.strictEqual(backend.length, 1, "Should have 1 backend skill");
+  assert.strictEqual(backend.length, 1, "Should have 1 backend guide");
 
   const none = guides.getGuidesByCategory(allGuides, "nonexistent");
   assert.strictEqual(none.length, 0, "Should return empty for nonexistent category");
@@ -850,7 +850,7 @@ async function test_guides_getGuidesByCategory() {
 
 // Test 30: updateGuide - updates fields
 async function test_guides_updateGuide() {
-  const guides = await importGuidesWithOverride(path.join(tempDir, "skills-update.jsonl"));
+  const guides = await importGuidesWithOverride(path.join(tempDir, "guides-update.jsonl"));
   const allGuides = [];
 
   guides.practiceGuide(allGuides, "React", "frontend", "Old description");
@@ -869,16 +869,16 @@ async function test_guides_updateGuide() {
 
 // Test 31: updateGuide - returns null for non-existent
 async function test_guides_updateGuide_notFound() {
-  const guides = await importGuidesWithOverride(path.join(tempDir, "skills-update-notfound.jsonl"));
+  const guides = await importGuidesWithOverride(path.join(tempDir, "guides-update-notfound.jsonl"));
   const allGuides = [];
 
   const result = guides.updateGuide(allGuides, "NonExistent", { description: "test" });
-  assert.strictEqual(result, null, "Should return null for non-existent skill");
+  assert.strictEqual(result, null, "Should return null for non-existent guide");
 }
 
-// Test 32: deleteGuide - removes skill
+// Test 32: deleteGuide - removes guide
 async function test_guides_deleteGuide() {
-  const guides = await importGuidesWithOverride(path.join(tempDir, "skills-delete.jsonl"));
+  const guides = await importGuidesWithOverride(path.join(tempDir, "guides-delete.jsonl"));
   const allGuides = [];
 
   guides.practiceGuide(allGuides, "React", "frontend");
@@ -893,16 +893,16 @@ async function test_guides_deleteGuide() {
 
 // Test 33: deleteGuide - returns false for non-existent
 async function test_guides_deleteGuide_notFound() {
-  const guides = await importGuidesWithOverride(path.join(tempDir, "skills-delete-notfound.jsonl"));
+  const guides = await importGuidesWithOverride(path.join(tempDir, "guides-delete-notfound.jsonl"));
   const allGuides = [];
 
   const result = guides.deleteGuide(allGuides, "NonExistent");
-  assert.strictEqual(result, false, "Should return false for non-existent skill");
+  assert.strictEqual(result, false, "Should return false for non-existent guide");
 }
 
-// Test 34: promoteToGuide - creates new skill from memory
+// Test 34: promoteToGuide - creates new guide from memory
 async function test_guides_promoteToGuide_createsNew() {
-  const guides = await importGuidesWithOverride(path.join(tempDir, "skills-promote.jsonl"));
+  const guides = await importGuidesWithOverride(path.join(tempDir, "guides-promote.jsonl"));
   const allGuides = [];
 
   const result = guides.promoteToGuide(allGuides, "React", "web-frontend", "useCallback prevents re-renders", "hooks");
@@ -914,12 +914,12 @@ async function test_guides_promoteToGuide_createsNew() {
   assert.ok(result.contexts.includes("hooks"), "Should have the context");
 }
 
-// Test 35: promoteToGuide - adds to existing skill
+// Test 35: promoteToGuide - adds to existing guide
 async function test_guides_promoteToGuide_addsToExisting() {
-  const guides = await importGuidesWithOverride(path.join(tempDir, "skills-promote-add.jsonl"));
+  const guides = await importGuidesWithOverride(path.join(tempDir, "guides-promote-add.jsonl"));
   const allGuides = [];
 
-  // Create initial skill
+  // Create initial guide
   guides.practiceGuide(allGuides, "React", "frontend", "Manual", ["hooks"], ["Initial learning"]);
 
   // Promote new knowledge
@@ -933,10 +933,10 @@ async function test_guides_promoteToGuide_addsToExisting() {
 
 // Test 36: promoteToGuide - deduplicates learnings
 async function test_guides_promoteToGuide_deduplicates() {
-  const guides = await importGuidesWithOverride(path.join(tempDir, "skills-promote-dedup.jsonl"));
+  const guides = await importGuidesWithOverride(path.join(tempDir, "guides-promote-dedup.jsonl"));
   const allGuides = [];
 
-  // Create initial skill
+  // Create initial guide
   guides.practiceGuide(allGuides, "React", "frontend", "", [], ["Same learning"]);
 
   // Try to promote same learning
@@ -948,7 +948,7 @@ async function test_guides_promoteToGuide_deduplicates() {
 
 // Test 37: loadGuides - empty file
 async function test_guides_loadGuides_emptyFile() {
-  const guidesFile = path.join(tempDir, "skills-empty.jsonl");
+  const guidesFile = path.join(tempDir, "guides-empty.jsonl");
   await fs.writeFile(guidesFile, "");
 
   const guides = await importGuidesWithOverride(guidesFile);
@@ -957,13 +957,13 @@ async function test_guides_loadGuides_emptyFile() {
   assert.deepStrictEqual(result, [], "Empty file should return empty array");
 }
 
-// Test 38: loadGuides - with skills
-async function test_guides_loadGuides_withSkills() {
-  const guidesFile = path.join(tempDir, "skills-load.jsonl");
+// Test 38: loadGuides - with guides
+async function test_guides_loadGuides_withGuides() {
+  const guidesFile = path.join(tempDir, "guides-load.jsonl");
 
-  const skill1 = {
-    id: "s123abc",
-    skill: "react",
+  const guide1 = {
+    id: "g123abc",
+    guide: "react",
     category: "frontend",
     usage_count: 5,
     last_used: "2026-03-01",
@@ -971,18 +971,18 @@ async function test_guides_loadGuides_withSkills() {
     learnings: ["test"]
   };
 
-  await fs.writeFile(guidesFile, JSON.stringify(skill1) + "\n");
+  await fs.writeFile(guidesFile, JSON.stringify(guide1) + "\n");
 
   const guides = await importGuidesWithOverride(guidesFile);
   const result = guides.loadGuides();
 
-  assert.strictEqual(result.length, 1, "Should load 1 skill");
-  assert.strictEqual(result[0].skill, "react", "Should have correct skill");
+  assert.strictEqual(result.length, 1, "Should load 1 guide");
+  assert.strictEqual(result[0].guide, "react", "Should have correct guide");
 }
 
 // Test 39: saveGuides - persists to disk
 async function test_guides_saveGuides_persists() {
-  const guidesFile = path.join(tempDir, "skills-save.jsonl");
+  const guidesFile = path.join(tempDir, "guides-save.jsonl");
 
   const guides = await importGuidesWithOverride(guidesFile);
   const allGuides = [];
@@ -991,13 +991,13 @@ async function test_guides_saveGuides_persists() {
   guides.saveGuides(allGuides);
 
   const content = await fs.readFile(guidesFile, "utf-8");
-  assert(content.includes("react"), "File should contain skill");
+  assert(content.includes("react"), "File should contain guide");
   assert(content.includes("frontend"), "File should contain category");
 }
 
 // Test 40: formatGuidesForLLM - correct format
 async function test_guides_formatGuidesForLLM() {
-  const guides = await importGuidesWithOverride(path.join(tempDir, "skills-format.jsonl"));
+  const guides = await importGuidesWithOverride(path.join(tempDir, "guides-format.jsonl"));
   const allGuides = [];
 
   guides.practiceGuide(allGuides, "React", "web-frontend", "React manual", ["hooks", "jsx"], ["Learning 1", "Learning 2"]);
@@ -1005,14 +1005,14 @@ async function test_guides_formatGuidesForLLM() {
   const formatted = guides.formatGuidesForLLM(allGuides);
 
   assert(formatted.includes("=== LEMMA GUIDES ==="), "Should include header");
-  assert(formatted.includes("react"), "Should include skill name");
+  assert(formatted.includes("react"), "Should include guide name");
   assert(formatted.includes("web-frontend"), "Should include category");
   assert(formatted.includes("(2 learnings)"), "Should include learning count");
 }
 
-// Test 41: formatGuidesForLLM - empty skills
+// Test 41: formatGuidesForLLM - empty guides
 async function test_guides_formatGuidesForLLM_empty() {
-  const guides = await importGuidesWithOverride(path.join(tempDir, "skills-format-empty.jsonl"));
+  const guides = await importGuidesWithOverride(path.join(tempDir, "guides-format-empty.jsonl"));
 
   const formatted = guides.formatGuidesForLLM([]);
 
@@ -1022,7 +1022,7 @@ async function test_guides_formatGuidesForLLM_empty() {
 
 // Test 42: formatGuideDetail - correct format
 async function test_guides_formatGuideDetail() {
-  const guides = await importGuidesWithOverride(path.join(tempDir, "skills-detail.jsonl"));
+  const guides = await importGuidesWithOverride(path.join(tempDir, "guides-detail.jsonl"));
 
   const guide = {
     id: "g123",
@@ -1044,18 +1044,18 @@ async function test_guides_formatGuideDetail() {
   assert(formatted.includes("useCallback prevents re-renders"), "Should include learnings");
 }
 
-// Test 43: formatGuideDetail - null skill
+// Test 43: formatGuideDetail - null guide
 async function test_guides_formatGuideDetail_null() {
-  const guides = await importGuidesWithOverride(path.join(tempDir, "skills-detail-null.jsonl"));
+  const guides = await importGuidesWithOverride(path.join(tempDir, "guides-detail-null.jsonl"));
 
   const formatted = guides.formatGuideDetail(null);
 
-  assert(formatted.includes("Guide not found"), "Should indicate skill not found");
+  assert(formatted.includes("Guide not found"), "Should indicate guide not found");
 }
 
-// Test 44: suggestGuides - finds relevant skills
+// Test 44: suggestGuides - finds relevant guides
 async function test_guides_suggestGuides_findsRelevant() {
-  const guides = await importGuidesWithOverride(path.join(tempDir, "skills-suggest.jsonl"));
+  const guides = await importGuidesWithOverride(path.join(tempDir, "guides-suggest.jsonl"));
   const allGuides = [];
 
   guides.practiceGuide(allGuides, "React", "web-frontend", "React library", ["hooks", "jsx"], ["useCallback is important"]);
@@ -1068,7 +1068,7 @@ async function test_guides_suggestGuides_findsRelevant() {
 
 // Test 45: suggestGuides - returns tracked and missing
 async function test_guides_suggestGuides_separatesTrackedAndMissing() {
-  const guides = await importGuidesWithOverride(path.join(tempDir, "skills-suggest-sep.jsonl"));
+  const guides = await importGuidesWithOverride(path.join(tempDir, "guides-suggest-sep.jsonl"));
   const allGuides = [];
 
   // Only React is tracked
@@ -1084,7 +1084,7 @@ async function test_guides_suggestGuides_separatesTrackedAndMissing() {
 
 // Test 46: formatSuggestions - correct format
 async function test_guides_formatSuggestions() {
-  const guides = await importGuidesWithOverride(path.join(tempDir, "skills-format-suggest.jsonl"));
+  const guides = await importGuidesWithOverride(path.join(tempDir, "guides-format-suggest.jsonl"));
 
   const result = {
     summary: "Found 2 relevant guides (1 tracked, 1 new)",
@@ -1102,16 +1102,16 @@ async function test_guides_formatSuggestions() {
   assert(formatted.includes("=== GUIDE SUGGESTIONS ==="), "Should include header");
   assert(formatted.includes("TRACKED"), "Should include tracked section");
   assert(formatted.includes("SUGGESTED"), "Should include suggested section");
-  assert(formatted.includes("react"), "Should include skill name");
+  assert(formatted.includes("react"), "Should include guide name");
   assert(formatted.includes("test learning"), "Should include learning");
 }
 
 // Test 47: formatSuggestions - empty results
 async function test_guides_formatSuggestions_empty() {
-  const guides = await importGuidesWithOverride(path.join(tempDir, "skills-format-suggest-empty.jsonl"));
+  const guides = await importGuidesWithOverride(path.join(tempDir, "guides-format-suggest-empty.jsonl"));
 
   const result = {
-    summary: "Found 0 relevant skills (0 tracked, 0 new)",
+    summary: "Found 0 relevant guides (0 tracked, 0 new)",
     relevant: [],
     missing: [],
     suggested: []
@@ -1142,7 +1142,7 @@ async function runTests() {
   await setup();
 
   console.log("\n" + "=".repeat(60));
-  console.log("Running Lemma Memory & Skills System Tests");
+  console.log("Running Lemma Memory & Guides System Tests");
   console.log("=".repeat(60) + "\n");
 
   console.log("--- MEMORY TESTS ---\n");
@@ -1185,18 +1185,18 @@ async function runTests() {
   await runTest("getGuidesByCategory - filters correctly", test_guides_getGuidesByCategory);
   await runTest("updateGuide - updates fields", test_guides_updateGuide);
   await runTest("updateGuide - returns null for non-existent", test_guides_updateGuide_notFound);
-  await runTest("deleteGuide - removes skill", test_guides_deleteGuide);
+  await runTest("deleteGuide - removes guide", test_guides_deleteGuide);
   await runTest("deleteGuide - returns false for non-existent", test_guides_deleteGuide_notFound);
-  await runTest("promoteToGuide - creates new skill", test_guides_promoteToGuide_createsNew);
+  await runTest("promoteToGuide - creates new guide", test_guides_promoteToGuide_createsNew);
   await runTest("promoteToGuide - adds to existing", test_guides_promoteToGuide_addsToExisting);
   await runTest("promoteToGuide - deduplicates learnings", test_guides_promoteToGuide_deduplicates);
   await runTest("loadGuides - empty file", test_guides_loadGuides_emptyFile);
-  await runTest("loadGuides - with skills", test_guides_loadGuides_withSkills);
+  await runTest("loadGuides - with guides", test_guides_loadGuides_withGuides);
   await runTest("saveGuides - persists to disk", test_guides_saveGuides_persists);
   await runTest("formatGuidesForLLM - correct format", test_guides_formatGuidesForLLM);
-  await runTest("formatGuidesForLLM - empty skills", test_guides_formatGuidesForLLM_empty);
+  await runTest("formatGuidesForLLM - empty guides", test_guides_formatGuidesForLLM_empty);
   await runTest("formatGuideDetail - correct format", test_guides_formatGuideDetail);
-  await runTest("formatGuideDetail - null skill", test_guides_formatGuideDetail_null);
+  await runTest("formatGuideDetail - null guide", test_guides_formatGuideDetail_null);
   await runTest("suggestGuides - finds relevant", test_guides_suggestGuides_findsRelevant);
   await runTest("suggestGuides - separates tracked and missing", test_guides_suggestGuides_separatesTrackedAndMissing);
   await runTest("formatSuggestions - correct format", test_guides_formatSuggestions);
