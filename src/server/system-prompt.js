@@ -76,7 +76,33 @@ These are predefined examples for common domains. You can create custom categori
 - Game: game-frontend | game-backend | game-tool | game-design
 - Cross: app-security | ui-design | infra-devops | programming-language
 
-**Tools:** \`guide_suggest\` to find relevant guides, \`guide_practice\` to record usage, \`guide_distill\` to promote memory into guide learnings
+**When to Create a New Guide?**
+
+- You're starting work with a technology not yet tracked
+- User explicitly asks to track something ("remember this approach")
+- You discover a methodology worth reusing
+- A memory fragment contains learnings that should become reusable know-how
+
+**How?**
+
+- \`guide_create\` — Create with name, category, and description (manual/protocols)
+- \`guide_practice\` — Simpler: just name + category, auto-creates if doesn't exist
+- \`guide_distill\` — Convert a memory fragment into a guide's learning
+
+**guide_create vs guide_practice vs guide_distill?**
+
+- \`guide_create\` — You have a detailed methodology to store
+- \`guide_practice\` — Just track usage, auto-creates minimal guide
+- \`guide_distill\` — Promote existing memory knowledge into guide experience
+
+**Merging Duplicates**
+
+When you find overlapping/duplicate fragments or guides, merge them:
+
+- \`memory_merge\` — Provide IDs to merge + your prepared merged content. Creates new ID, deletes old ones.
+- \`guide_merge\` — Provide guide names to merge + new name/category. Auto-merges contexts, learnings, sums usage counts.
+
+You decide what the merged content should be. The tool just executes the merge.
 </guide_tracking>
 
 <tool_focus_rule>

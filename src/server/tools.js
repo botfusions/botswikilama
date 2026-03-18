@@ -284,4 +284,69 @@ export const TOOLS = [
       required: ["guide"],
     },
   },
+  {
+    name: "memory_merge",
+    description: "Merge multiple memory fragments into one. You decide the merged content, this tool just executes the merge. Use when you find related/overlapping fragments that should be consolidated.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        ids: {
+          type: "array",
+          items: { type: "string" },
+          description: "Array of fragment IDs to merge (will be deleted after merge)",
+        },
+        title: {
+          type: "string",
+          description: "Title for the merged fragment",
+        },
+        fragment: {
+          type: "string",
+          description: "The merged content you prepared",
+        },
+        project: {
+          type: "string",
+          description: "Project scope (null = global, string = project-specific). Optional.",
+          default: null,
+        },
+      },
+      required: ["ids", "title", "fragment"],
+    },
+  },
+  {
+    name: "guide_merge",
+    description: "Merge multiple guides into one. You decide the merged content (description, contexts, learnings). Usage counts are summed. Use when you find overlapping guides that should be consolidated.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        guides: {
+          type: "array",
+          items: { type: "string" },
+          description: "Array of guide names to merge (will be deleted after merge)",
+        },
+        guide: {
+          type: "string",
+          description: "Name for the merged guide",
+        },
+        category: {
+          type: "string",
+          description: "Category for the merged guide",
+        },
+        description: {
+          type: "string",
+          description: "Merged description/manual (optional, can be empty)",
+        },
+        contexts: {
+          type: "array",
+          items: { type: "string" },
+          description: "Merged contexts (optional, will auto-merge from source guides if not provided)",
+        },
+        learnings: {
+          type: "array",
+          items: { type: "string" },
+          description: "Merged learnings (optional, will auto-merge from source guides if not provided)",
+        },
+      },
+      required: ["guides", "guide", "category"],
+    },
+  },
 ];

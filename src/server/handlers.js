@@ -568,6 +568,136 @@ export async function handleGuideDistill(args) {
 }
 
 /**
+ * Handle memory_merge tool
+ */
+export async function handleMemoryMerge(args) {
+  const ids = args?.ids;
+  const title = args?.title;
+  const fragment = args?.fragment;
+  const project = args?.project === undefined ? null : args.project;
+
+  if (!ids || !Array.isArray(ids) || ids.length < 2) {
+    return {
+      content: [{ type: "text", text: "Error: 'ids' must be an array with at least 2 fragment IDs" }],
+      isError: true,
+    };
+  }
+
+  if (!title || typeof title !== "string") {
+    return {
+      content: [{ type: "text", text: "Error: 'title' is required and must be a string" }],
+      isError: true,
+    };
+  }
+
+  if (!fragment || typeof fragment !== "string") {
+    return {
+      content: [{ type: "text", text: "Error: 'fragment' is required and must be a string" }],
+      isError: true,
+    };
+  }
+
+  const memory = core.loadMemory();
+
+  // Verify all IDs exist
+  const notFound = ids.filter(id => !memory.find(f => f.id === id));
+  if (notFound.length > 0) {
+    return {
+      content: [{ type: "text", text: `Error: Fragment(s) not found: ${notFound.join(", ")}` }],
+      isError: true,
+    };
+  }
+
+  // Create new merged fragment
+  const newFragment = core.createFragment(fragment, "ai", title, project);
+  memory.push(newFragment);
+
+  // Remove old fragments
+  const mergedMemory = memory.filter(f => !ids.includes(f.id));
+  core.saveMemory(mergedMemory);
+
+  const scopeInfo = newFragment.project ? ` (project: ${newFragment.project})` : " (global)";
+  return {
+    content: [{ type: "text", text: `Merged ${ids.length} fragments into [${newFragment.id}]${scopeInfo}: "${newFragment.title}"\nRemoved IDs: ${ids.join(", ")}` }],
+  };
+}
+
+/**
+ * Handle guide_merge tool
+ */
+export async function handleGuideMerge(args) {
+  const guideNames = args?.guides;
+  const newGuideName = args?.guide;
+  const category = args?.category;
+  const description = args?.description || "";
+  let contexts = args?.contexts;
+  let learnings = args?.learnings;
+
+  if (!guideNames || !Array.isArray(guideNames) || guideNames.length < 2) {
+    return {
+      content: [{ type: "text", text: "Error: 'guides' must be an array with at least 2 guide names" }],
+      isError: true,
+    };
+  }
+
+  if (!newGuideName || !category) {
+    return {
+      content: [{ type: "text", text: "Error: 'guide' and 'category' parameters are required" }],
+      isError: true,
+    };
+  }
+
+  const allGuides = guides.loadGuides();
+
+  // Find all source guides
+  const sourceGuides = [];
+  const notFound = [];
+  for (const name of guideNames) {
+    const g = guides.findGuide(allGuides, name);
+    if (g) {
+      sourceGuides.push(g);
+    } else {
+      notFound.push(name);
+    }
+  }
+
+  if (notFound.length > 0) {
+    return {
+      content: [{ type: "text", text: `Error: Guide(s) not found: ${notFound.join(", ")}` }],
+      isError: true,
+    };
+  }
+
+  // Auto-merge contexts and learnings if not provided
+  if (!contexts) {
+    contexts = [...new Set(sourceGuides.flatMap(g => g.contexts))];
+  }
+  if (!learnings) {
+    learnings = [...new Set(sourceGuides.flatMap(g => g.learnings))];
+  }
+
+  // Sum usage counts
+  const totalUsage = sourceGuides.reduce((sum, g) => sum + g.usage_count, 0);
+
+  // Create new merged guide
+  const newGuide = guides.createGuide(newGuideName, category, description, contexts, learnings);
+  newGuide.usage_count = totalUsage;
+  allGuides.push(newGuide);
+
+  // Remove old guides
+  const mergedGuides = allGuides.filter(g => !guideNames.map(n => n.toLowerCase()).includes(g.guide));
+  guides.saveGuides(mergedGuides);
+
+  let response = `Merged ${guideNames.length} guides into "${newGuide.guide}" (${newGuide.category})\n`;
+  response += `Total usage: ${totalUsage}x | Contexts: ${contexts.length} | Learnings: ${learnings.length}\n`;
+  response += `Removed: ${guideNames.join(", ")}`;
+
+  return {
+    content: [{ type: "text", text: response }],
+  };
+}
+
+/**
  * Main call tool handler - dispatches to appropriate handler
  */
 export async function handleCallTool(request) {
@@ -603,6 +733,10 @@ export async function handleCallTool(request) {
         return await handleGuideSuggest(args);
       case "guide_distill":
         return await handleGuideDistill(args);
+      case "memory_merge":
+        return await handleMemoryMerge(args);
+      case "guide_merge":
+        return await handleGuideMerge(args);
       default:
         return {
           content: [{ type: "text", text: `Error: Unknown tool '${name}'` }],
