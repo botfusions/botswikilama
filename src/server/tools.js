@@ -201,14 +201,6 @@ export const TOOLS = [
     },
   },
   {
-    name: "guide_discover",
-    description: "Auto-discover guides from current project by analyzing package.json, config files, and file extensions.",
-    inputSchema: {
-      type: "object",
-      properties: {},
-    },
-  },
-  {
     name: "guide_suggest",
     description: "Suggest relevant guides based on a task description. Analyzes the task and returns matching guides - both tracked (with experience) and untracked (new suggestions). Use this when user asks 'hangi guide lar gerekli', 'uygun rehberler var mı', or starting a new task.",
     inputSchema: {

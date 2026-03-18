@@ -382,126 +382,6 @@ export async function handleGuideCreate(args) {
 }
 
 /**
- * Handle guide_discover tool
- */
-export async function handleGuideDiscover() {
-  const fs = await import("fs");
-  const path = await import("path");
-  const cwd = process.cwd();
-  const discovered = [];
-
-  // Check package.json for dependencies
-  const pkgPath = path.join(cwd, "package.json");
-  if (fs.existsSync(pkgPath)) {
-    try {
-      const pkg = JSON.parse(fs.readFileSync(pkgPath, "utf-8"));
-      const deps = { ...pkg.dependencies, ...pkg.devDependencies };
-
-      // Map common packages to guides
-      const packageToGuide = {
-        "react": { guide: "react", category: "web-frontend" },
-        "vue": { guide: "vue", category: "web-frontend" },
-        "angular": { guide: "angular", category: "web-frontend" },
-        "svelte": { guide: "svelte", category: "web-frontend" },
-        "next": { guide: "nextjs", category: "web-frontend" },
-        "express": { guide: "express", category: "web-backend" },
-        "fastify": { guide: "fastify", category: "web-backend" },
-        "nestjs": { guide: "nestjs", category: "web-backend" },
-        "koa": { guide: "koa", category: "web-backend" },
-        "typescript": { guide: "typescript", category: "programming-language" },
-        "python": { guide: "python", category: "programming-language" },
-        "mongoose": { guide: "mongodb", category: "data-storage" },
-        "prisma": { guide: "prisma", category: "data-storage" },
-        "sequelize": { guide: "sequelize", category: "data-storage" },
-        "tailwindcss": { guide: "tailwind", category: "web-frontend" },
-        "jest": { guide: "jest", category: "dev-tool" },
-        "vitest": { guide: "vitest", category: "dev-tool" },
-        "eslint": { guide: "eslint", category: "dev-tool" },
-        "webpack": { guide: "webpack", category: "dev-tool" },
-        "vite": { guide: "vite", category: "dev-tool" },
-        "docker": { guide: "docker", category: "infra-devops" },
-        "@modelcontextprotocol/sdk": { guide: "mcp", category: "dev-tool" },
-        "zod": { guide: "zod", category: "dev-tool" },
-        "fuse.js": { guide: "fusejs", category: "dev-tool" },
-        "axios": { guide: "axios", category: "dev-tool" },
-        "lodash": { guide: "lodash", category: "dev-tool" },
-        "chalk": { guide: "chalk", category: "dev-tool" },
-        "commander": { guide: "commander", category: "dev-tool" },
-        "yaml": { guide: "yaml", category: "dev-tool" },
-        "dotenv": { guide: "dotenv", category: "dev-tool" },
-      };
-
-      for (const [pkgName] of Object.entries(deps)) {
-        const mapping = packageToGuide[pkgName];
-        if (mapping) {
-          discovered.push(mapping);
-        }
-      }
-    } catch {
-      // Ignore parse errors
-    }
-  }
-
-  // --- File-based Discovery Enhancement ---
-  try {
-    const files = fs.readdirSync(cwd);
-    const fileMappings = [
-      { pattern: /\.js$/, guide: "javascript", category: "programming-language" },
-      { pattern: /\.ts$/, guide: "typescript", category: "programming-language" },
-      { pattern: /tsconfig\.json$/, guide: "typescript", category: "programming-language" },
-      { pattern: /\.mcp\.json$|claude_desktop_config\.json$/, guide: "mcp", category: "dev-tool" },
-    ];
-
-    for (const mapping of fileMappings) {
-      if (files.some(f => mapping.pattern.test(f))) {
-        // Only add if not already in discovered (to avoid duplicates)
-        if (!discovered.some(d => d.guide === mapping.guide)) {
-          discovered.push({ guide: mapping.guide, category: mapping.category });
-        }
-      }
-    }
-  } catch {
-    // Ignore readdir errors
-  }
-
-  // Register discovered guides
-  const allGuides = guides.loadGuides();
-  const registered = [];
-  const alreadyTracked = [];
-
-  for (const { guide, category } of discovered) {
-    const existing = guides.findGuide(allGuides, guide);
-    if (!existing) {
-      guides.practiceGuide(allGuides, guide, category, "");
-      registered.push(`${guide} (${category})`);
-    } else {
-      alreadyTracked.push(guide);
-    }
-  }
-
-  if (registered.length > 0) {
-    guides.saveGuides(allGuides);
-  }
-
-  // Build response message
-  let message = "";
-  if (registered.length > 0) {
-    message += `✅ Discovered and registered ${registered.length} new guides:\n${registered.join("\n")}`;
-  }
-  if (alreadyTracked.length > 0) {
-    if (message) message += "\n\n";
-    message += `📌 Already tracked (${alreadyTracked.length}): ${alreadyTracked.join(", ")}`;
-  }
-  if (!message) {
-    message = "No recognizable packages found in project dependencies.";
-  }
-
-  return {
-    content: [{ type: "text", text: message }],
-  };
-}
-
-/**
  * Handle guide_suggest tool
  */
 export async function handleGuideSuggest(args) {
@@ -727,8 +607,6 @@ export async function handleCallTool(request) {
         return await handleGuideForget(args);
       case "guide_create":
         return await handleGuideCreate(args);
-      case "guide_discover":
-        return await handleGuideDiscover();
       case "guide_suggest":
         return await handleGuideSuggest(args);
       case "guide_distill":

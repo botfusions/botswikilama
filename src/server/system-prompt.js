@@ -103,6 +103,15 @@ When you find overlapping/duplicate fragments or guides, merge them:
 - \`guide_merge\` — Provide guide names to merge + new name/category. Auto-merges contexts, learnings, sums usage counts.
 
 You decide what the merged content should be. The tool just executes the merge.
+
+**Discovering Technologies**
+
+When starting with a new project, you can identify its technologies manually:
+1. Read the project's \`package.json\` to see dependencies and devDependencies
+2. Identify technologies (e.g., react, express, typescript, prisma, tailwindcss)
+3. Register them with \`guide_practice\` using appropriate category
+
+You already have file reading capabilities — use them directly. This is more reliable than automated discovery and works regardless of project structure.
 </guide_tracking>
 
 <tool_focus_rule>

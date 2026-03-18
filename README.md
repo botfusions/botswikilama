@@ -304,6 +304,18 @@ List all memory fragments in JSON format.
 
 **Returns:** JSON array of all fragments
 
+### `memory_merge`
+
+Merge multiple memory fragments into one. Useful when you find related/overlapping fragments that should be consolidated. Creates a new fragment with a new ID and deletes the originals.
+
+**Parameters:**
+- `ids` (array of strings, required): Array of fragment IDs to merge (will be deleted after merge)
+- `title` (string, required): Title for the merged fragment
+- `fragment` (string, required): The merged content you prepared
+- `project` (string, optional): Project scope (null = global, string = project-specific)
+
+**Returns:** New fragment ID and list of removed IDs
+
 ## Guide Tracking
 
 Lemma also tracks guides you use during work. This helps build a profile of expertise over time.
@@ -347,14 +359,6 @@ Record guide usage - increments usage count, updates last_used date, and optiona
 }
 ```
 
-### `guide_discover`
-
-Auto-discover guides from current project by analyzing package.json dependencies.
-
-**Parameters:** None
-
-**Returns:** List of newly discovered and registered guides
-
 ### `guide_create`
 
 **New:** Create a new guide with a detailed manual, mission, and protocols. This allows you to establish a "Manager Guide" framework rather than just tracking usage.
@@ -365,6 +369,20 @@ Auto-discover guides from current project by analyzing package.json dependencies
 - `description` (string, required): The full manual, protocols, mission, and templates for this guide.
 - `contexts` (array, optional): Initial contexts.
 - `learnings` (array, optional): Initial learnings.
+
+### `guide_merge`
+
+Merge multiple guides into one. Useful when you find overlapping guides that should be consolidated. Usage counts are summed, contexts and learnings are auto-merged.
+
+**Parameters:**
+- `guides` (array of strings, required): Array of guide names to merge (will be deleted after merge)
+- `guide` (string, required): Name for the merged guide
+- `category` (string, required): Category for the merged guide
+- `description` (string, optional): Merged description/manual
+- `contexts` (array, optional): Merged contexts (auto-merged from source guides if not provided)
+- `learnings` (array, optional): Merged learnings (auto-merged from source guides if not provided)
+
+**Returns:** Merged guide name, total usage count, and removed guide names
 
 ### Guide File Location
 

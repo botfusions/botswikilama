@@ -306,6 +306,18 @@ Tüm bellek fragmanlarını JSON formatında listeler.
 
 **Dönüş:** Tüm fragmanların JSON dizisi
 
+### `memory_merge`
+
+Birden fazla bellek fragmanını birleştirir. İlgili/çakışan fragmanları birleştirmek istediğinizde kullanışlıdır. Yeni bir ID ile yeni fragman oluşturur ve orijinallerini siler.
+
+**Parametreler:**
+- `ids` (string dizisi, zorunlu): Birleştirilecek fragman ID'leri (birleştirme sonrası silinecek)
+- `title` (string, zorunlu): Birleştirilmiş fragmanın başlığı
+- `fragment` (string, zorunlu): Hazırladığınız birleştirilmiş içerik
+- `project` (string, opsiyonel): Proje kapsamı (null = global, string = projeye özel)
+
+**Dönüş:** Yeni fragman ID'si ve silinen ID'lerin listesi
+
 ## Rehber Takibi (Guide Tracking)
 
 Lemma ayrıca çalışma sırasında kullandığınız rehberleri takip eder. Bu, zaman içinde bir uzmanlık profili oluşturmaya yardımcı olur.
@@ -351,13 +363,19 @@ Rehber kullanımını kaydet - kullanım sayısını artırır, son_kullanım ta
 - `contexts` (string dizisi, opsiyonel): İlk bağlamlar.
 - `learnings` (string dizisi, opsiyonel): İlk öğrenimler.
 
-### `guide_discover`
+### `guide_merge`
 
-Mevcut projeden package.json bağımlılıklarını analiz ederek rehberleri otomatik keşfet.
+Birden fazla rehberi birleştirir. Çakışan rehberleri birleştirmek istediğinizde kullanışlıdır. Kullanım sayıları toplanır, bağlamlar ve öğrenimler otomatik birleştirilir.
 
-**Parametreler:** Yok
+**Parametreler:**
+- `guides` (string dizisi, zorunlu): Birleştirilecek rehber adları (birleştirme sonrası silinecek)
+- `guide` (string, zorunlu): Birleştirilmiş rehberin adı
+- `category` (string, zorunlu): Birleştirilmiş rehberin kategorisi
+- `description` (string, opsiyonel): Birleştirilmiş açıklama/kılavuz
+- `contexts` (string dizisi, opsiyonel): Birleştirilmiş bağlamlar (sağlanmazsa kaynak rehberlerden otomatik birleştirilir)
+- `learnings` (string dizisi, opsiyonel): Birleştirilmiş öğrenimler (sağlanmazsa kaynak rehberlerden otomatik birleştirilir)
 
-**Dönüş:** Yeni keşfedilen ve kaydedilen rehberlerin listesi
+**Dönüş:** Birleştirilmiş rehber adı, toplam kullanım sayısı ve silinen rehber adları
 
 ### Rehber Dosyası Konumu
 
