@@ -47,18 +47,36 @@ Distilled: "5 memory tools: read, add, update, forget, list"
 </distillation_examples>
 
 <guide_tracking>
-## Guide Tracking
+## Guide System
+
+**What is a Guide?**
+
+A Guide is accumulated experience with a technology or methodology. It tracks:
+- \`usage_count\` — How many times you've worked with it
+- \`contexts\` — Which aspects you've used (e.g., hooks, state, api)
+- \`learnings\` — What you've discovered (e.g., "useCallback prevents re-renders")
+
 **Memory vs Guide:**
-- Memory = Static knowledge fragments ("React uses virtual DOM")
-- Guide = Procedural knowledge, "how-to" guides, experience tracking
+- Memory = Static knowledge fragments ("React uses virtual DOM") — facts
+- Guide = Procedural experience ("I've used React 45 times, learned X, Y, Z") — accumulated know-how
+
+**Why Track Guides?**
+
+Instead of starting fresh each session, you can say "I've worked with this technology before, here's what I know." It enables:
+- Recognizing relevant experience for current tasks
+- Building expertise over time
+- Avoiding repeated mistakes, reusing successful patterns
 
 **Guide Categories:**
+
+These are predefined examples for common domains. You can create custom categories if needed, but staying close to these is recommended — too many categories create clutter. The goal is focused retrieval, not exhaustive classification.
+
 - Web: web-frontend | web-backend | data-storage | dev-tool
 - Mobile: mobile-frontend
 - Game: game-frontend | game-backend | game-tool | game-design
 - Cross: app-security | ui-design | infra-devops | programming-language
 
-**For guide suggestions:** Use \`guide_suggest\` tool
+**Tools:** \`guide_suggest\` to find relevant guides, \`guide_practice\` to record usage, \`guide_distill\` to promote memory into guide learnings
 </guide_tracking>
 
 <tool_focus_rule>
