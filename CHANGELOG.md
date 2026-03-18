@@ -1,5 +1,22 @@
 # Changelog
 
+## [0.2.2] - 2026-03-18
+
+### Added
+- **memory_merge Tool**: Merge multiple memory fragments into one to consolidate duplicates. Creates new ID, deletes originals.
+- **guide_merge Tool**: Merge multiple guides into one. Auto-merges contexts, learnings, and sums usage counts.
+- **Auto-backup**: Both `memory.jsonl` and `guides.jsonl` are automatically backed up to `.bak` on every save.
+
+### Changed
+- **System Prompt**: Rewritten identity section — clearer, explanatory, non-mandatory tone
+- **System Prompt**: Expanded guide tracking section with detailed explanations (memory vs guide, categories, merge tools)
+- **System Prompt**: Added "Discovering Technologies" recommendation for manual project analysis via `package.json`
+
+### Removed
+- **guide_discover Tool**: Removed in favor of manual discovery. System prompt now recommends reading `package.json` directly and using `guide_practice` to register technologies.
+
+---
+
 ## [0.2.0] - 2026-03-15
 
 ### Breaking Changes
