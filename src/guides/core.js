@@ -108,6 +108,8 @@ export function saveGuides(guides) {
     }
     const jsonl = guides.map(g => JSON.stringify(g)).join("\n");
     fs.writeFileSync(GUIDES_FILE, jsonl, "utf-8");
+    // Auto-backup
+    fs.writeFileSync(GUIDES_FILE + ".bak", jsonl, "utf-8");
   } catch (error) {
     console.error("Error saving guides:", error.message);
     throw error;

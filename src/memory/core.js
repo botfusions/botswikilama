@@ -179,6 +179,8 @@ export function saveMemory(fragments) {
     // Write each fragment as a JSON line
     const jsonl = fragments.map(f => JSON.stringify(f)).join("\n");
     fs.writeFileSync(MEMORY_FILE, jsonl, "utf-8");
+    // Auto-backup
+    fs.writeFileSync(MEMORY_FILE + ".bak", jsonl, "utf-8");
   } catch (error) {
     console.error("Error saving memory:", error.message);
     throw error;
