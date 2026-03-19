@@ -1,6 +1,6 @@
 {
   "name": "@lemma/lemma",
-  "version": "0.2.2",
+  "version": "0.2.3",
   "exports": {
     ".": "./src/index.js",
     "./memory": "./src/memory/index.js",
