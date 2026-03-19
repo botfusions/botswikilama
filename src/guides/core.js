@@ -106,10 +106,41 @@ export function saveGuides(guides) {
     if (!fs.existsSync(dir)) {
       fs.mkdirSync(dir, { recursive: true });
     }
+
+    // SAFETY CHECK: Never save empty data - prevents accidental data loss
+    if (!guides || guides.length === 0) {
+      console.warn("WARNING: Attempted to save empty guides array - ABORTED to prevent data loss");
+      return;
+    }
+
     const jsonl = guides.map(g => JSON.stringify(g)).join("\n");
+
+    // SAFETY: Backup is a cumulative archive — never removes entries
+    // Merge: backup keeps UNION of old backup entries + new entries (by ID)
+    const backupFile = GUIDES_FILE + ".bak";
+    if (fs.existsSync(backupFile)) {
+      try {
+        const backupContent = fs.readFileSync(backupFile, "utf-8");
+        const backupEntries = backupContent.trim().split("\n").filter(Boolean).map(l => JSON.parse(l));
+        const backupIds = new Set(backupEntries.map(e => e.id));
+        // Add any new entries not already in backup
+        const newEntries = guides.filter(g => !backupIds.has(g.id));
+        if (newEntries.length > 0) {
+          const merged = [...backupEntries, ...newEntries];
+          fs.writeFileSync(backupFile, merged.map(g => JSON.stringify(g)).join("\n"), "utf-8");
+        }
+        // If no new entries, backup stays untouched
+      } catch {
+        // Backup corrupt — overwrite with current data
+        fs.writeFileSync(backupFile, jsonl, "utf-8");
+      }
+    } else {
+      // No backup yet — create it
+      fs.writeFileSync(backupFile, jsonl, "utf-8");
+    }
+
+    // Always write main file
     fs.writeFileSync(GUIDES_FILE, jsonl, "utf-8");
-    // Auto-backup
-    fs.writeFileSync(GUIDES_FILE + ".bak", jsonl, "utf-8");
   } catch (error) {
     console.error("Error saving guides:", error.message);
     throw error;

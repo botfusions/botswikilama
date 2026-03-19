@@ -176,11 +176,42 @@ export function saveMemory(fragments) {
     if (!fs.existsSync(dir)) {
       fs.mkdirSync(dir, { recursive: true });
     }
+
+    // SAFETY CHECK: Never save empty data - prevents accidental data loss
+    if (!fragments || fragments.length === 0) {
+      console.warn("WARNING: Attempted to save empty memory array - ABORTED to prevent data loss");
+      return;
+    }
+
     // Write each fragment as a JSON line
     const jsonl = fragments.map(f => JSON.stringify(f)).join("\n");
+
+    // SAFETY: Backup is a cumulative archive — never removes entries
+    // Merge: backup keeps UNION of old backup entries + new entries (by ID)
+    const backupFile = MEMORY_FILE + ".bak";
+    if (fs.existsSync(backupFile)) {
+      try {
+        const backupContent = fs.readFileSync(backupFile, "utf-8");
+        const backupEntries = backupContent.trim().split("\n").filter(Boolean).map(l => JSON.parse(l));
+        const backupIds = new Set(backupEntries.map(e => e.id));
+        // Add any new entries not already in backup
+        const newEntries = fragments.filter(f => !backupIds.has(f.id));
+        if (newEntries.length > 0) {
+          const merged = [...backupEntries, ...newEntries];
+          fs.writeFileSync(backupFile, merged.map(f => JSON.stringify(f)).join("\n"), "utf-8");
+        }
+        // If no new entries, backup stays untouched
+      } catch {
+        // Backup corrupt — overwrite with current data
+        fs.writeFileSync(backupFile, jsonl, "utf-8");
+      }
+    } else {
+      // No backup yet — create it
+      fs.writeFileSync(backupFile, jsonl, "utf-8");
+    }
+
+    // Always write main file
     fs.writeFileSync(MEMORY_FILE, jsonl, "utf-8");
-    // Auto-backup
-    fs.writeFileSync(MEMORY_FILE + ".bak", jsonl, "utf-8");
   } catch (error) {
     console.error("Error saving memory:", error.message);
     throw error;
@@ -211,9 +242,10 @@ export function filterByProject(fragments, currentProject) {
  * Apply time-based confidence decay to memory fragments
  * Decay rate decreases as access count increases, but it also considers time elapsed
  * since last access. Even highly accessed items decay eventually if unused.
- * Removes fragments with confidence below 0.1
+ * IMPORTANT: Never removes fragments — only reduces confidence scores.
+ * Removal is handled exclusively by memory_forget.
  * @param {Array<object>} fragments - Array of memory fragments
- * @returns {Array<object>} Filtered and decayed fragments
+ * @returns {Array<object>} Decayed fragments (same count, never fewer)
  */
 export function decayConfidence(fragments) {
   const now = new Date();
@@ -240,14 +272,10 @@ export function decayConfidence(fragments) {
 
       return {
         ...frag,
-        confidence: Math.max(0, newConfidence)
+        confidence: Math.max(0, newConfidence),
+        accessed: 0 // Reset access counter for the next session
       };
-    })
-    .filter(frag => frag.confidence >= 0.1)
-    .map(frag => ({
-      ...frag,
-      accessed: 0 // Reset access counter for the next session
-    }));
+    });
 }
 
 /**
