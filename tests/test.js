@@ -117,13 +117,14 @@ describe("Memory Core", () => {
   // ── filterByProject ────────────────────────────────────────────────
 
   describe("filterByProject", () => {
-    test("filters by project scope (strict isolation)", () => {
+    test("filters by project scope (case-insensitive)", () => {
       const frags = [
         core.createFragment("global", "ai", "G", null),
-        core.createFragment("proj-a", "ai", "A", "alpha"),
+        core.createFragment("proj-a", "ai", "A", "Alpha"),
         core.createFragment("proj-b", "ai", "B", "beta"),
       ];
       assert.equal(core.filterByProject(frags, "alpha").length, 1);
+      assert.equal(core.filterByProject(frags, "ALPHA").length, 1);
       assert.equal(core.filterByProject(frags, null).length, 1);
     });
 
@@ -552,6 +553,28 @@ function seedMemory() {
 describe("Handlers (Integration)", () => {
 
   // ── memory_read ────────────────────────────────────────────────────
+
+  describe("handleMemoryCheck", () => {
+    test("returns empty when no memory for project", async () => {
+      const result = await handlers.handleMemoryCheck({ project: "nonexistent" });
+      assert.ok(result.content[0].text.includes("No memory found"));
+    });
+
+    test("returns summary when memory exists", async () => {
+      seedMemory();
+      const result = await handlers.handleMemoryCheck({ project: "testproj" });
+      assert.ok(!result.isError);
+      assert.ok(result.content[0].text.includes("Found 1"));
+      assert.ok(result.content[0].text.includes("testproj"));
+    });
+
+    test("matches project case-insensitively", async () => {
+      // seedMemory creates with "testproj" — search with different case
+      seedMemory();
+      const result = await handlers.handleMemoryCheck({ project: "TESTPROJ" });
+      assert.ok(result.content[0].text.includes("Found 1"));
+    });
+  });
 
   describe("handleMemoryRead", () => {
     test("returns summary list", async () => {

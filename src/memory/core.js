@@ -309,15 +309,15 @@ export function saveMemory(fragments, options = {}) {
 export function filterByProject(fragments, currentProject) {
   // Normalize: treat empty string, whitespace-only, "null", "undefined" as null
   const project = (typeof currentProject === 'string')
-    ? currentProject.trim() || null
+    ? currentProject.trim().toLowerCase() || null
     : null;
 
   if (!project) {
     // No project context, return only global fragments
     return fragments.filter(f => f.project === null || f.project === undefined);
   }
-  // STRICT: Return ONLY the specified project's fragments (not global)
-  return fragments.filter(f => f.project === project);
+  // Return ONLY the specified project's fragments (case-insensitive)
+  return fragments.filter(f => f.project && f.project.toLowerCase() === project);
 }
 
 /**
