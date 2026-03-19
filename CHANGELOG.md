@@ -1,5 +1,10 @@
 # Changelog
 
+## [0.3.1] - 2026-03-19
+
+### Fixed
+- **Critical: Memory data loss in `memory_read`** — Accessing memory within a project scope was mistakenly overwriting the main file with only the filtered project fragments, deleting all global and other project data. Fixed by separating full and filtered memory arrays during the save process.
+
 ## [0.3.0] - 2026-03-19
 
 ### Added
@@ -155,6 +160,7 @@
 
 ---
 
+[0.3.1]: https://github.com/xenitV1/lemma/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/xenitV1/lemma/compare/v0.2.3...v0.3.0
 [0.2.3]: https://github.com/xenitV1/lemma/compare/v0.2.2...v0.2.3
 [0.2.2]: https://github.com/xenitV1/lemma/compare/v0.2.0...v0.2.2

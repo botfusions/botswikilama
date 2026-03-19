@@ -34,10 +34,10 @@ export async function handleMemoryRead(args) {
   }
 
   // Normal mode: filtered summary view
-  memory = core.filterByProject(memory, currentProject);
+  const filteredMemory = core.filterByProject(memory, currentProject);
 
-  // Execute Search and Top-K Truncation
-  const results = core.searchAndSortFragments(memory, query, 30);
+  // Execute Search and Top-K Truncation on filtered set
+  const results = core.searchAndSortFragments(filteredMemory, query, 30);
 
   // Boost accessed fragments in the full memory array
   const resultIds = new Set(results.map(r => r.id));
@@ -49,7 +49,7 @@ export async function handleMemoryRead(args) {
   }
 
   const formatted = core.formatMemoryForLLM(results, currentProject);
-  core.saveMemory(memory); // Save decayed + boosted memory
+  core.saveMemory(memory); // Save the FULL decayed + boosted memory
   return {
     content: [{ type: "text", text: formatted }],
   };
