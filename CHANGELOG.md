@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.2.3] - 2026-03-19
+
+### Fixed
+- **Critical: Memory data loss from decay** — `decayConfidence()` was permanently removing fragments with confidence below 0.1 from disk. Decay now only reduces confidence scores; fragments are never removed implicitly. Deletion is exclusive to `memory_forget` and `memory_merge` (explicit user actions).
+- **Critical: Backup overwrite on same-count save** — When new data had the same number of entries as the backup but different IDs, the backup was silently overwritten, losing unique entries. Backup is now cumulative (ID-based merge) — it only adds new entries and never removes existing ones.
+- **Critical: Backup overwrite after count recovery** — After decay reduced entries and new additions brought the count back up, the backup was overwritten with data missing decayed entries. Cumulative backup prevents this entirely.
+- **saveMemory(null/undefined/[]) protection** — Empty, null, or undefined arrays are now rejected before writing, preventing accidental file wipe.
+
+### Changed
+- **Backup system rewritten** — Both `memory.jsonl.bak` and `guides.jsonl.bak` now use cumulative merging instead of overwrite. The backup grows over time but never loses entries.
+- **Test suite added** — Comprehensive memory test suite (110 tests) covering all tools, decay behavior, backup safety, and data loss scenarios.
+
 ## [0.2.2] - 2026-03-18
 
 ### Added
@@ -121,6 +133,8 @@
 
 ---
 
+[0.2.3]: https://github.com/xenitV1/lemma/compare/v0.2.2...v0.2.3
+[0.2.2]: https://github.com/xenitV1/lemma/compare/v0.2.0...v0.2.2
 [0.1.4]: https://github.com/xenitV1/lemma/compare/v0.1.3...v0.1.4
 [0.1.3]: https://github.com/xenitV1/lemma/compare/v0.1.2...v0.1.3
 [0.1.2]: https://github.com/xenitV1/lemma/compare/v0.1.1...v0.1.2
