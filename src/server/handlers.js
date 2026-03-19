@@ -9,6 +9,7 @@ export async function handleMemoryRead(args) {
   const currentProject = args?.project || core.detectProject();
   const query = args?.query || null;
   const detailId = args?.id || null; // Optional: get full detail for specific ID
+  const context = args?.context || null; // Optional: context tag for boosting
 
   let memory = core.loadMemory();
   memory = core.decayConfidence(memory);
@@ -22,9 +23,9 @@ export async function handleMemoryRead(args) {
         isError: true,
       };
     }
-    // Update access
-    fragment.accessed++;
-    fragment.lastAccessed = new Date().toISOString();
+    // Update access with confidence boost and context tagging
+    const boosted = core.boostOnAccess(fragment, context);
+    Object.assign(fragment, boosted);
     core.saveMemory(memory);
 
     return {
@@ -36,10 +37,19 @@ export async function handleMemoryRead(args) {
   memory = core.filterByProject(memory, currentProject);
 
   // Execute Search and Top-K Truncation
-  memory = core.searchAndSortFragments(memory, query, 30);
+  const results = core.searchAndSortFragments(memory, query, 30);
 
-  const formatted = core.formatMemoryForLLM(memory, currentProject);
-  core.saveMemory(core.loadMemory()); // Save decayed full memory
+  // Boost accessed fragments in the full memory array
+  const resultIds = new Set(results.map(r => r.id));
+  for (const frag of memory) {
+    if (resultIds.has(frag.id)) {
+      const boosted = core.boostOnAccess(frag, context);
+      Object.assign(frag, boosted);
+    }
+  }
+
+  const formatted = core.formatMemoryForLLM(results, currentProject);
+  core.saveMemory(memory); // Save decayed + boosted memory
   return {
     content: [{ type: "text", text: formatted }],
   };
@@ -195,7 +205,7 @@ export async function handleMemoryForget(args) {
     };
   }
 
-  core.saveMemory(filtered);
+  core.saveMemory(filtered, { force: true });
 
   return {
     content: [{ type: "text", text: `Forgot fragment with ID: ${id}` }],
@@ -338,7 +348,8 @@ export async function handleGuideForget(args) {
     };
   }
 
-  guides.saveGuides(allGuides);
+  // deleteGuide mutates in-place; save result (may be empty after delete all)
+  guides.saveGuides(allGuides, { force: true });
   return {
     content: [{ type: "text", text: `Successfully forgot guide: ${guideName}` }],
   };
@@ -445,6 +456,53 @@ export async function handleGuideDistill(args) {
   return {
     content: [{ type: "text", text: response }],
   };
+}
+
+/**
+ * Handle memory_feedback tool
+ */
+export async function handleMemoryFeedback(args) {
+  const id = args?.id;
+  const useful = args?.useful;
+
+  if (!id || typeof id !== "string") {
+    return {
+      content: [{ type: "text", text: "Error: 'id' parameter is required" }],
+      isError: true,
+    };
+  }
+  if (typeof useful !== "boolean") {
+    return {
+      content: [{ type: "text", text: "Error: 'useful' parameter is required and must be a boolean" }],
+      isError: true,
+    };
+  }
+
+  const memory = core.loadMemory();
+  const targetIndex = memory.findIndex((f) => f.id === id);
+
+  if (targetIndex === -1) {
+    return {
+      content: [{ type: "text", text: `Error: Fragment with ID '${id}' not found` }],
+      isError: true,
+    };
+  }
+
+  if (useful) {
+    const boosted = core.boostOnAccess(memory[targetIndex]);
+    Object.assign(memory[targetIndex], boosted);
+    core.saveMemory(memory);
+    return {
+      content: [{ type: "text", text: `Positive feedback recorded for [${id}]. Confidence boosted to ${memory[targetIndex].confidence.toFixed(2)}.` }],
+    };
+  } else {
+    const penalized = core.recordNegativeHit(memory[targetIndex]);
+    Object.assign(memory[targetIndex], penalized);
+    core.saveMemory(memory);
+    return {
+      content: [{ type: "text", text: `Negative feedback recorded for [${id}]. Confidence reduced to ${memory[targetIndex].confidence.toFixed(2)}.` }],
+    };
+  }
 }
 
 /**
@@ -597,6 +655,8 @@ export async function handleCallTool(request) {
         return await handleMemoryForget(args);
       case "memory_list":
         return await handleMemoryList(args);
+      case "memory_feedback":
+        return await handleMemoryFeedback(args);
       case "guide_get":
         return await handleGuideGet(args);
       case "guide_practice":

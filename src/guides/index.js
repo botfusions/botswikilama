@@ -18,5 +18,6 @@ export {
   suggestGuides,
   formatSuggestions,
   formatGuideDetail,
+  setGuidesDir,
   TASK_GUIDE_MAP
 } from "./core.js";

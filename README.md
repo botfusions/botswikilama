@@ -6,7 +6,7 @@
 
 [English](README.md) | [Türkçe](README.tr.md)
 
-Lemma is a Model Context Protocol (MCP) server that provides a persistent memory layer for Large Language Models. It enables LLMs to remember facts, preferences, and context across sessions through a simple, elegant interface with automatic memory decay.
+Lemma is a Model Context Protocol (MCP) server that provides a persistent memory layer for Large Language Models. It enables LLMs to remember facts, preferences, and context across sessions through a simple, elegant interface with automatic memory decay and learning.
 
 ## What is Lemma?
 
@@ -16,6 +16,7 @@ Lemma operates on the same principle:
 
 - **Raw conversations are never stored** — only synthesized fragments
 - **Fragments decay over time** — frequently accessed ones strengthen
+- **Used knowledge gains context** — tags and associations are built automatically
 - **The LLM reads fragments at every session** and remembers who it is
 
 ## How It Works
@@ -30,26 +31,39 @@ Each memory fragment has:
 | `title` | string | Short title for quick scanning |
 | `fragment` | string | Synthesized memory text |
 | `project` | string | Project scope (`null` for global) |
-| `confidence` | float | Reliability 0.0-1.0 (decays over time) |
+| `confidence` | float | Reliability 0.0-1.0 (decays and boosts over time) |
 | `source` | string | `"user"` or `"ai"` |
 | `created` | string | Creation date (YYYY-MM-DD) |
 | `lastAccessed` | string | ISO timestamp of last read |
 | `accessed` | int | Access count in current decay cycle |
+| `tags` | string[] | Context tags from usage (e.g., "debugging", "refactoring") |
+| `associatedWith` | string[] | IDs of fragments accessed in the same session |
+| `negativeHits` | int | Times this memory was marked unhelpful (resets per session) |
 
-### Decay Mechanism
+### Learning System
 
-Decay is applied every time memory is read. Unlike static memory, Lemma uses a biological model where frequency of access strengthens the memory, while time elapsed since last access weakens it:
+Unlike static memory, Lemma uses a biological model where knowledge evolves through use:
 
+**Boost (on access):**
+```
+confidence = min(1.0, confidence + 0.1)
+tags += context_tag  (e.g., "debugging")
+associatedWith += co_accessed_fragment_ids
+```
+
+**Decay (per session):**
 ```
 modifier = max(0.005, 0.05 - (accessed * 0.005))
 time_multiplier = 1 + (days_since_last_access * 0.05)
-decay_step = modifier * time_multiplier
+negative_multiplier = 1 + (negativeHits * 0.2)
+decay_step = modifier * time_multiplier * negative_multiplier
 confidence = confidence - decay_step
 ```
 
-- **Frequency**: Frequently accessed items reach a minimum decay rate.
-- **Recency**: Items not accessed for a long time decay faster due to the `time_multiplier`.
-- **Cleanup**: Fragments with **confidence < 0.1** are automatically purged.
+- **Frequency**: Frequently accessed items reach a minimum decay rate
+- **Recency**: Items not accessed for a long time decay faster
+- **Negative feedback**: Marked unhelpful memories decay faster
+- **Associations**: Fragments used together build cross-references for future recall
 
 ### Memory File Location
 
@@ -65,7 +79,7 @@ Memories are stored in JSONL format at:
 
 The recommended way to use Lemma is via **JSR**. Add this to your MCP client configuration:
 
-**Claude Desktop (Windows):** `%APPDATA%\Claude\claude_desktop_config.json`  
+**Claude Desktop (Windows):** `%APPDATA%\Claude\claude_desktop_config.json`
 **Claude Desktop (macOS):** `~/Library/Application Support/Claude/claude_desktop_config.json`
 
 ```json
@@ -80,7 +94,6 @@ The recommended way to use Lemma is via **JSR**. Add this to your MCP client con
 ```
 
 ### Alternative: Run directly from GitHub
-If you don't want to use JSR, you can run Lemma directly from GitHub:
 
 ```json
 {
@@ -95,25 +108,7 @@ If you don't want to use JSR, you can run Lemma directly from GitHub:
 
 ---
 
-## 💡 Important Recommendation for New Users
-
-If you are using Lemma for the first time, please consider this advice:
-
-When you first start using the system, your **Guides** and **Memory** will be empty. For the system to use Lemma fully automatically and effectively, you need to manually seed it with some initial information and guides.
-
-**Follow these steps to get started:**
-1. Ask an AI model to perform web research on a specific topic.
-2. Instruct it to save the findings to Lemma's memory following its core principles.
-3. Once you have some initial data, ask the system to create **Guides** based on the acquired knowledge.
-4. If you have existing `SKILL.md` files or documentation, read them into the system and ask Lemma to add them to its guide set.
-
-By doing this, the system will gradually develop its own knowledge base and guide set more effectively over time.
-
----
-
-## 🚀 Manual Installation (For Developers)
-
-If you want to modify Lemma or run it locally:
+## Manual Installation (For Developers)
 
 ```bash
 git clone https://github.com/xenitV1/lemma
@@ -121,20 +116,16 @@ cd Lemma
 npm install
 ```
 
-### Requirements
-
-- Node.js 18.0.0 or higher
+**Requirements:** Node.js 18.0.0 or higher
 
 ### Local Configuration
-
-If you have cloned the repository locally, use this configuration:
 
 ```json
 {
   "mcpServers": {
     "lemma": {
       "command": "node",
-      "args": ["C:\\path\\to\\your\\Lemma\\memory.js"]
+      "args": ["C:\\path\\to\\Lemma\\src\\index.js"]
     }
   }
 }
@@ -142,271 +133,165 @@ If you have cloned the repository locally, use this configuration:
 
 ---
 
-### NPM (Optional)
-While Lemma can be run via `npx` directly from GitHub, you can also publish to NPM if you prefer:
-```bash
-npm publish --access public
-```
-
----
-
-## ⚓ System Prompt
-
-The server provides a system prompt resource at `lemma://system-prompt`. MCP clients can discover this automatically.
-
-**Manual configuration** (if needed):
-
-```xml
-<system_prompt>
-<identity>
-# Lemma — YOUR BRAIN
-When you see Lemma, KNOW THIS:
-- This is YOUR memory layer — your knowledge, experiences, guides are stored here
-- Learnings from previous sessions are saved here
-- User preferences, project details, learned guides are all here
-- Every session: Start with **memory_read** → load your knowledge → End with **memory_add** → save new learnings
-- This is NOT an "external tool" — it is YOUR extended memory
-</identity>
-
-<intro>
-## How It Works
-Like the human brain: important information is retained, frequently accessed memories grow stronger, unused ones fade over time.
-</intro>
-
-<core_workflow>
-## Core Workflow (FOLLOW THIS)
-1. **Session Start** → Call `memory_read` (load your knowledge)
-2. **Context Discovery** → Call `memory_check` + `guide_suggest` (what do you know? what's needed?)
-3. **Execution** → Apply learned guides and knowledge
-4. **Session End** → Call `memory_add` + `guide_practice` (save what you learned)
-</core_workflow>
-
-<scope_rules>
-## Scope Rules
-| Scope | Use For | Example |
-|-------|---------|---------|
-| project: null | Global preferences | "User prefers dark mode" |
-| project: "Name" | Project-specific | "Lemma uses Node.js 18+" |
-</scope_rules>
-
-<distillation_examples>
-## Distillation Examples
-<example>
-Raw: "The project uses package.json with dependencies like @modelcontextprotocol/sdk version 1.0.0"
-Distilled: "MCP SDK 1.0.0, Node.js 18+"
-</example>
-<example>
-Raw: "There are 5 tools for memory: memory_read, memory_add, memory_update, memory_forget, memory_list"
-Distilled: "5 memory tools: read, add, update, forget, list"
-</example>
-</distillation_examples>
-
-<guide_tracking>
-## Guide Tracking
-**Memory vs Guide:**
-- Memory = Static knowledge fragments ("React uses virtual DOM")
-- Guide = Procedural knowledge, "how-to" guides, experience tracking
-
-**Guide Categories:**
-- Web: web-frontend | web-backend | data-storage | dev-tool
-- Mobile: mobile-frontend
-- Game: game-frontend | game-backend | game-tool | game-design
-- Cross: app-security | ui-design | infra-devops | programming-language
-
-**For guide suggestions:** Use `guide_suggest` tool
-</guide_tracking>
-
-<tool_focus_rule>
-## Tool Focus Rule
-When you see tool names (memory_read, guide_get, etc.):
-- EXECUTE the tool, don't discuss the project
-- Lemma = your brain, use it
-</tool_focus_rule>
-</system_prompt>
-```
-
 ## Available Tools
 
-Read and return formatted memory fragments for LLM consumption. Applies confidence decay, limits to top-K, and reformats for optimum context.
+### Memory Tools
+
+#### `memory_read`
+
+Read memory fragments. SUMMARY MODE shows title + description; use `id` for full detail.
 
 **Parameters:**
-- `project` (string, optional): Project name to filter (defaults to current project).
-- `query` (string, optional): Semantic search keyword to find specific context.
+- `project` (string, optional): Project name to filter
+- `query` (string, optional): Semantic search keyword
+- `id` (string, optional): Get full detail for a specific fragment
+- `context` (string, optional): Tag this access with a context (e.g., "debugging") — boosts confidence
 
 **Returns:** Formatted string with confidence bars:
 
 ```
-=== LEMMA MEMORY FRAGMENTS ===
-[m1a2b3] █████ (🤖 ai) Communication style
-    User prefers short and direct answers
-[m4c5d6] █████ (👤 user) Project stack
-    Project is TypeScript, Node 20
+=== LEMMA MEMORY FRAGMENTS (project: myapp) ===
+[m1a2b3] ████░ (🤖) [myapp] React Hooks
+    useState and useEffect patterns
 ==============================
 ```
 
-### `memory_check`
+#### `memory_check`
 
-**MANDATORY:** Call this BEFORE any analysis, research, or document reading. Checks if project/topic already exists in memory. Prevents redundant work.
+**MANDATORY:** Call BEFORE any analysis. Checks if project/topic already exists in memory.
 
 **Parameters:**
-- `project` (string, optional): Project name to check (defaults to current project).
+- `project` (string, optional): Project name to check
 
-### `memory_add`
+#### `memory_add`
 
-Add a new memory fragment.
+**MANDATORY:** Call AFTER completing analysis to save findings.
 
 **Parameters:**
 - `fragment` (string, required): The memory text to store
-- `title` (string, optional): Short title (auto-generated from first 40 chars if not provided)
+- `title` (string, optional): Short title
+- `description` (string, optional): Short summary
+- `project` (string, optional): Project scope (null = global)
 - `source` (string, optional): "user" or "ai", default "ai"
 
-**Example:**
-```json
-{
-  "fragment": "User prefers dark mode in all applications",
-  "title": "Dark mode preference",
-  "source": "ai"
-}
-```
+#### `memory_update`
 
-### `memory_update`
-
-Update an existing memory fragment.
+Update an existing fragment by ID.
 
 **Parameters:**
-- `id` (string, required): The fragment ID to update
-- `title` (string, optional): New title text
-- `fragment` (string, optional): New fragment text
-- `confidence` (number, optional): New confidence 0.0-1.0
+- `id` (string, required): Fragment ID
+- `title` (string, optional): New title
+- `fragment` (string, optional): New text
+- `confidence` (number, optional): New confidence 0-1
 
-**Example:**
-```json
-{
-  "id": "m1a2b3",
-  "title": "Updated title",
-  "fragment": "Updated information",
-  "confidence": 0.9
-}
-```
+#### `memory_feedback`
 
-### `memory_forget`
-
-Remove a memory fragment.
+Provide feedback on a memory fragment after use. Positive feedback boosts confidence; negative feedback reduces it and marks it for faster decay.
 
 **Parameters:**
-- `id` (string, required): The fragment ID to remove
+- `id` (string, required): Fragment ID
+- `useful` (boolean, required): `true` if helpful, `false` if not
 
-### `memory_list`
+#### `memory_forget`
+
+Remove a memory fragment by ID.
+
+**Parameters:**
+- `id` (string, required): Fragment ID
+
+#### `memory_list`
 
 List all memory fragments in JSON format.
 
-**Parameters:** None
+**Parameters:**
+- `all` (boolean, optional): Show all projects (default: current project only)
 
-**Returns:** JSON array of all fragments
+#### `memory_merge`
 
-### `memory_merge`
-
-Merge multiple memory fragments into one. Useful when you find related/overlapping fragments that should be consolidated. Creates a new fragment with a new ID and deletes the originals.
+Merge multiple fragments into one. Creates new ID, deletes originals.
 
 **Parameters:**
-- `ids` (array of strings, required): Array of fragment IDs to merge (will be deleted after merge)
-- `title` (string, required): Title for the merged fragment
-- `fragment` (string, required): The merged content you prepared
-- `project` (string, optional): Project scope (null = global, string = project-specific)
+- `ids` (string[], required): Fragment IDs to merge
+- `title` (string, required): Title for merged fragment
+- `fragment` (string, required): Merged content
+- `project` (string, optional): Project scope
 
-**Returns:** New fragment ID and list of removed IDs
+### Guide Tools
 
-## Guide Tracking
+#### `guide_get`
 
-Lemma also tracks guides you use during work. This helps build a profile of expertise over time.
-
-### `guide_get`
-
-Get all tracked guides with usage statistics.
+Get tracked guides with usage statistics.
 
 **Parameters:**
-- `category` (string, optional): Filter by category (frontend, backend, tool, language, database)
-- `guide` (string, optional): Get detail for a specific guide name
+- `category` (string, optional): Filter by category
+- `guide` (string, optional): Get detail for specific guide
 
-**Returns:** Formatted guide list sorted by usage count
+#### `guide_practice`
 
-**Example output:**
-```
-=== LEMMA GUIDES ===
-[frontend] react: 45x (last: 2026-03-06) [hooks, jsx, state] (3 learnings)
-[backend] nodejs: 30x (last: 2026-03-05) [express, api]
-[language] typescript: 25x (last: 2026-03-06)
-====================
-```
-
-### `guide_practice`
-
-Record guide usage - increments usage count, updates last_used date, and optionally adds contexts/learnings.
+**MANDATORY:** Record guide usage when you use a guide during work.
 
 **Parameters:**
-- `guide` (string, required): Guide name (e.g., "react", "python", "git")
-- `category` (string, required): Category: frontend, backend, tool, language, database
-- `contexts` (array of strings, optional): Additional contexts (e.g., ["hooks", "state"])
-- `learnings` (array of strings, optional): New learnings discovered during use
-
-**Example:**
-```json
-{
-  "guide": "react",
-  "category": "frontend",
-  "contexts": ["hooks", "useCallback"],
-  "learnings": ["useCallback prevents unnecessary re-renders"]
-}
-```
-
-### `guide_create`
-
-**New:** Create a new guide with a detailed manual, mission, and protocols. This allows you to establish a "Manager Guide" framework rather than just tracking usage.
-
-**Parameters:**
-- `guide` (string, required): Guide name (e.g., "X Viral Growth Engine")
+- `guide` (string, required): Guide name
 - `category` (string, required): Category
-- `description` (string, required): The full manual, protocols, mission, and templates for this guide.
-- `contexts` (array, optional): Initial contexts.
-- `learnings` (array, optional): Initial learnings.
+- `description` (string, optional): Detailed manual/protocols
+- `contexts` (string[], required): Contexts where used
+- `learnings` (string[], required): New learnings discovered
 
-### `guide_merge`
+#### `guide_create`
 
-Merge multiple guides into one. Useful when you find overlapping guides that should be consolidated. Usage counts are summed, contexts and learnings are auto-merged.
+Create a guide with a detailed manual.
 
 **Parameters:**
-- `guides` (array of strings, required): Array of guide names to merge (will be deleted after merge)
-- `guide` (string, required): Name for the merged guide
-- `category` (string, required): Category for the merged guide
-- `description` (string, optional): Merged description/manual
-- `contexts` (array, optional): Merged contexts (auto-merged from source guides if not provided)
-- `learnings` (array, optional): Merged learnings (auto-merged from source guides if not provided)
+- `guide` (string, required): Guide name
+- `category` (string, required): Category
+- `description` (string, required): Full manual/protocols
+- `contexts` (string[], optional): Initial contexts
+- `learnings` (string[], optional): Initial learnings
 
-**Returns:** Merged guide name, total usage count, and removed guide names
+#### `guide_suggest`
 
-### Guide File Location
+Suggest relevant guides based on a task description.
 
-Guides are stored in JSONL format at:
+**Parameters:**
+- `task` (string, required): Task description
 
-| OS | Path |
-|---|---|
-| **Windows** | `C:\Users\{username}\.lemma\guides.jsonl` |
-| **macOS** | `/Users/{username}/.lemma/guides.jsonl` |
-| **Linux** | `/home/{username}/.lemma/guides.jsonl` |
+#### `guide_distill`
 
-### Guide Data Structure
+Transform a memory fragment into a guide's learning.
 
-```json
-{
-  "id": "g1a2b3",
-  "guide": "react",
-  "category": "frontend",
-  "usage_count": 45,
-  "last_used": "2026-03-06",
-  "contexts": ["hooks", "jsx", "state"],
-  "learnings": ["useCallback prevents unnecessary re-renders"]
-}
-```
+**Parameters:**
+- `memory_id` (string, required): Memory fragment ID
+- `guide` (string, required): Target guide name
+- `category` (string, optional): Category (required if creating new guide)
+
+#### `guide_update`
+
+Update an existing guide's properties.
+
+**Parameters:**
+- `guide` (string, required): Current guide name
+- `new_name` (string, optional): New name
+- `category` (string, optional): New category
+- `description` (string, optional): New description/manual
+
+#### `guide_forget`
+
+Remove a guide.
+
+**Parameters:**
+- `guide` (string, required): Guide name
+
+#### `guide_merge`
+
+Merge multiple guides into one. Usage counts are summed.
+
+**Parameters:**
+- `guides` (string[], required): Guide names to merge
+- `guide` (string, required): Name for merged guide
+- `category` (string, required): Category
+- `description` (string, optional): Merged description
+- `contexts` (string[], optional): Merged contexts
+- `learnings` (string[], optional): Merged learnings
 
 ## Philosophy
 
@@ -421,7 +306,6 @@ Guides are stored in JSONL format at:
 - Successful solutions and approaches used
 - Shortcuts discovered for recurring tasks
 - Approaches that were tried and failed
-- Task types and their best-fit strategy patterns
 
 ### What Should NOT Be Stored
 
@@ -438,21 +322,37 @@ Guides are stored in JSONL format at:
 npm test
 ```
 
+90 tests covering memory core, guides core, handlers, and learning lifecycle. All I/O is isolated to temp directories — real data is never touched.
+
 ### Project Structure
 
 ```
 Lemma/
-├── memory.js       # Main MCP server implementation
-├── memory-core.js  # Core memory logic (load, save, decay)
-├── test.js         # Test suite
-├── package.json    # Dependencies and metadata
-├── README.md       # This file
-└── .gitignore      # Git ignore rules
+├── src/
+│   ├── index.js          # MCP server entry point
+│   ├── memory/
+│   │   ├── index.js      # Memory module re-exports
+│   │   └── core.js       # Core memory logic
+│   ├── guides/
+│   │   ├── index.js      # Guides module re-exports
+│   │   ├── core.js       # Core guides logic
+│   │   └── task-map.js   # Task-to-guide mapping
+│   └── server/
+│       ├── index.js      # Server setup
+│       ├── handlers.js   # Tool handlers
+│       ├── tools.js      # Tool definitions
+│       └── system-prompt.js
+├── tests/
+│   └── test.js           # Test suite (90 tests)
+├── package.json
+├── jsr.json
+├── CHANGELOG.md
+└── README.md
 ```
 
 ## Security
 
-`memory.jsonl` is a local file and is never sent anywhere. Users can inspect its contents or clear it at any time via the MCP tools.
+`memory.jsonl` and `guides.jsonl` are local files and are never sent anywhere. Users can inspect their contents or clear them at any time via the MCP tools.
 
 ## License
 

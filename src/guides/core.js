@@ -7,8 +7,17 @@ import fs from "fs";
 import Fuse from "fuse.js";
 import { TASK_GUIDE_MAP } from "./task-map.js";
 
-const MEMORY_DIR = path.join(os.homedir(), ".lemma");
-const GUIDES_FILE = path.join(MEMORY_DIR, "guides.jsonl");
+let MEMORY_DIR = path.join(os.homedir(), ".lemma");
+let GUIDES_FILE = path.join(MEMORY_DIR, "guides.jsonl");
+
+/**
+ * Override guides directory for testing or custom storage.
+ * @param {string} dir - New directory path
+ */
+export function setGuidesDir(dir) {
+  MEMORY_DIR = dir;
+  GUIDES_FILE = path.join(MEMORY_DIR, "guides.jsonl");
+}
 
 /**
  * Generate a unique guide ID
@@ -99,21 +108,23 @@ export function loadGuides() {
 /**
  * Save guides to disk as JSONL
  * @param {Array<object>} guides - Array of guide objects to save
+ * @param {object} options - Options
+ * @param {boolean} options.force - If true, allow saving empty array (for intentional deletion)
  */
-export function saveGuides(guides) {
+export function saveGuides(guides, options = {}) {
   try {
     const dir = path.dirname(GUIDES_FILE);
     if (!fs.existsSync(dir)) {
       fs.mkdirSync(dir, { recursive: true });
     }
 
-    // SAFETY CHECK: Never save empty data - prevents accidental data loss
-    if (!guides || guides.length === 0) {
+    // SAFETY CHECK: Never save empty data unless forced
+    if ((!guides || guides.length === 0) && !options.force) {
       console.warn("WARNING: Attempted to save empty guides array - ABORTED to prevent data loss");
       return;
     }
 
-    const jsonl = guides.map(g => JSON.stringify(g)).join("\n");
+    const jsonl = guides && guides.length > 0 ? guides.map(g => JSON.stringify(g)).join("\n") : "";
 
     // SAFETY: Backup is a cumulative archive — never removes entries
     // Merge: backup keeps UNION of old backup entries + new entries (by ID)

@@ -1,6 +1,6 @@
 {
   "name": "lemma-mcp",
-  "version": "0.2.3",
+  "version": "0.3.0",
   "description": "Persistent memory layer for LLMs via MCP",
   "type": "module",
   "main": "src/index.js",

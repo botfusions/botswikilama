@@ -1,5 +1,27 @@
 # Changelog
 
+## [0.3.0] - 2026-03-19
+
+### Added
+- **Memory Learning System** — Fragments now gain confidence when actively used, not just decay slower
+  - `boostOnAccess()`: +0.1 confidence per use (max 1.0), context tagging, access counter
+  - `recordNegativeHit()`: -0.1 confidence when memory is unhelpful, negative hit counter
+  - `trackAssociations()`: Bidirectional cross-references between co-accessed fragments
+  - New fragment fields: `tags`, `associatedWith`, `negativeHits`
+- **`memory_feedback` Tool** — Provide positive/negative feedback on memory fragments after use
+- **`memory_read` context parameter** — Tag fragments with usage context (e.g., "debugging", "refactoring") for future recall
+- **Test Suite** — 90 tests covering all modules (memory core, guides core, handlers, learning lifecycle) with full I/O isolation
+
+### Changed
+- **Decay now factors negative hits** — Fragments marked unhelpful decay faster via `negativeHitMultiplier`
+- **Negative hits reset per session** — Like `accessed`, `negativeHits` resets after each decay cycle
+- **`saveMemory` / `saveGuides` accept `force` option** — Allows intentional empty array saves (for deletion operations)
+- **`formatMemoryDetail`** — Shows `tags` and `associatedWith` fields when present
+
+### Fixed
+- **`handleMemoryForget`** — Saving empty array after deleting last fragment now works (was silently blocked by safety check)
+- **`handleGuideForget`** — Same fix for guides deletion
+
 ## [0.2.3] - 2026-03-19
 
 ### Fixed
@@ -133,6 +155,7 @@
 
 ---
 
+[0.3.0]: https://github.com/xenitV1/lemma/compare/v0.2.3...v0.3.0
 [0.2.3]: https://github.com/xenitV1/lemma/compare/v0.2.2...v0.2.3
 [0.2.2]: https://github.com/xenitV1/lemma/compare/v0.2.0...v0.2.2
 [0.1.4]: https://github.com/xenitV1/lemma/compare/v0.1.3...v0.1.4

@@ -10,5 +10,9 @@ export {
   decayConfidence,
   searchAndSortFragments,
   formatMemoryForLLM,
-  formatMemoryDetail
+  formatMemoryDetail,
+  boostOnAccess,
+  recordNegativeHit,
+  trackAssociations,
+  setMemoryDir
 } from "./core.js";

@@ -6,8 +6,17 @@ import path from "path";
 import fs from "fs";
 import Fuse from "fuse.js";
 
-const MEMORY_DIR = path.join(os.homedir(), ".lemma");
-const MEMORY_FILE = path.join(MEMORY_DIR, "memory.jsonl");
+let MEMORY_DIR = path.join(os.homedir(), ".lemma");
+let MEMORY_FILE = path.join(MEMORY_DIR, "memory.jsonl");
+
+/**
+ * Override memory directory for testing or custom storage.
+ * @param {string} dir - New directory path
+ */
+export function setMemoryDir(dir) {
+  MEMORY_DIR = dir;
+  MEMORY_FILE = path.join(MEMORY_DIR, "memory.jsonl");
+}
 
 /**
  * Generate a unique memory fragment ID
@@ -87,7 +96,10 @@ export function createFragment(fragment, source, title = null, project = null, d
     source: source,
     created: now.toISOString().split("T")[0],
     lastAccessed: now.toISOString(),
-    accessed: 0
+    accessed: 0,
+    tags: [],
+    associatedWith: [],
+    negativeHits: 0
   };
 }
 
@@ -143,6 +155,74 @@ export function findSimilarFragment(fragments, fragmentText, project, threshold 
 }
 
 /**
+ * Boost a fragment's confidence and tag it with context on access.
+ * Called when a memory is actively used (not just read/decayed).
+ * @param {object} fragment - Memory fragment to boost
+ * @param {string|null} context - Optional context tag (e.g., "debugging", "error-handling")
+ * @returns {object} Updated fragment
+ */
+export function boostOnAccess(fragment, context = null) {
+  const boosted = { ...fragment };
+  boosted.confidence = Math.min(1.0, boosted.confidence + 0.1);
+  boosted.accessed++;
+  boosted.lastAccessed = new Date().toISOString();
+
+  if (context && typeof context === "string") {
+    const tags = boosted.tags || [];
+    const newTag = context.trim().toLowerCase();
+    if (newTag && !tags.includes(newTag)) {
+      boosted.tags = [...tags, newTag];
+    }
+  }
+
+  return boosted;
+}
+
+/**
+ * Record a negative signal for a fragment (it was accessed but wasn't useful).
+ * Reduces confidence and increments negative hit counter.
+ * @param {object} fragment - Memory fragment to penalize
+ * @returns {object} Updated fragment
+ */
+export function recordNegativeHit(fragment) {
+  return {
+    ...fragment,
+    confidence: Math.max(0, fragment.confidence - 0.1),
+    negativeHits: (fragment.negativeHits || 0) + 1,
+    lastAccessed: new Date().toISOString()
+  };
+}
+
+/**
+ * Track associations between fragments accessed in the same session.
+ * Mutates fragments in place to add cross-references.
+ * @param {Array<object>} fragments - All memory fragments
+ * @param {string} accessedId - The ID of the fragment being accessed
+ * @param {Array<string>} sessionIds - IDs of other fragments accessed in the same session
+ */
+export function trackAssociations(fragments, accessedId, sessionIds) {
+  if (!sessionIds || sessionIds.length === 0) return;
+
+  const target = fragments.find(f => f.id === accessedId);
+  if (!target) return;
+
+  const existing = new Set(target.associatedWith || []);
+  for (const id of sessionIds) {
+    if (id !== accessedId && !existing.has(id)) {
+      existing.add(id);
+      // Also add reverse association
+      const other = fragments.find(f => f.id === id);
+      if (other) {
+        const otherAssoc = new Set(other.associatedWith || []);
+        otherAssoc.add(accessedId);
+        other.associatedWith = [...otherAssoc];
+      }
+    }
+  }
+  target.associatedWith = [...existing];
+}
+
+/**
  * Load all memory fragments from disk
  * @returns {Array<object>} Array of memory fragments, empty if file doesn't exist
  */
@@ -168,8 +248,10 @@ export function loadMemory() {
 /**
  * Save memory fragments to disk as JSONL
  * @param {Array<object>} fragments - Array of memory fragments to save
+ * @param {object} options - Options
+ * @param {boolean} options.force - If true, allow saving empty array (for intentional deletion)
  */
-export function saveMemory(fragments) {
+export function saveMemory(fragments, options = {}) {
   try {
     // Create directory if it doesn't exist
     const dir = path.dirname(MEMORY_FILE);
@@ -177,14 +259,14 @@ export function saveMemory(fragments) {
       fs.mkdirSync(dir, { recursive: true });
     }
 
-    // SAFETY CHECK: Never save empty data - prevents accidental data loss
-    if (!fragments || fragments.length === 0) {
+    // SAFETY CHECK: Never save empty data unless forced
+    if ((!fragments || fragments.length === 0) && !options.force) {
       console.warn("WARNING: Attempted to save empty memory array - ABORTED to prevent data loss");
       return;
     }
 
     // Write each fragment as a JSON line
-    const jsonl = fragments.map(f => JSON.stringify(f)).join("\n");
+    const jsonl = fragments && fragments.length > 0 ? fragments.map(f => JSON.stringify(f)).join("\n") : "";
 
     // SAFETY: Backup is a cumulative archive — never removes entries
     // Merge: backup keeps UNION of old backup entries + new entries (by ID)
@@ -266,14 +348,18 @@ export function decayConfidence(fragments) {
       // (1 + days factor ensures old items decay even if they were accessed heavily before)
       const timeDecayMultiplier = 1 + (daysSinceAccess * 0.05);
 
-      const sessionDecay = accessDecayModifier * timeDecayMultiplier;
+      // Negative hit multiplier: fragments that were frequently unhelpful decay faster
+      const negativeHitMultiplier = 1 + ((frag.negativeHits || 0) * 0.2);
+
+      const sessionDecay = accessDecayModifier * timeDecayMultiplier * negativeHitMultiplier;
 
       const newConfidence = frag.confidence - sessionDecay;
 
       return {
         ...frag,
         confidence: Math.max(0, newConfidence),
-        accessed: 0 // Reset access counter for the next session
+        accessed: 0, // Reset access counter for the next session
+        negativeHits: 0 // Reset negative hits each session
       };
     });
 }
@@ -390,6 +476,12 @@ export function formatMemoryDetail(fragment) {
     detail += `Summary: ${fragment.description}\n`;
   }
   detail += `Created: ${fragment.created} | Confidence: ${fragment.confidence.toFixed(2)}\n`;
+  if (fragment.tags && fragment.tags.length > 0) {
+    detail += `Tags: ${fragment.tags.join(", ")}\n`;
+  }
+  if (fragment.associatedWith && fragment.associatedWith.length > 0) {
+    detail += `Related: ${fragment.associatedWith.join(", ")}\n`;
+  }
   detail += `--- CONTENT ---\n${fragment.fragment}\n==============`;
 
   return detail;

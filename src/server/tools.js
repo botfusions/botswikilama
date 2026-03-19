@@ -18,6 +18,10 @@ export const TOOLS = [
           type: "string",
           description: "Get FULL DETAIL for a specific fragment ID. Use this after seeing the summary to read the complete content.",
         },
+        context: {
+          type: "string",
+          description: "Optional context tag for this access (e.g., 'debugging', 'refactoring'). Boosts confidence and tags the fragment for future recall.",
+        },
       },
     },
   },
@@ -274,6 +278,24 @@ export const TOOLS = [
         },
       },
       required: ["guide"],
+    },
+  },
+  {
+    name: "memory_feedback",
+    description: "Provide feedback on a memory fragment after use. positive = the memory was useful (boosts confidence), negative = it was not helpful (reduces confidence and marks it for faster decay).",
+    inputSchema: {
+      type: "object",
+      properties: {
+        id: {
+          type: "string",
+          description: "The ID of the fragment to give feedback on",
+        },
+        useful: {
+          type: "boolean",
+          description: "true if the memory was helpful, false if it was not relevant or incorrect",
+        },
+      },
+      required: ["id", "useful"],
     },
   },
   {
