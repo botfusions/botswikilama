@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.4.1] - 2026-03-20
+
+### Changed
+- **Streamlined Initialize Response** — Cleaner context display on MCP initialization
+  - Added `buildDynamicInstructions()` for focused project context
+  - Project memories + global memories shown in compact tables
+  - Guides now show only name and category (no usage_count, learnings)
+  - Removed verbose resource listing from `ListResourcesRequestSchema`
+  - Memories and guides accessed exclusively via tools, not resources
+
+---
+
 ## [0.4.0] - 2026-03-20
 
 ### Added
@@ -202,6 +214,7 @@
 
 ---
 
+[0.4.1]: https://github.com/xenitV1/lemma/compare/v0.4.0...v0.4.1
 [0.4.0]: https://github.com/xenitV1/lemma/compare/v0.3.2...v0.4.0
 [0.3.2]: https://github.com/xenitV1/lemma/compare/v0.3.1...v0.3.2
 [0.3.1]: https://github.com/xenitV1/lemma/compare/v0.3.0...v0.3.1
