@@ -6,6 +6,7 @@ import {
   ListToolsRequestSchema,
   ListResourcesRequestSchema,
   ReadResourceRequestSchema,
+  InitializeRequestSchema,
 } from "@modelcontextprotocol/sdk/types.js";
 import * as core from "../memory/index.js";
 import * as guides from "../guides/index.js";
@@ -36,8 +37,107 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
   return { tools: TOOLS };
 });
 
+/**
+ * Build dynamic instructions for initialize response
+ * @param {string|null} projectName - Detected project name
+ * @returns {string} Formatted instructions with project context
+ */
+function buildDynamicInstructions(projectName) {
+  const memory = core.loadMemory();
+  const decayedMemory = core.decayConfidence(memory);
+
+  // Get project-specific fragments
+  const projectFragments = projectName
+    ? core.filterByProject(decayedMemory, projectName)
+        .sort((a, b) => b.confidence - a.confidence)
+        .slice(0, 20)
+    : [];
+
+  // Get global fragments (always include top 10)
+  const globalFragments = core.filterByProject(decayedMemory, null)
+    .sort((a, b) => b.confidence - a.confidence)
+    .slice(0, 10);
+
+  // Get guides (only name and description)
+  const allGuides = guides.loadGuides();
+  const topGuides = guides.getTopGuides(allGuides, 30);
+
+  let instructions = `# Lemma Memory Context\n\n`;
+
+  // Project context
+  if (projectName && projectFragments.length > 0) {
+    instructions += `## 📁 Project: ${projectName}\n`;
+    instructions += `You have ${projectFragments.length} saved memories for this project.\n\n`;
+    instructions += `| ID | Title | Description |\n`;
+    instructions += `|---|---|---|\n`;
+    for (const frag of projectFragments) {
+      const desc = (frag.description || frag.fragment?.slice(0, 80) || '').replace(/\n/g, ' ').slice(0, 100);
+      instructions += `| ${frag.id} | ${frag.title} | ${desc} |\n`;
+    }
+    instructions += `\nUse \`memory_read id="<id>"\` to get full content.\n\n`;
+  } else if (projectName) {
+    instructions += `## 📁 Project: ${projectName}\n`;
+    instructions += `No saved memories for this project yet. Start working to build memory.\n\n`;
+  }
+
+  // Global context
+  if (globalFragments.length > 0) {
+    instructions += `## 🌐 Global Knowledge\n`;
+    instructions += `Cross-project learnings:\n\n`;
+    instructions += `| ID | Title | Description |\n`;
+    instructions += `|---|---|---|\n`;
+    for (const frag of globalFragments) {
+      const desc = (frag.description || frag.fragment?.slice(0, 80) || '').replace(/\n/g, ' ').slice(0, 100);
+      instructions += `| ${frag.id} | ${frag.title} | ${desc} |\n`;
+    }
+    instructions += `\n`;
+  }
+
+  // Guides section (only name and description)
+  if (topGuides.length > 0) {
+    instructions += `## 📚 Available Guides\n`;
+    instructions += `| Name | Category |\n`;
+    instructions += `|---|---|\n`;
+    for (const guide of topGuides) {
+      instructions += `| ${guide.guide} | ${guide.category} |\n`;
+    }
+    instructions += `\nUse \`guide_get guide="<name>"\` to see full details.\n\n`;
+  }
+
+  instructions += `**Tip:** Call \`memory_read\` to refresh memories or \`guide_get task="<your task>"\` to find relevant guides.`;
+
+  return instructions;
+}
+
+// Register initialize handler - returns dynamic instructions with project context
+server.setRequestHandler(InitializeRequestSchema, async (request) => {
+  // Detect project on initialize
+  detectedProject = core.detectProject();
+
+  if (detectedProject) {
+    console.error(`[Lemma] Detected project: ${detectedProject}`);
+  }
+
+  // Build dynamic instructions
+  const instructions = buildDynamicInstructions(detectedProject);
+
+  // Return initialize result with dynamic instructions
+  return {
+    protocolVersion: "2024-11-05",
+    capabilities: {
+      tools: {},
+      resources: {},
+    },
+    serverInfo: {
+      name: "lemma",
+      version: "1.0.0",
+    },
+    instructions,
+  };
+});
+
 // Register list resources handler
-// Lists individual URIs for each memory fragment and guide (metadata only)
+// Only exposes system-prompt resource - memories and guides are accessed via tools
 server.setRequestHandler(ListResourcesRequestSchema, async () => {
   const resources = [
     {
@@ -47,29 +147,6 @@ server.setRequestHandler(ListResourcesRequestSchema, async () => {
       mimeType: "text/markdown",
     },
   ];
-
-  // List each memory fragment as individual resource (metadata only)
-  const memory = core.loadMemory();
-  for (const frag of memory) {
-    const scopeTag = frag.project ? `[${frag.project}]` : "[global]";
-    resources.push({
-      uri: `lemma://memory/${frag.id}`,
-      name: `Memory: ${frag.title}`,
-      description: `${scopeTag} confidence: ${(frag.confidence * 100).toFixed(0)}%`,
-      mimeType: "application/json",
-    });
-  }
-
-  // List each guide as individual resource (metadata only)
-  const allGuides = guides.loadGuides();
-  for (const guide of allGuides) {
-    resources.push({
-      uri: `lemma://guides/${guide.guide}`,
-      name: `Guide: ${guide.guide}`,
-      description: `[${guide.category}] ${guide.usage_count}x usage, ${guide.learnings.length} learnings`,
-      mimeType: "application/json",
-    });
-  }
 
   return { resources };
 });
