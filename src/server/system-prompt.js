@@ -67,8 +67,8 @@ A Guide is accumulated experience with a technology or methodology. It tracks:
 - \`learnings\` — What you've discovered (e.g., "useCallback prevents re-renders")
 
 **Memory vs Guide:**
-- Memory = Static knowledge fragments ("React uses virtual DOM") — facts
-- Guide = Procedural experience ("I've used React 45 times, learned X, Y, Z") — accumulated know-how
+- **Memory** = WHAT you know — static facts, findings, project details ("Uses TypeScript strict mode", "API at /api/v1")
+- **Guide** = HOW you work — accumulated experience with a technology ("Used React 45x, learned: avoid prop drilling, prefer composition")
 
 **Why Track Guides?**
 
