@@ -23,6 +23,10 @@ Like the human brain: important information persists, frequently accessed memori
 
 This is not an "external tool" to be managed. It's your extended memory. Using it is recommended — you'll be more informed and prepared in each session.
 
+## Why Use Lemma?
+
+When a user makes a request, Lemma helps you work more efficiently by providing relevant knowledge and guides. Instead of starting from scratch each time, you can leverage accumulated experience from previous sessions. Check your memories and guides first — they often contain solutions, patterns, and preferences that will make your response more accurate and aligned with the user's needs.
+
 ## Suggested Usage
 
 - Session start: \`memory_read\` to load previous knowledge
@@ -161,6 +165,29 @@ ${lines.join("\n")}
 }
 
 /**
+ * Format global context for injection into system prompt
+ * @param {Array<object>} fragments - Global-scoped memory fragments (project=null)
+ * @returns {string} Formatted context section
+ */
+function formatGlobalContext(fragments) {
+  if (!fragments || fragments.length === 0) {
+    return "";
+  }
+
+  const lines = fragments.map(frag => {
+    return `- **${frag.title}**: ${frag.description || frag.fragment.slice(0, 100)}`;
+  });
+
+  return `<global_knowledge>
+## Global Knowledge
+
+Cross-project learnings and preferences that apply everywhere:
+
+${lines.join("\n")}
+</global_knowledge>`;
+}
+
+/**
  * Get dynamic system prompt with project context injection
  * Called on server startup and when system prompt resource is requested
  * @param {string|null} projectName - Current project name (null = no project context)
@@ -168,16 +195,33 @@ ${lines.join("\n")}
  */
 export async function getDynamicSystemPrompt(projectName) {
   let prompt = BASE_SYSTEM_PROMPT;
+  const memory = core.loadMemory();
 
   // Build context for modifiers
   const context = {
     project: projectName,
     fragments: [],
+    globalFragments: [],
   };
+
+  // Inject global context (always, if exists)
+  const globalFragments = memory.filter(f => f.project === null);
+  if (globalFragments.length > 0) {
+    const decayedGlobal = core.decayConfidence(globalFragments);
+    const sortedGlobal = [...decayedGlobal]
+      .sort((a, b) => b.confidence - a.confidence)
+      .slice(0, 10);
+
+    context.globalFragments = sortedGlobal;
+    const globalContext = formatGlobalContext(sortedGlobal);
+    prompt = prompt.replace(
+      "</system_prompt>",
+      `\n${globalContext}\n</system_prompt>`
+    );
+  }
 
   // Inject project context if available
   if (projectName) {
-    const memory = core.loadMemory();
     const projectFragments = core.filterByProject(memory, projectName);
 
     if (projectFragments.length > 0) {

@@ -1036,7 +1036,7 @@ describe("Dynamic System Prompt", () => {
       assert.ok(prompt.includes("State Mgmt"));
     });
 
-    test("only includes project-scoped memories (not global)", async () => {
+    test("separates project and global contexts", async () => {
       // Create global memory with unique title
       const globalFrag = core.createFragment("Global unique info xyz", "ai", "GlobalUniqueTitle", null);
       // Create project memory
@@ -1044,8 +1044,11 @@ describe("Dynamic System Prompt", () => {
       core.saveMemory([globalFrag, projFrag]);
 
       const prompt = await getDynamicSystemPrompt("ScopedProj");
-      assert.ok(prompt.includes("ProjectUniqueTitle"), "Should include project memory");
-      assert.ok(!prompt.includes("GlobalUniqueTitle"), "Should NOT include global memory");
+      // Project context should have project memory
+      assert.ok(prompt.includes("ProjectUniqueTitle"), "Should include project memory in project_context");
+      // Global knowledge should have global memory (separate section)
+      assert.ok(prompt.includes("GlobalUniqueTitle"), "Should include global memory in global_knowledge");
+      assert.ok(prompt.includes("<global_knowledge>"), "Should have global_knowledge section");
     });
 
     test("limits to top 20 fragments by confidence", async () => {
