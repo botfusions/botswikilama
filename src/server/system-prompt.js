@@ -1,5 +1,6 @@
 // System prompt for LLM clients
 import * as core from "../memory/index.js";
+import { applyPromptModifiers } from "./hooks.js";
 
 /**
  * Base system prompt template (without project context)
@@ -25,7 +26,7 @@ This is not an "external tool" to be managed. It's your extended memory. Using i
 ## Suggested Usage
 
 - Session start: \`memory_read\` to load previous knowledge
-- During work: \`memory_check\` to see what you already know, \`guide_suggest\` for relevant guides
+- During work: \`memory_read query="topic"\` to find specific context, \`guide_get task="description"\` for relevant guides
 - Session end: \`memory_add\` to save new learnings, \`guide_practice\` to track technology usage
 
 Recommended — using it will improve your effectiveness across sessions.
@@ -46,8 +47,8 @@ Raw: "The project uses package.json with dependencies like @modelcontextprotocol
 Distilled: "MCP SDK 1.0.0, Node.js 18+"
 </example>
 <example>
-Raw: "There are 5 tools for memory: memory_read, memory_add, memory_update, memory_forget, memory_list"
-Distilled: "5 memory tools: read, add, update, forget, list"
+Raw: "There are 5 tools for memory: memory_read, memory_add, memory_update, memory_forget, memory_feedback"
+Distilled: "5 memory tools: read, add, update, forget, feedback"
 </example>
 </distillation_examples>
 
@@ -163,41 +164,47 @@ ${lines.join("\n")}
  * Get dynamic system prompt with project context injection
  * Called on server startup and when system prompt resource is requested
  * @param {string|null} projectName - Current project name (null = no project context)
- * @returns {string} System prompt with optional project context
+ * @returns {Promise<string>} System prompt with optional project context and modifiers applied
  */
-export function getDynamicSystemPrompt(projectName) {
-  // No project detected - return base prompt without injection
-  if (!projectName) {
-    return BASE_SYSTEM_PROMPT;
+export async function getDynamicSystemPrompt(projectName) {
+  let prompt = BASE_SYSTEM_PROMPT;
+
+  // Build context for modifiers
+  const context = {
+    project: projectName,
+    fragments: [],
+  };
+
+  // Inject project context if available
+  if (projectName) {
+    const memory = core.loadMemory();
+    const projectFragments = core.filterByProject(memory, projectName);
+
+    if (projectFragments.length > 0) {
+      // Apply decay for accurate confidence display
+      const decayedFragments = core.decayConfidence(projectFragments);
+
+      // Sort by confidence (highest first), limit to top 20
+      const sortedFragments = [...decayedFragments]
+        .sort((a, b) => b.confidence - a.confidence)
+        .slice(0, 20);
+
+      // Store in context for modifiers
+      context.fragments = sortedFragments;
+
+      // Generate and inject project context
+      const projectContext = formatProjectContext(sortedFragments, projectName);
+      prompt = prompt.replace(
+        "</system_prompt>",
+        `\n${projectContext}\n</system_prompt>`
+      );
+    }
   }
 
-  // Load and filter memories for this project
-  const memory = core.loadMemory();
-  const projectFragments = core.filterByProject(memory, projectName);
+  // Apply registered prompt modifiers
+  prompt = await applyPromptModifiers(prompt, context);
 
-  // No fragments for this project - return base prompt
-  if (projectFragments.length === 0) {
-    return BASE_SYSTEM_PROMPT;
-  }
-
-  // Apply decay for accurate confidence display
-  const decayedFragments = core.decayConfidence(projectFragments);
-
-  // Sort by confidence (highest first), limit to top 20 for context window
-  const sortedFragments = [...decayedFragments]
-    .sort((a, b) => b.confidence - a.confidence)
-    .slice(0, 20);
-
-  // Generate project context section
-  const projectContext = formatProjectContext(sortedFragments, projectName);
-
-  // Inject project context into system prompt (before closing tag)
-  const injectedPrompt = BASE_SYSTEM_PROMPT.replace(
-    "</system_prompt>",
-    `\n${projectContext}\n</system_prompt>`
-  );
-
-  return injectedPrompt;
+  return prompt;
 }
 
 /**

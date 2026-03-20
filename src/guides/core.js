@@ -319,22 +319,16 @@ export function getGuidesByCategory(guides, category) {
  */
 export function formatGuidesForLLM(guides) {
   if (guides.length === 0) {
-    return `=== LEMMA GUIDES ===\n(no guides tracked yet)\n====================`;
+    return `╔══════════════════════════════════════╗\n║              GUIDES                   ║\n╠══════════════════════════════════════╣\n║  (no guides tracked yet)              ║\n╚══════════════════════════════════════╝`;
   }
 
   const sorted = getTopGuides(guides, 30);
 
   const lines = sorted.map(guide => {
-    const contextsStr = guide.contexts.length > 0
-      ? ` [${guide.contexts.slice(0, 5).join(", ")}${guide.contexts.length > 5 ? "..." : ""}]`
-      : "";
-    const learningsCount = guide.learnings.length > 0
-      ? ` (${guide.learnings.length} learnings)`
-      : "";
-    return `[${guide.category}] ${guide.guide}: ${guide.usage_count}x (last: ${guide.last_used})${contextsStr}${learningsCount}`;
+    return `  [${guide.category}] ${guide.guide}\n              ${guide.usage_count}x usage, ${guide.learnings.length} learnings`;
   });
 
-  return `=== LEMMA GUIDES ===\n${lines.join("\n")}\n====================`;
+  return `╔══════════════════════════════════════╗\n║              GUIDES                   ║\n╠══════════════════════════════════════╣\n${lines.join("\n")}\n╚══════════════════════════════════════╝`;
 }
 
 /**

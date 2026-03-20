@@ -3,13 +3,14 @@ import * as core from "../memory/index.js";
 import * as guides from "../guides/index.js";
 
 /**
- * Handle memory_read tool
+ * Handle memory_read tool (unified: read, list, search)
  */
 export async function handleMemoryRead(args) {
   const currentProject = args?.project || core.detectProject();
   const query = args?.query || null;
-  const detailId = args?.id || null; // Optional: get full detail for specific ID
-  const context = args?.context || null; // Optional: context tag for boosting
+  const detailId = args?.id || null;
+  const context = args?.context || null;
+  const showAll = args?.all === true;
 
   let memory = core.loadMemory();
   memory = core.decayConfidence(memory);
@@ -33,8 +34,10 @@ export async function handleMemoryRead(args) {
     };
   }
 
-  // Normal mode: filtered summary view
-  const filteredMemory = core.filterByProject(memory, currentProject);
+  // Filter by project (or show all if all=true)
+  const filteredMemory = showAll
+    ? memory
+    : core.filterByProject(memory, currentProject);
 
   // Execute Search and Top-K Truncation on filtered set
   const results = core.searchAndSortFragments(filteredMemory, query, 30);
@@ -48,30 +51,11 @@ export async function handleMemoryRead(args) {
     }
   }
 
-  const formatted = core.formatMemoryForLLM(results, currentProject);
-  core.saveMemory(memory); // Save the FULL decayed + boosted memory
+  const scopeInfo = showAll ? "all projects" : currentProject || "global";
+  const formatted = core.formatMemoryForLLM(results, scopeInfo);
+  core.saveMemory(memory);
   return {
     content: [{ type: "text", text: formatted }],
-  };
-}
-
-/**
- * Handle memory_check tool
- */
-export async function handleMemoryCheck(args) {
-  const project = args?.project || core.detectProject();
-  const memory = core.loadMemory();
-  const filtered = core.filterByProject(memory, project);
-
-  if (filtered.length === 0) {
-    return {
-      content: [{ type: "text", text: `No memory found for: ${project}\nProceed with analysis and save findings.` }],
-    };
-  }
-
-  const summary = filtered.map(f => `[${f.id}] ${f.title}`).join("\n");
-  return {
-    content: [{ type: "text", text: `Found ${filtered.length} fragments for "${project}":\n${summary}\n\nYou already have context. Ask user if they want re-analysis or summary.` }],
   };
 }
 
@@ -82,7 +66,6 @@ export async function handleMemoryAdd(args) {
   const fragment = args?.fragment;
   const title = args?.title || null;
   const description = args?.description || null;
-  // null = global, undefined = auto-detect, string = project-specific
   const project = args?.project === undefined ? null : args.project;
   const source = args?.source || "ai";
 
@@ -213,252 +196,6 @@ export async function handleMemoryForget(args) {
 }
 
 /**
- * Handle memory_list tool
- */
-export async function handleMemoryList(args) {
-  const all = args?.all === true;
-  const currentProject = core.detectProject();
-  let memory = core.loadMemory();
-
-  if (!all) {
-    memory = core.filterByProject(memory, currentProject);
-  }
-
-  const formatted = JSON.stringify(memory, null, 2);
-  const scopeInfo = all ? "(all projects)" : `(project: ${currentProject || "global"})`;
-  return {
-    content: [{ type: "text", text: `=== MEMORY FRAGMENTS ${scopeInfo} ===\n${formatted}` }],
-  };
-}
-
-/**
- * Handle guide_get tool
- */
-export async function handleGuideGet(args) {
-  const category = args?.category || null;
-  const guideName = args?.guide || null;
-  const allGuides = guides.loadGuides();
-
-  // Get specific guide detail
-  if (guideName) {
-    const guide = guides.findGuide(allGuides, guideName);
-    return {
-      content: [{ type: "text", text: guides.formatGuideDetail(guide) }],
-    };
-  }
-
-  // Filter by category or get all
-  const filtered = category
-    ? guides.getGuidesByCategory(allGuides, category)
-    : allGuides;
-
-  const formatted = guides.formatGuidesForLLM(filtered);
-  return {
-    content: [{ type: "text", text: formatted }],
-  };
-}
-
-/**
- * Handle guide_practice tool
- */
-export async function handleGuidePractice(args) {
-  const guideName = args?.guide;
-  const category = args?.category;
-  const description = args?.description || "";
-  const contexts = args?.contexts || [];
-  const learnings = args?.learnings || [];
-
-  if (!guideName || !category) {
-    return {
-      content: [{ type: "text", text: "Error: 'guide' and 'category' parameters are required" }],
-      isError: true,
-    };
-  }
-
-  const allGuides = guides.loadGuides();
-  const updated = guides.practiceGuide(allGuides, guideName, category, description, contexts, learnings);
-  guides.saveGuides(allGuides);
-
-  const isNew = updated.usage_count === 1;
-  const action = isNew ? "Created" : "Updated";
-
-  // Return guide detail including description/manual so AI can read protocols
-  let response = `${action} guide "${updated.guide}" (${updated.category}): ${updated.usage_count}x usage\n\n`;
-  response += guides.formatGuideDetail(updated);
-
-  return {
-    content: [{ type: "text", text: response }],
-  };
-}
-
-/**
- * Handle guide_update tool
- */
-export async function handleGuideUpdate(args) {
-  const guideName = args?.guide;
-  const updates = {
-    guide: args?.new_name,
-    category: args?.category,
-    description: args?.description
-  };
-
-  if (!guideName) {
-    return {
-      content: [{ type: "text", text: "Error: 'guide' parameter is required" }],
-      isError: true,
-    };
-  }
-
-  const allGuides = guides.loadGuides();
-  const updated = guides.updateGuide(allGuides, guideName, updates);
-
-  if (!updated) {
-    return {
-      content: [{ type: "text", text: `Error: Guide "${guideName}" not found.` }],
-      isError: true,
-    };
-  }
-
-  guides.saveGuides(allGuides);
-  return {
-    content: [{ type: "text", text: `Updated guide "${updated.guide}":\n${guides.formatGuideDetail(updated)}` }],
-  };
-}
-
-/**
- * Handle guide_forget tool
- */
-export async function handleGuideForget(args) {
-  const guideName = args?.guide;
-
-  if (!guideName) {
-    return {
-      content: [{ type: "text", text: "Error: 'guide' parameter is required" }],
-      isError: true,
-    };
-  }
-
-  const allGuides = guides.loadGuides();
-  const success = guides.deleteGuide(allGuides, guideName);
-
-  if (!success) {
-    return {
-      content: [{ type: "text", text: `Error: Guide "${guideName}" not found.` }],
-      isError: true,
-    };
-  }
-
-  // deleteGuide mutates in-place; save result (may be empty after delete all)
-  guides.saveGuides(allGuides, { force: true });
-  return {
-    content: [{ type: "text", text: `Successfully forgot guide: ${guideName}` }],
-  };
-}
-
-/**
- * Handle guide_create tool
- */
-export async function handleGuideCreate(args) {
-  const guideName = args?.guide;
-  const category = args?.category;
-  const description = args?.description;
-  const contexts = args?.contexts || [];
-  const learnings = args?.learnings || [];
-
-  if (!guideName || !category || !description) {
-    return {
-      content: [{ type: "text", text: "Error: 'guide', 'category', and 'description' parameters are required" }],
-      isError: true,
-    };
-  }
-
-  const allGuides = guides.loadGuides();
-  const existing = guides.findGuide(allGuides, guideName);
-
-  if (existing) {
-    existing.description = description;
-    guides.saveGuides(allGuides);
-    return {
-      content: [{ type: "text", text: `Updated manual for existing guide "${existing.guide}" (${existing.category})` }],
-    };
-  }
-
-  const newGuide = guides.createGuide(guideName, category, description, contexts, learnings);
-  allGuides.push(newGuide);
-  guides.saveGuides(allGuides);
-
-  return {
-    content: [{ type: "text", text: `Created new guide "${newGuide.guide}" (${newGuide.category}) with a detailed manual.` }],
-  };
-}
-
-/**
- * Handle guide_suggest tool
- */
-export async function handleGuideSuggest(args) {
-  const task = args?.task;
-
-  if (!task) {
-    return {
-      content: [{ type: "text", text: "Error: 'task' parameter is required" }],
-      isError: true,
-    };
-  }
-
-  const allGuides = guides.loadGuides();
-  const result = guides.suggestGuides(task, allGuides);
-  const formatted = guides.formatSuggestions(result);
-
-  return {
-    content: [{ type: "text", text: formatted }],
-  };
-}
-
-/**
- * Handle guide_distill tool
- */
-export async function handleGuideDistill(args) {
-  const memoryId = args?.memory_id;
-  const guideName = args?.guide;
-  const category = args?.category || "dev-tool"; // Default to dev-tool if not provided
-
-  if (!memoryId || !guideName) {
-    return {
-      content: [{ type: "text", text: "Error: 'memory_id' and 'guide' parameters are required" }],
-      isError: true,
-    };
-  }
-
-  const allMemory = core.loadMemory();
-  const fragment = allMemory.find(m => m.id === memoryId);
-
-  if (!fragment) {
-    return {
-      content: [{ type: "text", text: `Error: Memory fragment with ID '${memoryId}' not found.` }],
-      isError: true,
-    };
-  }
-
-  const allGuides = guides.loadGuides();
-  const updated = guides.promoteToGuide(
-    allGuides,
-    guideName,
-    category,
-    fragment.fragment,
-    fragment.project || "global"
-  );
-
-  guides.saveGuides(allGuides);
-
-  let response = `Successfully distilled memory [${memoryId}] into guide "${updated.guide}" (${updated.category}).\n\n`;
-  response += guides.formatGuideDetail(updated);
-
-  return {
-    content: [{ type: "text", text: response }],
-  };
-}
-
-/**
  * Handle memory_feedback tool
  */
 export async function handleMemoryFeedback(args) {
@@ -561,6 +298,219 @@ export async function handleMemoryMerge(args) {
 }
 
 /**
+ * Handle guide_get tool (unified: get, list, suggest)
+ */
+export async function handleGuideGet(args) {
+  const category = args?.category || null;
+  const guideName = args?.guide || null;
+  const task = args?.task || null;
+  const allGuides = guides.loadGuides();
+
+  // If task provided, return suggestions based on task
+  if (task) {
+    const result = guides.suggestGuides(task, allGuides);
+    const formatted = guides.formatSuggestions(result);
+    return {
+      content: [{ type: "text", text: formatted }],
+    };
+  }
+
+  // Get specific guide detail
+  if (guideName) {
+    const guide = guides.findGuide(allGuides, guideName);
+    return {
+      content: [{ type: "text", text: guides.formatGuideDetail(guide) }],
+    };
+  }
+
+  // Filter by category or get all
+  const filtered = category
+    ? guides.getGuidesByCategory(allGuides, category)
+    : allGuides;
+
+  const formatted = guides.formatGuidesForLLM(filtered);
+  return {
+    content: [{ type: "text", text: formatted }],
+  };
+}
+
+/**
+ * Handle guide_practice tool
+ */
+export async function handleGuidePractice(args) {
+  const guideName = args?.guide;
+  const category = args?.category;
+  const description = args?.description || "";
+  const contexts = args?.contexts || [];
+  const learnings = args?.learnings || [];
+
+  if (!guideName || !category) {
+    return {
+      content: [{ type: "text", text: "Error: 'guide' and 'category' parameters are required" }],
+      isError: true,
+    };
+  }
+
+  const allGuides = guides.loadGuides();
+  const updated = guides.practiceGuide(allGuides, guideName, category, description, contexts, learnings);
+  guides.saveGuides(allGuides);
+
+  const isNew = updated.usage_count === 1;
+  const action = isNew ? "Created" : "Updated";
+
+  let response = `${action} guide "${updated.guide}" (${updated.category}): ${updated.usage_count}x usage\n\n`;
+  response += guides.formatGuideDetail(updated);
+
+  return {
+    content: [{ type: "text", text: response }],
+  };
+}
+
+/**
+ * Handle guide_create tool
+ */
+export async function handleGuideCreate(args) {
+  const guideName = args?.guide;
+  const category = args?.category;
+  const description = args?.description;
+  const contexts = args?.contexts || [];
+  const learnings = args?.learnings || [];
+
+  if (!guideName || !category || !description) {
+    return {
+      content: [{ type: "text", text: "Error: 'guide', 'category', and 'description' parameters are required" }],
+      isError: true,
+    };
+  }
+
+  const allGuides = guides.loadGuides();
+  const existing = guides.findGuide(allGuides, guideName);
+
+  if (existing) {
+    existing.description = description;
+    guides.saveGuides(allGuides);
+    return {
+      content: [{ type: "text", text: `Updated manual for existing guide "${existing.guide}" (${existing.category})` }],
+    };
+  }
+
+  const newGuide = guides.createGuide(guideName, category, description, contexts, learnings);
+  allGuides.push(newGuide);
+  guides.saveGuides(allGuides);
+
+  return {
+    content: [{ type: "text", text: `Created new guide "${newGuide.guide}" (${newGuide.category}) with a detailed manual.` }],
+  };
+}
+
+/**
+ * Handle guide_distill tool
+ */
+export async function handleGuideDistill(args) {
+  const memoryId = args?.memory_id;
+  const guideName = args?.guide;
+  const category = args?.category || "dev-tool";
+
+  if (!memoryId || !guideName) {
+    return {
+      content: [{ type: "text", text: "Error: 'memory_id' and 'guide' parameters are required" }],
+      isError: true,
+    };
+  }
+
+  const allMemory = core.loadMemory();
+  const fragment = allMemory.find(m => m.id === memoryId);
+
+  if (!fragment) {
+    return {
+      content: [{ type: "text", text: `Error: Memory fragment with ID '${memoryId}' not found.` }],
+      isError: true,
+    };
+  }
+
+  const allGuides = guides.loadGuides();
+  const updated = guides.promoteToGuide(
+    allGuides,
+    guideName,
+    category,
+    fragment.fragment,
+    fragment.project || "global"
+  );
+
+  guides.saveGuides(allGuides);
+
+  let response = `Successfully distilled memory [${memoryId}] into guide "${updated.guide}" (${updated.category}).\n\n`;
+  response += guides.formatGuideDetail(updated);
+
+  return {
+    content: [{ type: "text", text: response }],
+  };
+}
+
+/**
+ * Handle guide_update tool
+ */
+export async function handleGuideUpdate(args) {
+  const guideName = args?.guide;
+  const updates = {
+    guide: args?.new_name,
+    category: args?.category,
+    description: args?.description
+  };
+
+  if (!guideName) {
+    return {
+      content: [{ type: "text", text: "Error: 'guide' parameter is required" }],
+      isError: true,
+    };
+  }
+
+  const allGuides = guides.loadGuides();
+  const updated = guides.updateGuide(allGuides, guideName, updates);
+
+  if (!updated) {
+    return {
+      content: [{ type: "text", text: `Error: Guide "${guideName}" not found.` }],
+      isError: true,
+    };
+  }
+
+  guides.saveGuides(allGuides);
+  return {
+    content: [{ type: "text", text: `Updated guide "${updated.guide}":\n${guides.formatGuideDetail(updated)}` }],
+  };
+}
+
+/**
+ * Handle guide_forget tool
+ */
+export async function handleGuideForget(args) {
+  const guideName = args?.guide;
+
+  if (!guideName) {
+    return {
+      content: [{ type: "text", text: "Error: 'guide' parameter is required" }],
+      isError: true,
+    };
+  }
+
+  const allGuides = guides.loadGuides();
+  const success = guides.deleteGuide(allGuides, guideName);
+
+  if (!success) {
+    return {
+      content: [{ type: "text", text: `Error: Guide "${guideName}" not found.` }],
+      isError: true,
+    };
+  }
+
+  guides.saveGuides(allGuides, { force: true });
+  return {
+    content: [{ type: "text", text: `Successfully forgot guide: ${guideName}` }],
+  };
+}
+
+/**
  * Handle guide_merge tool
  */
 export async function handleGuideMerge(args) {
@@ -645,34 +595,28 @@ export async function handleCallTool(request) {
     switch (name) {
       case "memory_read":
         return await handleMemoryRead(args);
-      case "memory_check":
-        return await handleMemoryCheck(args);
       case "memory_add":
         return await handleMemoryAdd(args);
       case "memory_update":
         return await handleMemoryUpdate(args);
       case "memory_forget":
         return await handleMemoryForget(args);
-      case "memory_list":
-        return await handleMemoryList(args);
       case "memory_feedback":
         return await handleMemoryFeedback(args);
+      case "memory_merge":
+        return await handleMemoryMerge(args);
       case "guide_get":
         return await handleGuideGet(args);
       case "guide_practice":
         return await handleGuidePractice(args);
+      case "guide_create":
+        return await handleGuideCreate(args);
+      case "guide_distill":
+        return await handleGuideDistill(args);
       case "guide_update":
         return await handleGuideUpdate(args);
       case "guide_forget":
         return await handleGuideForget(args);
-      case "guide_create":
-        return await handleGuideCreate(args);
-      case "guide_suggest":
-        return await handleGuideSuggest(args);
-      case "guide_distill":
-        return await handleGuideDistill(args);
-      case "memory_merge":
-        return await handleMemoryMerge(args);
       case "guide_merge":
         return await handleGuideMerge(args);
       default:

@@ -84,7 +84,7 @@ server.setRequestHandler(ReadResourceRequestSchema, async (request) => {
 
   if (uri === "lemma://system-prompt") {
     // Return dynamic system prompt with project context injection
-    const dynamicPrompt = getDynamicSystemPrompt(detectedProject);
+    const dynamicPrompt = await getDynamicSystemPrompt(detectedProject);
     return {
       contents: [
         {

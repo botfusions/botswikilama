@@ -356,28 +356,26 @@ describe("Memory Core", () => {
   describe("formatMemoryForLLM", () => {
     test("shows empty state when no fragments", () => {
       const output = core.formatMemoryForLLM([]);
-      assert.ok(output.includes("no active fragments"));
+      assert.ok(output.includes("no fragments"));
     });
 
-    test("includes confidence bar", () => {
-      const frag = { ...core.createFragment("test", "ai"), confidence: 0.8 };
+    test("shows title and description", () => {
+      const frag = core.createFragment("test content", "ai", "My Title", null);
       const output = core.formatMemoryForLLM([frag]);
-      assert.ok(output.includes("████"));
-      assert.ok(output.includes("░"));
-    });
-
-    test("shows source icon", () => {
-      const ai = core.createFragment("ai", "ai");
-      const user = core.createFragment("user", "user");
-      const output = core.formatMemoryForLLM([ai, user]);
-      assert.ok(output.includes("🤖"));
-      assert.ok(output.includes("👤"));
+      assert.ok(output.includes("My Title"));
+      assert.ok(output.includes("test content"));
     });
 
     test("shows project scope tag", () => {
       const frag = core.createFragment("test", "ai", "T", "myproj");
       const output = core.formatMemoryForLLM([frag]);
       assert.ok(output.includes("[myproj]"));
+    });
+
+    test("shows global scope when no project", () => {
+      const frag = core.createFragment("test", "ai", "T", null);
+      const output = core.formatMemoryForLLM([frag]);
+      assert.ok(output.includes("[global]"));
     });
   });
 
@@ -556,34 +554,12 @@ describe("Handlers (Integration)", () => {
 
   // ── memory_read ────────────────────────────────────────────────────
 
-  describe("handleMemoryCheck", () => {
-    test("returns empty when no memory for project", async () => {
-      const result = await handlers.handleMemoryCheck({ project: "nonexistent" });
-      assert.ok(result.content[0].text.includes("No memory found"));
-    });
-
-    test("returns summary when memory exists", async () => {
-      seedMemory();
-      const result = await handlers.handleMemoryCheck({ project: "testproj" });
-      assert.ok(!result.isError);
-      assert.ok(result.content[0].text.includes("Found 1"));
-      assert.ok(result.content[0].text.includes("testproj"));
-    });
-
-    test("matches project case-insensitively", async () => {
-      // seedMemory creates with "testproj" — search with different case
-      seedMemory();
-      const result = await handlers.handleMemoryCheck({ project: "TESTPROJ" });
-      assert.ok(result.content[0].text.includes("Found 1"));
-    });
-  });
-
   describe("handleMemoryRead", () => {
     test("returns summary list", async () => {
       seedMemory();
       const result = await handlers.handleMemoryRead({ project: "testproj" });
       assert.ok(!result.isError);
-      assert.ok(result.content[0].text.includes("LEMM"));
+      assert.ok(result.content[0].text.includes("MEMORY FRAGMENTS"));
     });
 
     test("returns detail by ID with boost", async () => {
@@ -1033,46 +1009,46 @@ describe("Dynamic System Prompt", () => {
   }
 
   describe("getDynamicSystemPrompt", () => {
-    test("returns base prompt when no project", () => {
-      const prompt = getDynamicSystemPrompt(null);
+    test("returns base prompt when no project", async () => {
+      const prompt = await getDynamicSystemPrompt(null);
       assert.ok(prompt.includes("Lemma — Persistent Memory Layer"));
       assert.ok(!prompt.includes("<project_context>"));
     });
 
-    test("returns base prompt when project has no memories", () => {
-      const prompt = getDynamicSystemPrompt("EmptyProject");
+    test("returns base prompt when project has no memories", async () => {
+      const prompt = await getDynamicSystemPrompt("EmptyProject");
       assert.ok(prompt.includes("Lemma — Persistent Memory Layer"));
       assert.ok(!prompt.includes("<project_context>"));
     });
 
-    test("injects project context when memories exist", () => {
+    test("injects project context when memories exist", async () => {
       seedProjectMemory("TestProject");
-      const prompt = getDynamicSystemPrompt("TestProject");
+      const prompt = await getDynamicSystemPrompt("TestProject");
       assert.ok(prompt.includes("<project_context>"));
       assert.ok(prompt.includes("Project Context: TestProject"));
       assert.ok(prompt.includes("2 saved memory fragment"));
     });
 
-    test("includes memory titles in injected context", () => {
+    test("includes memory titles in injected context", async () => {
       seedProjectMemory("AnotherProject");
-      const prompt = getDynamicSystemPrompt("AnotherProject");
+      const prompt = await getDynamicSystemPrompt("AnotherProject");
       assert.ok(prompt.includes("React Hooks"));
       assert.ok(prompt.includes("State Mgmt"));
     });
 
-    test("only includes project-scoped memories (not global)", () => {
+    test("only includes project-scoped memories (not global)", async () => {
       // Create global memory with unique title
       const globalFrag = core.createFragment("Global unique info xyz", "ai", "GlobalUniqueTitle", null);
       // Create project memory
       const projFrag = core.createFragment("Project unique info", "ai", "ProjectUniqueTitle", "ScopedProj");
       core.saveMemory([globalFrag, projFrag]);
 
-      const prompt = getDynamicSystemPrompt("ScopedProj");
+      const prompt = await getDynamicSystemPrompt("ScopedProj");
       assert.ok(prompt.includes("ProjectUniqueTitle"), "Should include project memory");
       assert.ok(!prompt.includes("GlobalUniqueTitle"), "Should NOT include global memory");
     });
 
-    test("limits to top 20 fragments by confidence", () => {
+    test("limits to top 20 fragments by confidence", async () => {
       // Create 25 fragments with varying confidence
       const frags = [];
       for (let i = 0; i < 25; i++) {
@@ -1082,16 +1058,75 @@ describe("Dynamic System Prompt", () => {
       }
       core.saveMemory(frags);
 
-      const prompt = getDynamicSystemPrompt("BigProject");
+      const prompt = await getDynamicSystemPrompt("BigProject");
       // Count how many fragment IDs appear in the output
       const matches = prompt.match(/\[m[a-f0-9]{6}\]/g) || [];
       assert.ok(matches.length <= 20, `Expected max 20 fragments, got ${matches.length}`);
     });
 
-    test("project name matching is case-insensitive", () => {
+    test("project name matching is case-insensitive", async () => {
       seedProjectMemory("CaseSensitive");
-      const prompt = getDynamicSystemPrompt("casesensitive");
+      const prompt = await getDynamicSystemPrompt("casesensitive");
       assert.ok(prompt.includes("<project_context>"));
+    });
+  });
+
+  describe("Prompt Modifiers", () => {
+    test("registerPromptModifier adds modifier", () => {
+      hooks.clearPromptModifiers();
+      const unregister = hooks.registerPromptModifier(async (p) => p);
+      assert.equal(hooks.getPromptModifierCount(), 1);
+      unregister();
+    });
+
+    test("applyPromptModifiers modifies prompt", async () => {
+      hooks.clearPromptModifiers();
+      hooks.registerPromptModifier(async (prompt, ctx) => {
+        return prompt + "\n\n<!-- Custom Footer -->";
+      });
+
+      const modified = await hooks.applyPromptModifiers("Base", { project: "Test" });
+      assert.ok(modified.includes("Custom Footer"));
+      hooks.clearPromptModifiers();
+    });
+
+    test("multiple modifiers are applied in order", async () => {
+      hooks.clearPromptModifiers();
+      hooks.registerPromptModifier(async (p) => p + " [A]");
+      hooks.registerPromptModifier(async (p) => p + " [B]");
+
+      const result = await hooks.applyPromptModifiers("Start", {});
+      assert.equal(result, "Start [A] [B]");
+      hooks.clearPromptModifiers();
+    });
+
+    test("modifier receives context with project and fragments", async () => {
+      hooks.clearPromptModifiers();
+      let receivedContext = null;
+
+      hooks.registerPromptModifier(async (prompt, ctx) => {
+        receivedContext = ctx;
+        return prompt;
+      });
+
+      // Create project memory
+      seedProjectMemory("ContextTestProject");
+      await getDynamicSystemPrompt("ContextTestProject");
+
+      assert.equal(receivedContext.project, "ContextTestProject");
+      assert.ok(receivedContext.fragments.length > 0);
+      hooks.clearPromptModifiers();
+    });
+
+    test("getDynamicSystemPrompt applies modifiers", async () => {
+      hooks.clearPromptModifiers();
+      hooks.registerPromptModifier(async (prompt) => {
+        return prompt.replace("</system_prompt>", "<!-- Modified by hook -->\n</system_prompt>");
+      });
+
+      const prompt = await getDynamicSystemPrompt(null);
+      assert.ok(prompt.includes("Modified by hook"));
+      hooks.clearPromptModifiers();
     });
   });
 });

@@ -415,25 +415,19 @@ export function searchAndSortFragments(fragments, query = null, topK = 30) {
  * @returns {string} Formatted string with confidence bars
  */
 export function formatMemoryForLLM(fragments, currentProject = null) {
-  const projectHeader = currentProject ? ` (project: ${currentProject})` : "";
+  const projectHeader = currentProject ? ` (${currentProject})` : "";
 
   if (fragments.length === 0) {
-    return `=== LEMMA MEMORY FRAGMENTS${projectHeader} ===\n(no active fragments)\n==============================`;
+    return `╔══════════════════════════════════════╗\n║         MEMORY FRAGMENTS${projectHeader.padEnd(18)}║\n╠══════════════════════════════════════╣\n║  (no fragments)                      ║\n╚══════════════════════════════════════╝`;
   }
 
   const lines = fragments.map(frag => {
-    const barCount = Math.round(frag.confidence / 0.2);
-    const confidenceBar = "█".repeat(barCount) + "░".repeat(5 - barCount);
-    const sourceIcon = frag.source === "ai" ? "🤖" : "👤";
-    const scopeTag = frag.project ? `[${frag.project}]` : "[global]";
-
-    // Use description (summary) instead of full fragment
+    const scopeTag = frag.project || "global";
     const summary = frag.description || frag.title;
-
-    return `[${frag.id}] ${confidenceBar} (${sourceIcon}) ${scopeTag} ${frag.title}\n    ${summary}`;
+    return `  [${scopeTag}] ${frag.title}\n              ${summary}`;
   });
 
-  return `=== LEMMA MEMORY FRAGMENTS${projectHeader} ===\n${lines.join("\n")}\n==============================`;
+  return `╔══════════════════════════════════════╗\n║         MEMORY FRAGMENTS${projectHeader.padEnd(18)}║\n╠══════════════════════════════════════╣\n${lines.join("\n")}\n╚══════════════════════════════════════╝`;
 }
 
 /**

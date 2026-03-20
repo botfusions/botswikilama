@@ -2,7 +2,7 @@
 export const TOOLS = [
   {
     name: "memory_read",
-    description: "Read memory fragments for LLM. SUMMARY MODE: Shows title + description only (not full content). Use id parameter to get full detail of a specific fragment.",
+    description: "Read memory fragments. SUMMARY MODE: Shows title + description only (not full content). Use id parameter to get full detail of a specific fragment. Use all=true to see fragments from all projects.",
     inputSchema: {
       type: "object",
       properties: {
@@ -22,18 +22,9 @@ export const TOOLS = [
           type: "string",
           description: "Optional context tag for this access (e.g., 'debugging', 'refactoring'). Boosts confidence and tags the fragment for future recall.",
         },
-      },
-    },
-  },
-  {
-    name: "memory_check",
-    description: "MANDATORY: Call this BEFORE any analysis, research, or document reading. Checks if project/topic already exists in memory. Prevents redundant work.",
-    inputSchema: {
-      type: "object",
-      properties: {
-        project: {
-          type: "string",
-          description: "Project name to check (optional, defaults to detected project)",
+        all: {
+          type: "boolean",
+          description: "If true, show fragments from all projects. Default: false (current project + global only)",
         },
       },
     },
@@ -111,21 +102,54 @@ export const TOOLS = [
     },
   },
   {
-    name: "memory_list",
-    description: "List memory fragments in JSON format. By default shows only current project + global. Use all=true to see all projects.",
+    name: "memory_feedback",
+    description: "Provide feedback on a memory fragment after use. positive = the memory was useful (boosts confidence), negative = it was not helpful (reduces confidence and marks it for faster decay).",
     inputSchema: {
       type: "object",
       properties: {
-        all: {
+        id: {
+          type: "string",
+          description: "The ID of the fragment to give feedback on",
+        },
+        useful: {
           type: "boolean",
-          description: "If true, show all fragments from all projects. Default: false (current project only)",
+          description: "true if the memory was helpful, false if it was not relevant or incorrect",
         },
       },
+      required: ["id", "useful"],
+    },
+  },
+  {
+    name: "memory_merge",
+    description: "Merge multiple memory fragments into one. You decide the merged content, this tool just executes the merge. Use when you find related/overlapping fragments that should be consolidated.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        ids: {
+          type: "array",
+          items: { type: "string" },
+          description: "Array of fragment IDs to merge (will be deleted after merge)",
+        },
+        title: {
+          type: "string",
+          description: "Title for the merged fragment",
+        },
+        fragment: {
+          type: "string",
+          description: "The merged content you prepared",
+        },
+        project: {
+          type: "string",
+          description: "Project scope (null = global, string = project-specific). Optional.",
+          default: null,
+        },
+      },
+      required: ["ids", "title", "fragment"],
     },
   },
   {
     name: "guide_get",
-    description: "Get all tracked guides with usage statistics. Returns guides sorted by usage count (most used first).",
+    description: "Get guides with usage statistics. Returns guides sorted by usage count (most used first). Use task parameter to get suggestions based on a task description.",
     inputSchema: {
       type: "object",
       properties: {
@@ -136,6 +160,10 @@ export const TOOLS = [
         guide: {
           type: "string",
           description: "Get detail for a specific guide name. Optional.",
+        },
+        task: {
+          type: "string",
+          description: "Task description to get relevant guide suggestions (e.g., 'react component with hooks', 'nodejs api'). Optional.",
         },
       },
     },
@@ -205,20 +233,6 @@ export const TOOLS = [
     },
   },
   {
-    name: "guide_suggest",
-    description: "Suggest relevant guides based on a task description. Analyzes the task and returns matching guides - both tracked (with experience) and untracked (new suggestions). Use this when user asks 'hangi guide lar gerekli', 'uygun rehberler var mı', or starting a new task.",
-    inputSchema: {
-      type: "object",
-      properties: {
-        task: {
-          type: "string",
-          description: "Task description to analyze for guide suggestions (e.g., 'react component with hooks', 'nodejs api development', 'python data analysis')",
-        },
-      },
-      required: ["task"],
-    },
-  },
-  {
     name: "guide_distill",
     description: "Transform a memory fragment (static fact) into a guide's learning (procedural knowledge). Use this when a learned piece of information should become part of a permanent capability.",
     inputSchema: {
@@ -278,52 +292,6 @@ export const TOOLS = [
         },
       },
       required: ["guide"],
-    },
-  },
-  {
-    name: "memory_feedback",
-    description: "Provide feedback on a memory fragment after use. positive = the memory was useful (boosts confidence), negative = it was not helpful (reduces confidence and marks it for faster decay).",
-    inputSchema: {
-      type: "object",
-      properties: {
-        id: {
-          type: "string",
-          description: "The ID of the fragment to give feedback on",
-        },
-        useful: {
-          type: "boolean",
-          description: "true if the memory was helpful, false if it was not relevant or incorrect",
-        },
-      },
-      required: ["id", "useful"],
-    },
-  },
-  {
-    name: "memory_merge",
-    description: "Merge multiple memory fragments into one. You decide the merged content, this tool just executes the merge. Use when you find related/overlapping fragments that should be consolidated.",
-    inputSchema: {
-      type: "object",
-      properties: {
-        ids: {
-          type: "array",
-          items: { type: "string" },
-          description: "Array of fragment IDs to merge (will be deleted after merge)",
-        },
-        title: {
-          type: "string",
-          description: "Title for the merged fragment",
-        },
-        fragment: {
-          type: "string",
-          description: "The merged content you prepared",
-        },
-        project: {
-          type: "string",
-          description: "Project scope (null = global, string = project-specific). Optional.",
-          default: null,
-        },
-      },
-      required: ["ids", "title", "fragment"],
     },
   },
   {
