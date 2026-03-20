@@ -11,6 +11,8 @@ import os from "os";
 import * as core from "../src/memory/index.js";
 import * as guides from "../src/guides/index.js";
 import * as handlers from "../src/server/handlers.js";
+import * as hooks from "../src/server/hooks.js";
+import { getDynamicSystemPrompt } from "../src/server/system-prompt.js";
 
 // ── Isolation: redirect all I/O to a temp dir ──────────────────────────
 let TMPDIR;
@@ -934,5 +936,162 @@ describe("Learning System Lifecycle", () => {
     // Confidence should still be high after boost + decay
     assert.ok(decayed.confidence > 0.8,
       `Confidence should remain high after boost, got ${decayed.confidence}`);
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════
+// HOOK SYSTEM
+// ═══════════════════════════════════════════════════════════════════════
+
+describe("Hook System", () => {
+  beforeEach(() => {
+    hooks.clearHooks();
+  });
+
+  describe("registerHook", () => {
+    test("registers a hook callback", () => {
+      const unregister = hooks.registerHook(hooks.HookTypes.ON_START, async () => {});
+      assert.equal(hooks.getHookCount(hooks.HookTypes.ON_START), 1);
+      unregister();
+    });
+
+    test("returns unregister function", () => {
+      const unregister = hooks.registerHook(hooks.HookTypes.ON_START, async () => {});
+      unregister();
+      assert.equal(hooks.getHookCount(hooks.HookTypes.ON_START), 0);
+    });
+
+    test("throws for unknown hook type", () => {
+      assert.throws(() => {
+        hooks.registerHook("unknown_type", async () => {});
+      });
+    });
+  });
+
+  describe("triggerHook", () => {
+    test("calls all registered callbacks", async () => {
+      let callCount = 0;
+      hooks.registerHook(hooks.HookTypes.ON_START, async () => { callCount++; });
+      hooks.registerHook(hooks.HookTypes.ON_START, async () => { callCount++; });
+
+      await hooks.triggerHook(hooks.HookTypes.ON_START, { project: "test" });
+      assert.equal(callCount, 2);
+    });
+
+    test("passes context to callbacks", async () => {
+      let receivedContext = null;
+      hooks.registerHook(hooks.HookTypes.ON_START, async (ctx) => {
+        receivedContext = ctx;
+      });
+
+      await hooks.triggerHook(hooks.HookTypes.ON_START, { project: "MyProject" });
+      assert.equal(receivedContext.project, "MyProject");
+    });
+
+    test("returns results from all callbacks", async () => {
+      hooks.registerHook(hooks.HookTypes.ON_START, async () => "result1");
+      hooks.registerHook(hooks.HookTypes.ON_START, async () => "result2");
+
+      const results = await hooks.triggerHook(hooks.HookTypes.ON_START, {});
+      assert.deepEqual(results, ["result1", "result2"]);
+    });
+
+    test("handles callback errors gracefully", async () => {
+      hooks.registerHook(hooks.HookTypes.ON_START, async () => { throw new Error("fail"); });
+      hooks.registerHook(hooks.HookTypes.ON_START, async () => "success");
+
+      const results = await hooks.triggerHook(hooks.HookTypes.ON_START, {});
+      assert.equal(results[0].error, "fail");
+      assert.equal(results[1], "success");
+    });
+  });
+
+  describe("clearHooks", () => {
+    test("removes all hooks", () => {
+      hooks.registerHook(hooks.HookTypes.ON_START, async () => {});
+      hooks.registerHook(hooks.HookTypes.ON_PROJECT_CHANGE, async () => {});
+      hooks.clearHooks();
+      assert.equal(hooks.getHookCount(hooks.HookTypes.ON_START), 0);
+      assert.equal(hooks.getHookCount(hooks.HookTypes.ON_PROJECT_CHANGE), 0);
+    });
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════
+// DYNAMIC SYSTEM PROMPT
+// ═══════════════════════════════════════════════════════════════════════
+
+describe("Dynamic System Prompt", () => {
+  // Helper to seed project-specific memories
+  function seedProjectMemory(projectName) {
+    const frags = [
+      core.createFragment("React hooks patterns", "ai", "React Hooks", projectName),
+      core.createFragment("State management tips", "ai", "State Mgmt", projectName),
+    ];
+    core.saveMemory(frags);
+    return frags;
+  }
+
+  describe("getDynamicSystemPrompt", () => {
+    test("returns base prompt when no project", () => {
+      const prompt = getDynamicSystemPrompt(null);
+      assert.ok(prompt.includes("Lemma — Persistent Memory Layer"));
+      assert.ok(!prompt.includes("<project_context>"));
+    });
+
+    test("returns base prompt when project has no memories", () => {
+      const prompt = getDynamicSystemPrompt("EmptyProject");
+      assert.ok(prompt.includes("Lemma — Persistent Memory Layer"));
+      assert.ok(!prompt.includes("<project_context>"));
+    });
+
+    test("injects project context when memories exist", () => {
+      seedProjectMemory("TestProject");
+      const prompt = getDynamicSystemPrompt("TestProject");
+      assert.ok(prompt.includes("<project_context>"));
+      assert.ok(prompt.includes("Project Context: TestProject"));
+      assert.ok(prompt.includes("2 saved memory fragment"));
+    });
+
+    test("includes memory titles in injected context", () => {
+      seedProjectMemory("AnotherProject");
+      const prompt = getDynamicSystemPrompt("AnotherProject");
+      assert.ok(prompt.includes("React Hooks"));
+      assert.ok(prompt.includes("State Mgmt"));
+    });
+
+    test("only includes project-scoped memories (not global)", () => {
+      // Create global memory with unique title
+      const globalFrag = core.createFragment("Global unique info xyz", "ai", "GlobalUniqueTitle", null);
+      // Create project memory
+      const projFrag = core.createFragment("Project unique info", "ai", "ProjectUniqueTitle", "ScopedProj");
+      core.saveMemory([globalFrag, projFrag]);
+
+      const prompt = getDynamicSystemPrompt("ScopedProj");
+      assert.ok(prompt.includes("ProjectUniqueTitle"), "Should include project memory");
+      assert.ok(!prompt.includes("GlobalUniqueTitle"), "Should NOT include global memory");
+    });
+
+    test("limits to top 20 fragments by confidence", () => {
+      // Create 25 fragments with varying confidence
+      const frags = [];
+      for (let i = 0; i < 25; i++) {
+        const frag = core.createFragment(`Fragment ${i}`, "ai", `Title ${i}`, "BigProject");
+        frag.confidence = 0.3 + (i * 0.02); // Varying confidence
+        frags.push(frag);
+      }
+      core.saveMemory(frags);
+
+      const prompt = getDynamicSystemPrompt("BigProject");
+      // Count how many fragment IDs appear in the output
+      const matches = prompt.match(/\[m[a-f0-9]{6}\]/g) || [];
+      assert.ok(matches.length <= 20, `Expected max 20 fragments, got ${matches.length}`);
+    });
+
+    test("project name matching is case-insensitive", () => {
+      seedProjectMemory("CaseSensitive");
+      const prompt = getDynamicSystemPrompt("casesensitive");
+      assert.ok(prompt.includes("<project_context>"));
+    });
   });
 });

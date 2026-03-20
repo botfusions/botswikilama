@@ -9,9 +9,13 @@ import {
 } from "@modelcontextprotocol/sdk/types.js";
 import * as core from "../memory/index.js";
 import * as guides from "../guides/index.js";
-import { SYSTEM_PROMPT } from "./system-prompt.js";
+import { getDynamicSystemPrompt } from "./system-prompt.js";
 import { TOOLS } from "./tools.js";
 import { handleCallTool } from "./handlers.js";
+import { triggerHook, HookTypes } from "./hooks.js";
+
+// Detected project context (set on startup)
+let detectedProject = null;
 
 // Create MCP server instance
 const server = new Server(
@@ -79,12 +83,14 @@ server.setRequestHandler(ReadResourceRequestSchema, async (request) => {
   const { uri } = request.params;
 
   if (uri === "lemma://system-prompt") {
+    // Return dynamic system prompt with project context injection
+    const dynamicPrompt = getDynamicSystemPrompt(detectedProject);
     return {
       contents: [
         {
           uri,
           mimeType: "text/markdown",
-          text: SYSTEM_PROMPT,
+          text: dynamicPrompt,
         },
       ],
     };
@@ -138,8 +144,44 @@ server.setRequestHandler(ReadResourceRequestSchema, async (request) => {
 // Register call tool handler
 server.setRequestHandler(CallToolRequestSchema, handleCallTool);
 
+/**
+ * Initialize server context on startup
+ * - Detect project from working directory
+ * - Trigger onStart hooks
+ */
+async function initializeContext() {
+  // Detect project from current working directory
+  detectedProject = core.detectProject();
+
+  if (detectedProject) {
+    // Log to stderr (doesn't interfere with stdio transport)
+    console.error(`[Lemma] Detected project: ${detectedProject}`);
+
+    // Check if project has memories
+    const memory = core.loadMemory();
+    const projectFragments = core.filterByProject(memory, detectedProject);
+
+    if (projectFragments.length > 0) {
+      console.error(`[Lemma] Found ${projectFragments.length} memory fragment(s) for this project`);
+    } else {
+      console.error(`[Lemma] No saved memories for this project yet`);
+    }
+  } else {
+    console.error(`[Lemma] No project detected (running in global context)`);
+  }
+
+  // Trigger onStart hooks with project context
+  await triggerHook(HookTypes.ON_START, {
+    project: detectedProject,
+    timestamp: new Date().toISOString(),
+  });
+}
+
 // Start server
 export async function startServer() {
+  // Initialize context before starting transport
+  await initializeContext();
+
   const transport = new StdioServerTransport();
   await server.connect(transport);
   // Server is now listening on stdin/stdout

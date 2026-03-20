@@ -1,5 +1,10 @@
 // System prompt for LLM clients
-export const SYSTEM_PROMPT = `<system_prompt>
+import * as core from "../memory/index.js";
+
+/**
+ * Base system prompt template (without project context)
+ */
+const BASE_SYSTEM_PROMPT = `<system_prompt>
 <identity>
 # Lemma — Persistent Memory Layer
 
@@ -121,3 +126,82 @@ When you see tool names (memory_read, guide_get, etc.):
 - Lemma = your brain, use it
 </tool_focus_rule>
 </system_prompt>`;
+
+/**
+ * Format project context for injection into system prompt
+ * @param {Array<object>} fragments - Project-scoped memory fragments
+ * @param {string} projectName - Name of the project
+ * @returns {string} Formatted context section
+ */
+function formatProjectContext(fragments, projectName) {
+  if (!fragments || fragments.length === 0) {
+    return "";
+  }
+
+  const lines = fragments.map(frag => {
+    const barCount = Math.round(frag.confidence / 0.2);
+    const confidenceBar = "█".repeat(barCount) + "░".repeat(5 - barCount);
+    const sourceIcon = frag.source === "ai" ? "🤖" : "👤";
+
+    // Only title + description (summary mode)
+    const summary = frag.description || frag.title;
+
+    return `[${frag.id}] ${confidenceBar} (${sourceIcon}) ${frag.title}\n    ${summary}`;
+  });
+
+  return `<project_context>
+## Project Context: ${projectName}
+
+You have ${fragments.length} saved memory fragment(s) for this project.
+Use \`memory_read\` to load full details or \`memory_read id="<id>"\` for specific fragment.
+
+${lines.join("\n")}
+</project_context>`;
+}
+
+/**
+ * Get dynamic system prompt with project context injection
+ * Called on server startup and when system prompt resource is requested
+ * @param {string|null} projectName - Current project name (null = no project context)
+ * @returns {string} System prompt with optional project context
+ */
+export function getDynamicSystemPrompt(projectName) {
+  // No project detected - return base prompt without injection
+  if (!projectName) {
+    return BASE_SYSTEM_PROMPT;
+  }
+
+  // Load and filter memories for this project
+  const memory = core.loadMemory();
+  const projectFragments = core.filterByProject(memory, projectName);
+
+  // No fragments for this project - return base prompt
+  if (projectFragments.length === 0) {
+    return BASE_SYSTEM_PROMPT;
+  }
+
+  // Apply decay for accurate confidence display
+  const decayedFragments = core.decayConfidence(projectFragments);
+
+  // Sort by confidence (highest first), limit to top 20 for context window
+  const sortedFragments = [...decayedFragments]
+    .sort((a, b) => b.confidence - a.confidence)
+    .slice(0, 20);
+
+  // Generate project context section
+  const projectContext = formatProjectContext(sortedFragments, projectName);
+
+  // Inject project context into system prompt (before closing tag)
+  const injectedPrompt = BASE_SYSTEM_PROMPT.replace(
+    "</system_prompt>",
+    `\n${projectContext}\n</system_prompt>`
+  );
+
+  return injectedPrompt;
+}
+
+/**
+ * Static system prompt for backward compatibility
+ * @deprecated Use getDynamicSystemPrompt() instead
+ */
+export const SYSTEM_PROMPT = BASE_SYSTEM_PROMPT;
