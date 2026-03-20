@@ -316,8 +316,11 @@ export function filterByProject(fragments, currentProject) {
     // No project context, return only global fragments
     return fragments.filter(f => f.project === null || f.project === undefined);
   }
-  // Return ONLY the specified project's fragments (case-insensitive)
-  return fragments.filter(f => f.project && f.project.toLowerCase() === project);
+  // Return BOTH the specified project's fragments (case-insensitive) AND global fragments
+  return fragments.filter(f => 
+    (f.project && f.project.toLowerCase() === project) || 
+    (f.project === null || f.project === undefined)
+  );
 }
 
 /**
@@ -424,7 +427,8 @@ export function formatMemoryForLLM(fragments, currentProject = null) {
   const lines = fragments.map(frag => {
     const scopeTag = frag.project || "global";
     const summary = frag.description || frag.title;
-    return `  [${scopeTag}] ${frag.title}\n              ${summary}`;
+    // Include the ID for follow-up retrieval
+    return `  [${frag.id}] [${scopeTag}] ${frag.title}\n              ${summary}`;
   });
 
   return `╔══════════════════════════════════════╗\n║         MEMORY FRAGMENTS${projectHeader.padEnd(18)}║\n╠══════════════════════════════════════╣\n${lines.join("\n")}\n╚══════════════════════════════════════╝`;
