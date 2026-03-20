@@ -1,5 +1,42 @@
 # Changelog
 
+## [0.4.0] - 2026-03-20
+
+### Added
+- **Dynamic System Prompt Generation** — System prompt now automatically injects project and global memory context at runtime
+  - `getDynamicSystemPrompt(projectName)` — Async function that builds contextualized prompts
+  - Global context section: Shows cross-project learnings and preferences (up to 10 fragments)
+  - Project context section: Shows project-specific fragments with confidence bars and source icons (up to 20 fragments)
+  - Automatic confidence decay applied for accurate relevance display
+  - `</system_prompt>` injection point for seamless context embedding
+
+- **Hook System** (`src/server/hooks.js`) — Pluggable lifecycle event system
+  - `HookTypes.ON_START` — Triggered when server starts
+  - `HookTypes.ON_PROJECT_CHANGE` — Triggered when project context changes
+  - `registerHook(type, callback)` — Register callbacks, returns unregister function
+  - `triggerHook(type, context)` — Execute all registered callbacks for a hook
+
+- **Prompt Modifier System** — Extend system prompt generation with custom transformations
+  - `registerPromptModifier(modifier)` — Add async functions that transform prompts
+  - `applyPromptModifiers(prompt, context)` — Apply all modifiers in sequence
+  - Context object provides: `{ project, fragments, globalFragments }`
+
+- **Visual Context Formatting** — Enhanced readability in injected contexts
+  - Confidence bars: `███░░` visual representation (5 blocks, 0.2 increments)
+  - Source icons: 🤖 (AI-generated) / 👤 (user-provided)
+  - Summary mode: Title + description only (full content via `memory_read`)
+
+### Changed
+- **Server Index** — Now uses `getDynamicSystemPrompt()` for resource requests
+- **Handlers Refactored** — Simplified tool/resource handling with hook integration
+- **Tools Module** — Streamlined tool definitions and registration
+- **Memory/Guides Core** — Minor improvements for context retrieval
+
+### Tests
+- **+269 lines** of new tests covering hook system, prompt modifiers, and dynamic context injection
+
+---
+
 ## [0.3.2] - 2026-03-20
 
 ### Changed
@@ -165,6 +202,8 @@
 
 ---
 
+[0.4.0]: https://github.com/xenitV1/lemma/compare/v0.3.2...v0.4.0
+[0.3.2]: https://github.com/xenitV1/lemma/compare/v0.3.1...v0.3.2
 [0.3.1]: https://github.com/xenitV1/lemma/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/xenitV1/lemma/compare/v0.2.3...v0.3.0
 [0.2.3]: https://github.com/xenitV1/lemma/compare/v0.2.2...v0.2.3

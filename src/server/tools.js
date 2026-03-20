@@ -103,7 +103,7 @@ export const TOOLS = [
   },
   {
     name: "memory_feedback",
-    description: "Provide feedback on a memory fragment after use. positive = the memory was useful (boosts confidence), negative = it was not helpful (reduces confidence and marks it for faster decay).",
+    description: "Provide feedback on a memory fragment after use. positive = the memory was useful (boosts confidence), negative = it was not helpful (reduces confidence by -0.1).",
     inputSchema: {
       type: "object",
       properties: {

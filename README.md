@@ -21,6 +21,15 @@ Lemma operates on the same principle:
 
 ## How It Works
 
+### Dynamic System Prompt
+
+Lemma automatically injects relevant context into the LLM's system prompt at runtime:
+
+- **Global Context**: Cross-project learnings and preferences (up to 10 fragments)
+- **Project Context**: Project-specific fragments with confidence visualization (up to 20 fragments)
+- **Visual Formatting**: Confidence bars (`███░░`) and source icons (🤖/👤)
+- **Prompt Modifiers**: Extensible system for custom prompt transformations
+
 ### Memory Structure
 
 Each memory fragment has:
@@ -104,6 +113,44 @@ The recommended way to use Lemma is via **JSR**. Add this to your MCP client con
 
 ---
 
+## Hook System
+
+Lemma provides a pluggable hook system for extending server behavior:
+
+### Lifecycle Hooks
+
+```javascript
+import { registerHook, HookTypes } from "@lemma/lemma/server";
+
+// Register a callback for server start
+registerHook(HookTypes.ON_START, async (context) => {
+  console.log("Server started!", context);
+});
+
+// Register a callback for project context changes
+registerHook(HookTypes.ON_PROJECT_CHANGE, async (context) => {
+  console.log(`Project changed to: ${context.project}`);
+});
+```
+
+### Prompt Modifiers
+
+Extend the system prompt generation with custom transformations:
+
+```javascript
+import { registerPromptModifier } from "@lemma/lemma/server";
+
+registerPromptModifier(async (prompt, context) => {
+  // Add custom context to the prompt
+  if (context.project === "my-app") {
+    return prompt + "\n\n<custom>Note: Using experimental features.</custom>";
+  }
+  return prompt;
+});
+```
+
+---
+
 ## Manual Installation (For Developers)
 
 ```bash
@@ -142,6 +189,7 @@ Read memory fragments. SUMMARY MODE shows title + description; use `id` for full
 - `query` (string, optional): Semantic search keyword
 - `id` (string, optional): Get full detail for a specific fragment
 - `context` (string, optional): Tag this access with a context (e.g., "debugging") — boosts confidence
+- `all` (boolean, optional): Show fragments from all projects (default: false)
 
 **Returns:** Formatted string with confidence bars:
 
@@ -151,13 +199,6 @@ Read memory fragments. SUMMARY MODE shows title + description; use `id` for full
     useState and useEffect patterns
 ==============================
 ```
-
-#### `memory_check`
-
-**MANDATORY:** Call BEFORE any analysis. Checks if project/topic already exists in memory.
-
-**Parameters:**
-- `project` (string, optional): Project name to check
 
 #### `memory_add`
 
@@ -182,7 +223,7 @@ Update an existing fragment by ID.
 
 #### `memory_feedback`
 
-Provide feedback on a memory fragment after use. Positive feedback boosts confidence; negative feedback reduces it and marks it for faster decay.
+Provide feedback on a memory fragment after use. Positive feedback boosts confidence; negative feedback reduces it directly (-0.1).
 
 **Parameters:**
 - `id` (string, required): Fragment ID
@@ -194,13 +235,6 @@ Remove a memory fragment by ID.
 
 **Parameters:**
 - `id` (string, required): Fragment ID
-
-#### `memory_list`
-
-List all memory fragments in JSON format.
-
-**Parameters:**
-- `all` (boolean, optional): Show all projects (default: current project only)
 
 #### `memory_merge`
 
@@ -216,11 +250,12 @@ Merge multiple fragments into one. Creates new ID, deletes originals.
 
 #### `guide_get`
 
-Get tracked guides with usage statistics.
+Get tracked guides with usage statistics. Returns guides sorted by usage count (most used first).
 
 **Parameters:**
 - `category` (string, optional): Filter by category
 - `guide` (string, optional): Get detail for specific guide
+- `task` (string, optional): Task description to get relevant guide suggestions
 
 #### `guide_practice`
 
@@ -243,13 +278,6 @@ Create a guide with a detailed manual.
 - `description` (string, required): Full manual/protocols
 - `contexts` (string[], optional): Initial contexts
 - `learnings` (string[], optional): Initial learnings
-
-#### `guide_suggest`
-
-Suggest relevant guides based on a task description.
-
-**Parameters:**
-- `task` (string, required): Task description
 
 #### `guide_distill`
 
@@ -318,7 +346,7 @@ Merge multiple guides into one. Usage counts are summed.
 npm test
 ```
 
-90 tests covering memory core, guides core, handlers, and learning lifecycle. All I/O is isolated to temp directories — real data is never touched.
+Comprehensive test suite covering memory core, guides core, handlers, learning lifecycle, hook system, and dynamic prompt generation. All I/O is isolated to temp directories — real data is never touched.
 
 ### Project Structure
 
@@ -337,9 +365,10 @@ Lemma/
 │       ├── index.js      # Server setup
 │       ├── handlers.js   # Tool handlers
 │       ├── tools.js      # Tool definitions
+│       ├── hooks.js      # Hook system & prompt modifiers
 │       └── system-prompt.js
 ├── tests/
-│   └── test.js           # Test suite (90 tests)
+│   └── test.js           # Test suite
 ├── package.json
 ├── jsr.json
 ├── CHANGELOG.md
