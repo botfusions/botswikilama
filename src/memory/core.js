@@ -330,28 +330,11 @@ export function filterByProject(fragments, currentProject) {
  * @returns {Array<object>} Decayed fragments (same count, never fewer)
  */
 export function decayConfidence(fragments) {
-  const now = new Date();
-
   return fragments
     .map(frag => {
-      // Compatibility fallback for older un-migrated memories
-      const lastAccessed = frag.lastAccessed ? new Date(frag.lastAccessed) : new Date(frag.created);
-
-      // Calculate days since last access
-      const daysSinceAccess = Math.max(0, (now - lastAccessed) / (1000 * 60 * 60 * 24));
-
-      // Base decay: lose 0.05 confidence per "session" (decay cycle)
-      // High access reduces decay magnitude
-      let accessDecayModifier = Math.max(0.005, 0.05 - (frag.accessed * 0.005));
-
-      // Time decay multiplier: if the memory hasn't been accessed in weeks, increase penalty
-      // (1 + days factor ensures old items decay even if they were accessed heavily before)
-      const timeDecayMultiplier = 1 + (daysSinceAccess * 0.05);
-
-      // Negative hit multiplier: fragments that were frequently unhelpful decay faster
-      const negativeHitMultiplier = 1 + ((frag.negativeHits || 0) * 0.2);
-
-      const sessionDecay = accessDecayModifier * timeDecayMultiplier * negativeHitMultiplier;
+      // Base decay: lose 0.05 confidence per session
+      // High access reduces decay magnitude (min 0.005)
+      const sessionDecay = Math.max(0.005, 0.05 - (frag.accessed * 0.005));
 
       const newConfidence = frag.confidence - sessionDecay;
 

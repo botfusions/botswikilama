@@ -38,18 +38,15 @@ Her bellek fragmanı şu alanlara sahiptir:
 
 ### Çürüme (Decay) Mekanizması
 
-Çürüme, bellek her okunduğunda uygulanır. Lemma, biyolojik bir model kullanır: erişim sıklığı belleği güçlendirirken, erişilmeyen süre belleği zayıflatır:
+Çürüme, bellek her okunduğunda uygulanır. Erişim sıklığına göre standart bir azalma oranı kullanılır:
 
 ```
-modifier = max(0.005, 0.05 - (accessed * 0.005))
-time_multiplier = 1 + (gecen_gun_sayisi * 0.05)
-decay_step = modifier * time_multiplier
-confidence = confidence - decay_step
+decay = max(0.005, 0.05 - (accessed * 0.005))
+confidence = confidence - decay
 ```
 
-- **Sıklık**: Sık erişilen öğeler minimum çürüme hızına ulaşır.
-- **Güncellik**: Uzun süre erişilmeyen öğeler `time_multiplier` nedeniyle daha hızlı çürür.
-- **Temizlik**: Güven puanı **0.1'in altına düşen** fragmanlar otomatik olarak silinir.
+- **Sıklık**: Sık erişilen öğeler daha yavaş çürür (minimum 0.005).
+- **Kullanılmayan öğeler** her oturumda temel oran olan 0.05 kadar çürür.
 
 ### Bellek Dosyası Konumu
 

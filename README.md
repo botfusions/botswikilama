@@ -53,16 +53,12 @@ associatedWith += co_accessed_fragment_ids
 
 **Decay (per session):**
 ```
-modifier = max(0.005, 0.05 - (accessed * 0.005))
-time_multiplier = 1 + (days_since_last_access * 0.05)
-negative_multiplier = 1 + (negativeHits * 0.2)
-decay_step = modifier * time_multiplier * negative_multiplier
-confidence = confidence - decay_step
+decay = max(0.005, 0.05 - (accessed * 0.005))
+confidence = confidence - decay
 ```
 
-- **Frequency**: Frequently accessed items reach a minimum decay rate
-- **Recency**: Items not accessed for a long time decay faster
-- **Negative feedback**: Marked unhelpful memories decay faster
+- **Frequency**: Frequently accessed items decay slower (min 0.005 per session)
+- **Unused items** decay at the base rate of 0.05 per session
 - **Associations**: Fragments used together build cross-references for future recall
 
 ### Memory File Location

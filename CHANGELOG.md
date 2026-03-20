@@ -1,5 +1,10 @@
 # Changelog
 
+## [0.3.2] - 2026-03-20
+
+### Changed
+- **Simplified decay formula** — Removed `time_multiplier` and `negativeHitMultiplier` from `decayConfidence()`. Decay is now a flat rate based only on access frequency: `max(0.005, 0.05 - accessed * 0.005)`. Negative feedback still reduces confidence directly via `memory_feedback` (-0.1), but no longer accelerates decay over time.
+
 ## [0.3.1] - 2026-03-19
 
 ### Fixed

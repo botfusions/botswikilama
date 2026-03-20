@@ -182,15 +182,15 @@ describe("Memory Core", () => {
       assert.ok(decayed.confidence >= 0);
     });
 
-    test("negative hits increase decay rate", () => {
+    test("negative hits do not affect decay rate", () => {
       const normal = { ...core.createFragment("normal", "ai"), accessed: 0, negativeHits: 0 };
       const hated = { ...core.createFragment("hated", "ai"), accessed: 0, negativeHits: 5 };
 
       const [decayedNormal] = core.decayConfidence([normal]);
       const [decayedHated] = core.decayConfidence([hated]);
 
-      assert.ok(decayedHated.confidence < decayedNormal.confidence,
-        "fragment with negativeHits should decay faster");
+      assert.equal(decayedNormal.confidence, decayedHated.confidence,
+        "negativeHits should not affect decay rate");
     });
 
     test("resets negativeHits after decay", () => {
@@ -857,15 +857,15 @@ describe("Learning System Lifecycle", () => {
     assert.equal(boosted.accessed, 3);
   });
 
-  test("negative feedback causes faster decay", () => {
+  test("negative feedback does not affect decay rate", () => {
     const good = { ...core.createFragment("good", "ai"), confidence: 0.8, accessed: 0, negativeHits: 0 };
     const bad = { ...core.createFragment("bad", "ai"), confidence: 0.8, accessed: 0, negativeHits: 3 };
 
     const [decayedGood] = core.decayConfidence([good]);
     const [decayedBad] = core.decayConfidence([bad]);
 
-    assert.ok(decayedBad.confidence < decayedGood.confidence,
-      `bad(${decayedBad.confidence}) should decay faster than good(${decayedGood.confidence})`);
+    assert.equal(decayedGood.confidence, decayedBad.confidence,
+      "negativeHits should not affect decay rate");
   });
 
   test("boost + decay equilibrium: frequent use sustains confidence", () => {
