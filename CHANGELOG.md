@@ -2,6 +2,10 @@
 
 ## [0.6.0] - 2026-04-18
 
+### Inspired by Karpathy's LLM Wiki
+- **Lint concept** — `memory_audit` tool inspired by Karpathy's wiki health-check idea (contradictions, orphans, gaps)
+- **Always-available knowledge** — Universal tool description injection ensures memories are in LLM context without explicit tool calls
+
 ### Added
 - **Universal Memory Injection** — Memories are now injected into tool descriptions via `tools/list`, guaranteeing ALL MCP clients (opencode, Claude Desktop, Cursor, VS Code, Gemini CLI) see full memory content without requiring explicit tool calls.
   - Top N memories injected as full content into `memory_read` tool description (~4000 tokens budget)
