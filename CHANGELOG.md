@@ -1,5 +1,47 @@
 # Changelog
 
+## [0.5.0] - 2026-04-18
+
+### Breaking Changes
+- **JSR support removed** — `jsr.json` deleted. Use `npx -y github:xenitV1/lemma` instead of `npx -y jsr @lemma/lemma`.
+
+### Fixed
+- **Critical: memory_read was destructive** — Decay was applied and saved on every `memory_read` call, causing confidence death spiral. Decay now only persists at session boundary (`initializeContext` on startup). Read operations no longer modify confidence.
+- **Critical: Jaccard dedup was semantically broken** — "Use React hooks" vs "Don't use React hooks" scored 0.75 (blocked as duplicate). Replaced with Fuse.js fuzzy matching at threshold 0.65 for accurate similarity detection.
+- **Critical: No concurrent write protection** — Added module-level write lock (`saveMemorySafe`) to prevent data loss from overlapping writes.
+- **High: Double context injection** — Both `buildDynamicInstructions` and `getDynamicSystemPrompt` produced overlapping data with double decay. Resource handler now returns static `BASE_SYSTEM_PROMPT` only. Dynamic context via initialize `instructions` is the single source.
+- **High: User memories bypassed dedup** — `source === "ai"` check meant user duplicates were never caught. Dedup now applies to all sources.
+- **High: Guide dedup missing** — "react", "reactjs", "react.js" created 3 separate guides. Added `findSimilarGuide` with Fuse.js fuzzy matching.
+- **High: ID collision risk** — 6 hex chars (16M space, 50% collision at ~4,800 IDs). Replaced with `crypto.randomUUID`-based 12 hex chars (281 trillion space).
+- **Redundant decay in buildDynamicInstructions** — Was applying decay a second time after `applySessionDecay` already ran on startup. Removed.
+
+### Added
+- **`memory_stats` tool** — Fragment counts, average confidence, project breakdown, high/low confidence counts.
+- **`memory_audit` tool** — Integrity check for orphan references, duplicate IDs, confidence anomalies, malformed entries.
+- **Batch read support** — `memory_read` now accepts `ids: string[]` for fetching multiple fragment details in one call.
+- **`outcome` parameter on `guide_practice`** — Track success/failure rate without requiring session_end.
+- **`guide_update` expanded** — Now supports `add_anti_patterns`, `add_pitfalls`, `superseded_by`, `deprecated` fields.
+- **`<critical_rules>` in system prompt** — Mandatory behavior rules forcing LLM to always call `memory_read` first and `memory_add` after learning.
+- **File locking** — `writeLock`/`writeQueue` mechanism prevents overlapping writes within same process.
+
+### Changed
+- **System prompt slimmed** — From ~1,300 tokens to ~500 tokens. Removed philosophical framing ("Recursive Cognitive Engine", "Agentic Sovereignty"). Kept operational instructions.
+- **Compact formatting** — Replaced box-drawing characters (╔═══╗║╚╝) with simple markdown headers. Removed 14-space alignment padding.
+- **`guide_practice` returns compact response** — One-liner confirmation instead of echoing full guide detail.
+- **`guide_merge` merges all array fields** — Now also merges `anti_patterns` and `known_pitfalls`, not just contexts/learnings.
+- **Dead guide fields removed** — `feedback_patterns` and `improvement_log` were never populated by any tool. Removed from schema.
+- **Session tracking** — Added `session_start`/`session_end` tools with guide suggestions, success rate tracking, and improvement detection.
+- **Feedback counters** — Memory fragments now track `positive_feedback` and `negative_feedback` counts.
+
+### Removed
+- **JSR support** — `jsr.json` deleted. README updated to show GitHub npx as sole installation method.
+- **`calculateSimilarity` (Jaccard)** — Replaced entirely by Fuse.js-based `findSimilarFragment`.
+
+### Tests
+- All 110 tests passing. Fixed broken assertions (`filterByProject` count, `findSimilarFragment` threshold, system prompt title).
+
+---
+
 ## [0.4.1] - 2026-03-20
 
 ### Changed
@@ -214,6 +256,7 @@
 
 ---
 
+[0.5.0]: https://github.com/xenitV1/lemma/compare/v0.4.1...v0.5.0
 [0.4.1]: https://github.com/xenitV1/lemma/compare/v0.4.0...v0.4.1
 [0.4.0]: https://github.com/xenitV1/lemma/compare/v0.3.2...v0.4.0
 [0.3.2]: https://github.com/xenitV1/lemma/compare/v0.3.1...v0.3.2
