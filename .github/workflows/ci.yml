@@ -24,5 +24,11 @@ jobs:
       - name: Install dependencies
         run: npm install
 
+      - name: Type check
+        run: npm run typecheck
+
+      - name: Build
+        run: npm run build
+
       - name: Run tests
-        run: npx --yes node --test tests/memory/*.test.js tests/guides/*.test.js tests/sessions/*.test.js tests/server/*.test.js
+        run: npm test
