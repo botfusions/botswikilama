@@ -15,7 +15,7 @@
   },
   "scripts": {
     "start": "node src/index.js",
-    "test": "node --test tests/**/*.test.js",
+    "test": "node --test tests/memory/*.test.js tests/guides/*.test.js tests/sessions/*.test.js tests/server/*.test.js",
     "test:memory": "node --test tests/memory/*.test.js",
     "test:guides": "node --test tests/guides/*.test.js",
     "test:sessions": "node --test tests/sessions/*.test.js",

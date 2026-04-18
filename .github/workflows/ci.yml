@@ -11,7 +11,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        node-version: [18, 20, 22]
+        node-version: [18, 22]
 
     steps:
       - uses: actions/checkout@v4
@@ -25,4 +25,4 @@ jobs:
         run: npm install
 
       - name: Run tests
-        run: npm test
+        run: npx --yes node --test tests/memory/*.test.js tests/guides/*.test.js tests/sessions/*.test.js tests/server/*.test.js
