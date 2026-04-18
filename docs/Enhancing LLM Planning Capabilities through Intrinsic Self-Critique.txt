@@ -1,0 +1,1309 @@
+2025-12-28
+
+Enhancing LLM Planning Capabilities through Intrinsic Self-Critique
+
+Bernd Bohnet
+
+1, Pierre-Alexandre Kamienny1, Hanie Sedghi1, Dilan Gorur1, Pranjal Awasthi1, Aaron Parisi1,
+
+Kevin Swersky1, Rosanne Liu1, Azade Nova1 and Noah Fiedel1 1Google DeepMind
+
+We demonstrate an approach for LLMs to critique their own answers with the goal of enhancing their performance that leads to significant improvements over established planning benchmarks. Despite the findings of earlier research that has cast doubt on the effectiveness of LLMs leveraging self critique methods, we show significant performance gains on planning datasets in the Blocksworld domain through intrinsic self-critique, without external source such as a verifier. We also demonstrate similar improvements on Logistics and Mini-grid datasets, exceeding strong baseline accuracies. We employ a few-shot learning technique and progressively extend it to a many-shot approach as our base method and demonstrate that it is possible to gain substantial improvement on top of this already competitive approach by employing an iterative process for correction and refinement. We illustrate how self-critique can significantly boost planning performance. Our empirical results present new state-of-the-art on the class of models considered, namely LLM model checkpoints from October 2024. Our primary focus lies on the method itself, demonstrating intrinsic self-improvement capabilities that are applicable regardless of the specific model version, and we believe that applying our method to more complex search techniques and more capable models will lead to even better performance.
+
+1. Introduction
+
+Recent advancements of Large Language Models (LLMs) have extended their applications to include planning, a domain traditionally dominated by algorithmic methods. LLM planning is important for a wide-range of tasks in which the task has implicit or explicit constraints and the LLM must generate a plan satisfying these constraints. Early investigations into LLM planning capabilities were unfavorable (Valmeekam et al., 2023b), reinforcing the notion that "Language Models cannot plan". However, subsequent studies have introduced techniques, such as Many-Shot learning on planning tasks, to enhance these capabilities (Agarwal et al., 2024; Bohnet et al., 2024). Despite these enhancements, LLMs still lag behind classic planners that tackle algorithmically complex problems. Our approach introduces further improvements that are very promising.
+
+For instance, where LLMs are typically tested on simplified problems such as Blocksworld with
+
+3-5 (Valmeekam et al., 2023c) or 3-7 blocks (Bohnet et al., 2024), classic planners can be applied to considerably more complex problems. Nevertheless, there’s a variety of natural-language tasks such as planning holiday trips or scheduling meetings (Gemini-Team, 2024; Hao et al., 2024) which are less computationally demanding, less classic planner friendly and less structured (often being posed in natural language). These tasks are more difficult for classical planners compared to LLMs underscoring the practical relevance of improving LLMs’ planning capabilities. This range of tasks, from natural-language to classic planning tasks, highlights the importance of continuing to enhance LLMs’ planning abilities, even though a gap remains with classic planners for more specialized, complex planning tasks.
+
+The concept of self-improvement in LLMs (refining their responses based on self-generated
+
+1Imagen 3 generated all pictures from Fig. 1.
+
+Corresponding author(s): bohnetbd@google.com © 2026 Google. All rights reserved
+
+arXiv:2512.24103v1 [cs.LG] 30 Dec 2025
+
+Enhancing LLM Planning Capabilities through Intrinsic Self-Critique
+
+Figure 1 | Illustration of the iterative self-improvement process for Large Language Models (LLMs) using in-context learning to incorporate self-critique feedback. The LLM, also represented by the explorer character, functions as the agent’s brain, accepting prompts as inputs and generating outputs, represented by green and red semi-circles, respectively. Each iteration of the self-improvement mechanism comprises two key steps: i) plan generation and ii) self-critiquing, aimed at iteratively refining LLM outputs. In step i), the LLM generates a plan (symbolized by a map) based on a prompt incorporating domain-specific knowledge and instructions (symbolized by the treasure chest). Step ii) involves a self-critique mechanism where the LLM evaluates its own performance, providing correctness assessments and justifications, again leveraging domain knowledge. The process continues until a plan deemed correct is identified. Previous plans and their associated self-critique feedback are aggregated into a collection (symbolized by a bag), serving as contextual material for subsequent plan generation cycles. 1
+
+feedback, often referred to as self-criticism), has gained significant attention often relying on an oracle for feedback (Shinn et al., 2023; Yao et al., 2023a,b). This technique is particularly appealing in the context of planning tasks, where the ability to identify and rectify errors to improve the plans could lead to substantial performance gains.
+
+Earlier attempts to enhance LLM planning through self-critique yielded discouraging results,
+
+principally due to the lack of sufficient self-evaluation capabilities (Huang et al., 2024; Valmeekam et al., 2023a). The application of self-critique in prior work resulted in models that had high falsepositive (FP) rates and that missed nearly all of the true negatives (TN), suggesting that current LLMs cannot effectively critique themselves (Valmeekam et al., 2023a).
+
+Thus, earlier results on iterative plan improvements motivated the use of external feedback such
+
+as verification with an oracle (that has access to correct plan) or relying on human input to guide the process. While these results give an indication of how much headroom there is for improving the plans in the presence of a perfect evaluator, the assumption that oracles are available at test time is unrealistic for most planning tasks of interest.
+
+Exploring the limits of intrinsic LLM self-improvement - improving generations without the aid
+
+of external signals or further training - remains an active area of research (Huang et al., 2024; Singh et al., 2024). In this work, we propose an effective self-improvement method using zero-shot
+
+2
+
+Enhancing LLM Planning Capabilities through Intrinsic Self-Critique
+
+or few-shot prompts without the need for an external verifier. Figure 1 illustrates the introduced self-improvement method via intrinsic self-critique in this paper, utilizing the LLM as the sole source of critique. The Figure shows the iterative process of a plan generation followed by a self-critique step while adding previous failures as context (see Section 4). The figure also highlights the crucial components: a clear definition of the domain and instructions (e.g. pre-conditions), proper prompt design, and the use of previous failures and critiques in subsequent plan refinement steps.
+
+We investigate variations of our proposed method via ablation studies. We perform ablation
+
+study on different elements of our method. Moreover, we explore how the method scales when across zero-shot and few-shot prompting and assess the impact of varying the number of self-critique iterations. We describe a novel approach to self-critique, where the LLM is prompted to evaluate the preconditions of each action and provided the state in a plan. Lastly, we examine the limitations of our method and evaluate the quality of self-criticisms aiming to provide a comprehensive understanding of the scalability and effectiveness of the proposed methods.
+
+Our focus lies on demonstrating intrinsic self-improvement capabilities of LLMs, independent of
+
+the specific model version. To this end, we use model checkpoints from October 2024 in our empirical studies. We conduct the exploratory experiments with Gemini 1.5 Pro (GeminiTeam et al., 2024) and confirm our results with other foundation models. Our work aims to demonstrate the applicability of our method to multiple foundational models, rather than comparing them to each other.
+
+In the Blocksworld domain, Gemini 1.5 Pro achieves significant performance gains on planning
+
+datasets. With the dataset from Valmeekam et al. (2023c) involving 3-5 blocks, we enhance performance from 49.8% to 89.3% through intrinsic self-critique, without external source such as a verifier. Similarly, for the dataset by Bohnet et al. (2024) with 3-7 blocks, we boost Gemini 1.5 Pro accuracy from 57.2% to 79.5%. We also demonstrate similar improvements on Logistics and Mini-grid datasets, exceeding strong baseline accuracies. In addition to results on Gemini 1.5 Pro, we have positive results with Claude 3.5 Sonnet (Anthropic, 2023) where accuracy improves from 68% to 89.5% and GPT-4o (OpenAI et al., 2024) for Blocksworld 3-5. With Gemma-2 27B (Team et al., 2024) we only see a modest improvement for Logistics but not for Blocksworld, suggesting larger and more capable models are better able to self-improve.
+
+2
+
+The paper is organized as follows: Section 2 reviews related work. Section 4 details the methods
+
+employed and Section 3 provides an overview on the datasets we use in our experiments. Section 5 presents the main findings across several datasets from related work, exploratory experiments on substantial number of validation examples to select hyper-parameters, and an in-depth investigation of what contributions of the self-critique method where important to improve the state-of-the-art. Finally, Section 6 concludes the paper.
+
+2. Related Work
+
+Our study builds upon the findings of Valmeekam et al. (2023a), who offered a critical assessment of the self-critiquing capabilities LLMs for planning. Contrary to more optimistic views on the self-correct, self-critique, reflexion, or iterative self-refinement abilities of LLMs (Madaan et al., 2023; Shinn et al., 2023; Welleck et al., 2023), for the Blocksworld eval, Valmeekam et al. (2023a) observed a modest improvement when relying exclusively on LLMs for both generation and verification. However, they highlight a critical issue: the use of LLMs for verification leads to a significant number of false positives.
+
+Huang et al. (2024) explore whether modern LLMs can self-correct their reasoning, concluding
+
+they cannot reliably self-correct. They introduce the concept of intrinsic self-correction and find that
+
+2For other models, see Table 5.
+
+3
+
+Enhancing LLM Planning Capabilities through Intrinsic Self-Critique
+
+despite prevailing optimism, LLMs struggle with this ability, as shown through experiments involving multiple prediction and self-correction steps that increase latency due to dual calls to the LLM.
+
+Their analysis shows that performance varies across models and datasets; for instance, GPT-4 and
+
+Llama-2 both experience performance declines on the GSM8K and CommonSenseQA datasets, with the extent of decline linked to the model’s intrinsic reasoning capabilities as well as prompt design. They also observe that attempts at self-correction can lead to correct outcomes being made wrong or inaccuracies being maintained through the reasoning chain. Stronger models, however, tend to show less performance drop.
+
+The focus of our work is on self-correction for planning, whereas Huang et al. (2024) concentrate
+
+on the challenges of self-correction in reasoning. Planning tasks differ from reasoning, as they have a set of constraints and "valid states" provided explicitly or implicitly by the problem definition. For classical reasoning tasks, the space of states, actions, and preconditions tend to be explicitly provided in the domain definition. Hence the verification of a LLM output can follow defined rules by checking the preconditions of each action and providing a follow up state.
+
+3. Benchmarks
+
+In this work, we focus on planning tasks utilizing a formal language based on Planning Domain Definition Language (PDDL) (McDermott et al., 1998) and keep the symbolic representation of the problem / action / state definition specified by PDDL. Previous research has demonstrated that the planning performance of LLMs on Natural Language and PDDL is comparable using few-shots (Bohnet et al., 2024).
+
+For each instance in these datasets, a problem is given and a solution plan is requested. A
+
+response/plan is considered correct when the goal is reached; otherwise, it is counted as incorrect.
+
+For our experiments, we selected datasets that have been widely utilized in prior works (Bohnet
+
+et al., 2024; Stein et al., 2024; Valmeekam et al., 2023b) to ensure meaningful comparisons between our method and existing results.
+
+Classical Planning Benchmarks These benchmarks are all from AI planning problems one can generate as hard or easy and as many instances given the sample generation code.
+
+1. Blocksworld consists a number of blocks on a table and a hand to move them from an initial configuration to another. 2. Logistics includes planning deliveries of packets between cities using trucks and planes. 3. Minigrid includes various rooms with random configurations and keys where a robot needs to navigate from an initial position to a final position.
+
+Mystery Blocksworld This dataset is inspired by a mystery dataset in planning domain and is similar to the one in (Valmeekam et al., 2023c) in nature. This dataset is notable for its obfuscation of actions and attributes into non-specific or deceptive predicates. We randomly choose some samples and replace some words of description, action, predicates or object names either with non-specific or deceptive which remain consistent throughout the dataset. The goal of such design is to see if models are using some common-sense knowledge in coming up with plans and how much obfuscation of this information hurts the model prediction. In the results we report the experiments section here, we use deceptive version. We also ran experiments with the non-specific counterparts and gained impressive results.
+
+4
+
+Enhancing LLM Planning Capabilities through Intrinsic Self-Critique
+
+AutoPlanBench We also compare our propose method on the planning problem domains from the AutoPlanBench (Stein et al., 2024) repository. AutoPlanBench contains 10 new domains in addition to the ones in (Valmeekam et al., 2023b) with 21 problems per domain. We ignore the floortile domain as no existing methods (including ours) achieve any non-trivial accuracy for this particular domain. For a given domain, each problem is represented in both PDDL and natural language and also comes optimal golden plans. For each planning domain, the optimal plan length varies between 3 and 20 steps. As mentioned before, in our experiments we make use of the PDDL representations of the problems.
+
+Datasets. Further, we drew upon the Blocksworld dataset described in Bohnet et al. (2024),
+
+which features problems with 3-7 blocks, consisting of a training set, validation and test sets. The validation and test set each contain 1000 problems. In addition to these, we employed the Logistics and Mini-Grid datasets, each with its own test set of 600 problems (Bohnet et al., 2024).
+
+Specifically, we incorporated datasets from (Valmeekam et al., 2023b), which consist of problems
+
+from Blocksworld dataset involving 3-5 blocks across a set of 600 problems, in addition to the mystery Blocksworld dataset. The latter dataset is notable for its obfuscation of actions and attributes into non-specific predicates, also encompassing 600 problems (see Appendix E.1 for domain definition and example problem).
+
+4. Method
+
+The self-critique methodology studied in this work involves an iterative refinement of responses from the LLM until a correct solution is found, as determined by the LLM’s own assessment. The iterative procedure is described as in Algorithm 1 and is explained below.
+
+Algorithm 1: Self-Critique Algorithm Main Algorithm: Input: Problem definition D, maximum iterations 𝑘,
+
+self-consistency samples 𝑁, a LLM sampling distribution 𝑃 is parametrized by 𝑃 ( 𝑝, 𝑛) where 𝑝 is the context and 𝑛 number of samples
+
+Output: Final plan 1 𝜏 ← ∅; 2 for 𝑠𝑡𝑒𝑝 = 0 to 𝑘 do 3 𝑝𝑙𝑎𝑛 ← PlanGeneration(D, 𝜏); 4 𝑐𝑟𝑖𝑡𝑖𝑞𝑢𝑒 ← SelfCritique(D, 𝑝𝑙𝑎𝑛, 𝑁); 5 if 𝑐𝑟𝑖𝑡𝑖𝑞𝑢𝑒 deems 𝑝𝑙𝑎𝑛 correct then 6 break; 7 𝜏 ← Revise-Prompt(𝜏, 𝑝𝑙𝑎𝑛, 𝑐𝑟𝑖𝑡𝑖𝑞𝑢𝑒); 8 return 𝑝𝑙𝑎𝑛
+
+Helper Functions: 9 Function PlanGeneration(D, 𝜏): 10 𝑝𝑟𝑜𝑚𝑝𝑡 ← PlanPrompt(D, 𝜏); 11 return 𝑃( 𝑝𝑟𝑜𝑚𝑝𝑡, 1);
+
+12 Function SelfCritique(D, 𝑝𝑙𝑎𝑛, 𝑁): 13 𝑝𝑟𝑜𝑚𝑝𝑡 ← CritiquePrompt(D, 𝑝𝑙𝑎𝑛); 14 return Self-Consistency(𝑃( 𝑝𝑟𝑜𝑚𝑝𝑡, 𝑁));
+
+15 Function Revise-Prompt(𝜏, 𝑝𝑙𝑎𝑛, 𝑐𝑟𝑖𝑡𝑖𝑞𝑢𝑒): 16 return 𝜏 ⊕ 𝑝𝑙𝑎𝑛 ⊕ 𝑐𝑟𝑖𝑡𝑖𝑞𝑢𝑒 ;
+
+For 𝑠𝑡𝑒𝑝 from 0 to 𝑘, repeat:
+
+1. Plan generation (lines 9-11): A LLM, also represented by the explorer character in Fig. 1, receives a prompt to solve a given planning problem and generates a 𝑝𝑙𝑎𝑛 from some distribution 𝑃. The prompt includes the previous predicted solutions and self-critique outputs from previous iterations (for 𝑘 > 1). If the prompt exceeds a predefined length limit, the loop is exited by returning the plan from the previous step. The plan generated by the explorer is represented as a map in Fig. 1.
+
+5
+
+Enhancing LLM Planning Capabilities through Intrinsic Self-Critique
+
+2. Self-Critique (lines 12-14): The same LLM is prompted to generate a critique of its proposed plan, with a prompt that includes both the problem definition D and its predicted 𝑝𝑙𝑎𝑛. We optionally apply Self-Consistency (Wang et al., 2023) which uses majority voting. The explorer is capable of reflecting on its own predictions! 3. Revise (lines 15-16): If the LLM deems the response from the self-critique as correct (line 5), the process concludes (line 6, equivalently to early stopping), and the final plan is returned, thereby exiting the loop. Otherwise, add the plan to the prompt (line 16) and go back to planning step (line 3). The LLM adds failures to its failure collection, represented by the bag in Fig. 1.
+
+This allows us to investigate the behavior of the self-critique method, on top of a planning process
+
+which scales favorably with the number of few-shot examples. The prompts are randomly sampled from the respective training set in a deterministic manner, ensuring that the few-shot exemplars for the same problem remain consistent across ablations. This approach facilitates more reliable comparisons between experiments.
+
+Self-Critique prompt. The design of the self-critique prompt is crucial for accuracy. It includes:
+
+(1) the domain definition D with actions, their preconditions, and effects. Notably, including the preconditions and a description of how the succeeding state is created are essential for a consistent verification process (2) Optionally, we provide few-shot exemplars for verification. (3) Instructions on how to verify each action in-sequence are also included. Section 5.3 demonstrates how these elements collectively improve our method’s performance. In most experiments, we use zero-shot self-critique prompt templates (Appendix A.2) and for Blocksworld, an 8-shot self-critique prompt template is also employed (Appendix A.1). We bootstrap the few-shot self-critique prompts from a single handcrafted example and obtain outputs by running the self-critique method on the training set. We ensure that the selected prompt ratings (correct/wrong) are consistent with a PDDL validator.
+
+5. Experiments
+
+Our experiments assess the performance of Self-Critique methods on planning benchmarks, specifically on PlanBench (Valmeekam et al., 2023a), AutoPlanBench (Stein et al., 2024) and the Planning-Capabilities (Bohnet et al., 2024). We apply our method described in Section 4; iteratively prompting the model and having it critique its own predictions. This process continues until either the LLM deems the solution correct or it exceeds some predefined number of iterations. In all exploratory experiments, we use Gemini 1.5 Pro (GeminiTeam et al., 2024), GPT-4o (OpenAI et al., 2024), Claude 3.5 Sonnet (Anthropic, 2023), as well as Gemma-27b (Team et al., 2024) as an open source alternative (Appendix C.1). The last proposed plan in the iterative process is used for computing the accuracy and it is validated by using a PDDL-validator VAL3.
+
+In Subsection 5.1, we present the main results of this approach and compare them with state-
+
+of-the-art results from the above planning benchmarks. In Subsection 5.2, we describe exploratory experiments on the validation sets. Finally in Section 5.3, we shed more light on the main findings and provide further analysis and an ablation study.
+
+5.1. Main results
+
+Figure 2 depicts the impact of our Self-Critique method on accuracy as the number of steps increases. The model is Gemini 1.5 Pro. We observe that across all three benchmarks our Self-Critique method
+
+3We use the VAL-PDDL verifier available from https://github.com/KCL-Planning/VAL
+
+6
+
+Enhancing LLM Planning Capabilities through Intrinsic Self-Critique
+
+Figure 2 | The figure illustrates how number of correct instances increases as we increase the number of Self-Critique iterations on Blocksworld (left), Mini-Grid (center) and Logistics (right). The initial step (step 0), depicted in the figure, represents the baseline without Self-Critique. Subsequent iterations, from 1 to 10, each involve a Self-Critique and a refinement request to an LLM, demonstrating progressive improvements of correct instances. We use a 16-shot planning prompt and 0-shots for the critique prompt on all benchmarks. Model: Gemini 1.5 Pro
+
+dramatically increases the accuracy across multiple steps. A large portion of the improvements on Blocksworld, Minigrid and Logistics happen during the first iteration of self-improvement, but we note that the accuracy keeps improving with the number of iterations. We compare Self-Critique methods against the accuracy of the Oracle, which uses the validator for feedback in the self-improvement process, thus eliminating the error due to inaccuracy of Self-Critique, testing the iterative planning capability. Lastly, we plot Self-{Critique+Consistency}, i.e. Self-Critique with Self-Consistency, where the final outcome is determined by aggregating the results of 5 independent Self-Critique calls and selecting the outcome with the most votes. This is the green line in the Blocksworld subfigure. We only applied it to Blocksworld for compute budget reasons and observed that the gap between Self-{Critique+Consistency} and the Oracle is really small, showing that the evaluation capabilities are substantially improved by using Self-Consistency.
+
+Figure 3 illustrates the improvements achieved by employing an increasing number of few-shots
+
+exemplars as the baseline method, enhanced by the addition of the Self-Critique method. The graphs depict curves with an increasing number of shots up to 64, with curves representing No-Critique (orange), Self-Critique (pink), and Oracle (blue). The 0-shot setting contains only the domain definition without any additional exemplars. The model used is Gemini 1.5 Pro.
+
+Table 1 shows in addition the final results along with results reported from Stechly et al. (2024a)
+
+for Blocksworld 3-5. As Stechly et al. (2024a) use GPT-4 and Natural Language for planning, we investigate the influence of these settings in Subsection 5.3 (see Table 6).
+
+Table 2 shows results on five additional datasets from Bohnet et al. (2024) and demonstrates the
+
+effectiveness of the Self-Critique method on other datasets. The first logistics dataset, with up to four places and two packages, can be nearly solved using Self-Critique techniques, reaching 93.2% accuracy. Meanwhile, a more challenging logistics dataset with up to 4 cities, 2 places per city and 8 packages, remains overall difficult, but Self-Critique improves the results substantially, from 18.9% to 32.8%. For Minigrid, we demonstrate significant gains. For Blocksworld 3-7, the gains are similar to
+
+7
+
+Enhancing LLM Planning Capabilities through Intrinsic Self-Critique
+
+0 1 2 4 8 16 32 64
+
+Few-shot exemplars
+
+0 20 40 60 80 100
+
+Accuracy (%)
+
+Blocksworld 3-7
+
+No-Critique Self-Critique Oracle
+
+0 1 2 4 8 16 32 64
+
+Few-shot exemplars
+
+0 20 40 60 80 100
+
+Accuracy (%)
+
+Minigrid
+
+No-Critique Self-Critique Oracle
+
+0 1 2 4 8 16 32 64
+
+Few-shot exemplars
+
+0 20 40 60 80 100
+
+Accuracy (%)
+
+Logistic
+
+No-Critique Self-Critique Oracle
+
+Figure 3 | Performance on Blocksworld (left), Mini-Grid (center) and Logistics (right) with increasing number of shots in the planning prompt. While performance on Logistic stagnates using more than 2 shots, the more exemplars in Blocksworld and Minigrid the better. To strike a good balance between LLM context length and accuracy over all benchmarks, we used this experiment to select the number of planning shots, and chose it to be 16 exemplars. Model: Gemini 1.5 Pro
+
+Table 1 | Accuracy comparisons across various methods for the Blocksworld 3-5 dataset, with results taken from Stechly et al. (2024b) (left). All accuracy values are expressed in percentages (%) and include the computation of 95% Confidence Intervals. Our method achieves SoTA results by utilizing 8-shot self-critic prompts, as detailed in Appendix A.1 and self-consistency (5 votes).
+
+(Stechly et al., 2024b) This work
+
+No-Critique Critique Oracle No-Critique Critique Critique+SC Oracle
+
+Blocksw. 3-5 40 55 87 49.8±4.0 85.5±2.8 89.3±2.5 91.5±2.3 Mystery BW 4 0 8 22.3±3.3 35.2±3.8 37.8±3.9 37.3±3.9
+
+8
+
+Enhancing LLM Planning Capabilities through Intrinsic Self-Critique
+
+those in Blocksworld 3-5, but all results are at a slightly lower level, probably due to the increased complexity of the solutions as we increase the number of blocks.
+
+Table 2 | Results on additional planning datasets demonstrate the effectiveness of the method across diverse problems. Model: Gemini 1.5 Pro. Datasets marked with ∗ are sourced from Bohnet et al. (2024). In these experiments, a zero-shot self-critic is employed, which incorporates the domain definition (see detailed prompt in the Appendix A.2). The Logistic and Mini-Grid Hard datasets contain more complex tasks.
+
+Dataset No-Critique Self-Critique Oracle Logistics∗ 60.7±3.9 93.2±1.8 95.0±1.7 Logistics Hard 18.9 ±2.4 32.8±2.9 38.8±3.9 Mini-Grid∗ 57.7±3.9 75.2±3.5 79.8±3.2 Mini-Grid Hard 39.7±4.0 43.5±4.0 52.3±4.0 Blocksworld∗ 3-7 57.2±3.1 79.5±2.5 92.7±1.6
+
+Table 3 also presents results on AutoPlanBench (Stein et al., 2024), which features a number
+
+of datasets across various problem types, each containing only 21 instances. In line with our other experiments, we employ a few-shot methodology, utilizing just a single shot and augmented by Self-Critique technique. We observe overall improvements across all datasets as a result of applying Self-Critique.
+
+5.2. Setup Exploration
+
+In this subsection, we summarize the experimental setup. We leave an ablation study on the prompt design for the final discussion of the results in Section 5.3. We determined the number of few-shot exemplars based on the optimal performance observed in Blocksworld, as depicted in Figure 3, where peak performance was achieved with approximately 16 exemplars. For Blocksworld and Mini-grideasy, performance improves with an increased number of shots but begins to plateau early, with a noticeable leveling off at just 8 shots, and even shows a slight decline thereafter with 32-shots. The Self-Critique iteration count was limited to 10 to constrain execution time, given that additional iterations produced only smaller gains in performance. Fig. 2 suggests that the potential of our method can still be leveraged with more improvement steps. This count was consistently applied across other datasets to enhance the cost efficiency of the experiments, particularly in terms of token usage. For datasets such as Minigrid and Logistics, however, more shots could have been beneficial. For the Self-Critique prompt, we explored in this work 0-shot and 8-shots on Blocksworld and investigated multiple prompt templates, ablated in Section 5.3. We ultimately selected zero-shot Self-Critique prompts because this approach does not require bootstrapping with few-shot prompts for all tasks, making it simpler and more directly applicable to new planning tasks.
+
+5.3. Ablation Study
+
+In previous section, the focus was on experiments to determine the optimal performance and access the performance of the proposed method. In the following, we provide a discussion on the elements critical to the performance of the Self-Critique method, and summarize the results. We demonstrate several ablation studies on prompt design and characterize performance in terms of required LLM calls. We investigate the statistical behaviour of the Self-Critique method over the course of the prediction and Self-Critique steps.
+
+9
+
+Enhancing LLM Planning Capabilities through Intrinsic Self-Critique
+
+Table 3 | AutoPlanBench with 1-shot plan and zero-shot Self-critique results and Act and CoT taken from (Stein et al., 2024). These experiments demonstrate performance enhancements across additional datasets. However, with only 21 exemplars available per task, more robust few-shot approaches were not investigated. Note that the Act method uses (per step) golden feedback from the validator and hence is not directly comparable with the proposed Self-Critique method.
+
+Dataset Act CoT 1-shot Self-Critique Goldminer 30 20 2.8 ±2.3 32.3 ±9.3 Rovers 50 10 0±0.0 7.6±6.4 Grid 70 20 9.5±0.0 53.3±7.6 Grippers 55 75 25.7±5.7 79.0±6.4 Satellite 90 50 4.7±3.0 91.4±4.6 Depot 20 15 0±0.0 20.9±3.8 Movie 100 100 3.8±1.9 100±0.0 Ferry 40 95 44.8±8.8 61.9±6.0 Vistall 100 85 96.1±3.5 99.0±1.9
+
+0 1 2 3 4 5 6 7 8 9 10
+
+0 25 50 75 100
+
+Percentage
+
+Oracle
+
+0 1 2 3 4 5 6 7 8 9 10
+
+Iterations Self-Critique
+
+0 1 2 3 4 5 6 7 8 9 10
+
+Iterations
+
+Self-{Critique+Consitency}
+
+True Positive False Positive False Negative True Negative
+
+Figure 4 | Accuracy of the Self-Critique process over the course of 10 Self-Critique steps. For these ablations, we use the Blocksworld validation set with 3-7 blocks, a 16-shot plan prediction prompt, and an 8-shot Self-Critique prompt. Overall, we observe relatively high accuracy and recall, but lower precision. Figure 7 in Appendix C.4 shows this error analysis on more ablations in terms of domain definition, temperature, instructions, number of steps, etc.
+
+Table 4 summarizes the results of the ablation study, in which we ablate various elements of our
+
+Self-Critique method to investigate their contributions and potential sources of gains. We conduct the test on 1000 problems from the validation set and provided 95% Confidence Intervals.
+
+Self-Critique evaluation. Figure 4 displays the accuracy of the plan and the Self-Critique method,
+
+over the course of 10 self-improvement iterations. The accumulation of false positives visualizes the most frequent error in the approach, whereas the Oracle represents the ideal case, showing the upper bound of accuracy achievable using Self-Critique. False negatives occur very rarely.
+
+Self-consistency. We also study self-consistency (Wang et al., 2023) in the Self-Critique process,
+
+utilizing voting to classify outcomes as either wrong/goal not reached or correct. In the event of a tie, the outcome is designated as wrong, which initiates a new prompt/critique step. Figures 2 and 4 and Table 4 show the impact of adding self-consistency to the Self-Critique, providing an additional improvement of nearly 5% absolute.
+
+Foundational Models. To ascertain the efficacy of the proposed Self-Critique method, we run
+
+10
+
+Enhancing LLM Planning Capabilities through Intrinsic Self-Critique
+
+Table 4 | Ablation study on the validation set for Blocksworld 3-7. We also report the accuracy of the first step without self-critique to account for non-deterministic predictions. Unless stated otherwise, we use a temperature of 0.0 for the LLM calls. A low temperature is expected to make the model more deterministic, but less diverse in its predictions. The highest accuracy was achieved using a self-critique method that employs self-consistency in each critique, where outcomes are determined by votes.
+
+Ablation (prompts in Appendix) 1st step 11th step LLM calls
+
+8-shot self-critic with self-consistency 5 votes (A.1) 57.1±3.1 84.6±2.2 14.0k 8-shot self-critic with self-consistency 2 votes (A.1) 56.1±3.1 84.5±2.2 12.2k no self-consistency, 8-shot self-critic (A.1) 56.2±3.1 79.7±2.5 6.3k no few-shot self-critic → 0-shot self-critic (A.2) 55.7±3.1 79.5±2.5 6.1k temperature 0.2; 0-shot self-critic (A.2) 56.1±3.1 76.1±2.7 6.4k temperature 0.5; 0-shot self-critic (A.2) 56.9±3.1 78.2±2.7 6.1k no Domain Definition (A.3) 56.0±3.1 74.4±2.7 5.8k no 3-Step Instruction (A.4) 55.2±3.1 64.0±3.1 4.1k no ’verify each action’ (A.5) 56.1±3.1 57.5±3.1 3.4k
+
+experiments across different foundational models. We demonstrate substantial improvements across the SoTA foundational models Gemini 1.5, GPT-4o and Claude 3.5 Sonnet. Table 5 shows the results for GPT-4o and Claude 3.5 Sonnet. Appendix C.1 includes the results for experiments on Gemma 2-27b.
+
+Table 5 | The performance of various LLMs to confirm the applicability of our method across different platforms. The focus is primarily on validating the method rather than comparing the performance across LLMs. We use 16 few-shot for the plan prediction and the 0-shot critic (A.2) and Blocksworld 3-5 Valmeekam et al. (2023b) as dataset.
+
+GPT-4o Claude 3.5 Sonnet
+
+Dataset No-Critique Self-Critique No-Critique Self-Critique Blocksworld 3-5 42.8±3.9 64.2±3.8 68.0±3.7 89.5 ±2.5
+
+Complexity. Equation (1) defines the upper limit of LLM calls 𝑞, as the measure of complexity for
+
+the self-improvement process. The actual calls to the LLM, documented in Table 4, are significantly lower due to the process being stopped once the LLM deems a solution correct. The upper limit of calls to the LLM per iteration is linearly related to twice the maximum number of allowed steps consisting of a prediction and a subsequent Self-Critique. Note, for practical reasons, we stop the iterations after 𝑘 steps (10 in this study) to reduce the required context length and runtime.
+
+q = 2 × 𝑠 (1)
+
+When self-consistency is employed, it introduces an additional multiplicative constant factor
+
+𝑐 for the number of self-consistency calls as shown in Equation (2). It is important to note that self-consistency does not increase latency, as these operations can be executed in parallel.
+
+q = 𝑠 + 𝑐 × 𝑠. (2)
+
+11
+
+Enhancing LLM Planning Capabilities through Intrinsic Self-Critique
+
+6. Conclusion
+
+This work shows that self-improvement using intrinsic self-critique can significantly enhances performance on standard planning benchmarks, when properly implemented. We obtain substantial performance gains on all of the studied benchmarks. Problems that had previously been challenging are now solvable with a high accuracy presenting SoTA for the model class considered, such as in Blocksworld 3-5, where we achieve an 89.3% success rate employing self-critique with self-consistency. This work is also the first to demonstrate that LLMs can solve Mystery Blocksworld problems with 22% accuracy and achieve substantial accuracy gains, reaching 37.8%, when self-improvement using self-critique and self-consistency is employed.
+
+Furthermore, there is potential to swap out in-context learning for more sophisticated planning
+
+methods, such as Chain-of-Thought, Self-Consistency, or even to integrate these with advanced search-based algorithms like Monte-Carlo Tree Search to further improve accuracy or tackle even more complex tasks (Coulom, 2007; Madaan et al., 2023; Wei et al., 2022).
+
+Lastly, this work not only demonstrates the viability of self-improvement using self-critique in
+
+enhancing planning accuracy but also lays the groundwork for a new paradigm in AI planning. By bridging the gap between symbolic planning and language models, we open up possibilities for tackling more complex, real-world planning scenarios and pushing the boundaries of AI problem-solving capabilities by leveraging LLMs.
+
+12
+
+Enhancing LLM Planning Capabilities through Intrinsic Self-Critique
+
+References
+
+R. Agarwal, A. Singh, L. M. Zhang, B. Bohnet, L. Rosias, S. Chan, B. Zhang, A. Anand, Z. Abbas, A. Nova, J. D. Co-Reyes, E. Chu, F. Behbahani, A. Faust, and H. Larochelle. Many-shot in-context learning, 2024. URL https://arxiv.org/abs/2404.11018.
+
+Anthropic. Model Card and Evaluations for Claude Models, 2023.
+
+B. Bohnet, A. Nova, A. T. Parisi, K. Swersky, K. Goshvadi, H. Dai, D. Schuurmans, N. Fiedel, and H. Sedghi. Exploring and benchmarking the planning capabilities of large language models, 2024. URL https://arxiv.org/abs/2406.13094.
+
+R. Coulom. Efficient selectivity and backup operators in monte-carlo tree search. In H. J. van den Herik, P. Ciancarini, and H. H. L. M. Donkers, editors, Computers and Games, 5th International Conference, CG 2006, Turin, Italy, May 29–31, 2006, Revised Papers, pages 72–83. Springer, 2007. ISBN 978-3-540-75537-1. doi: 10.1007/978-3-540-75538-8_8. URL https://citeseerx.ist. psu.edu/viewdoc/summary?doi=10.1.1.81.6817.
+
+Gemini-Team. Gemini 1.5: Unlocking multimodal understanding across millions of tokens of context, 2024. URL https://arxiv.org/abs/2403.05530.
+
+GeminiTeam, M. Reid, N. Savinov, D. Teplyashin, D. Lepikhin, T. Lillicrap, J. baptiste Alayrac, R. Soricut, A. Lazaridou, O. Firat, J. Schrittwieser, I. Antonoglou, R. Anil, S. Borgeaud, A. Dai, K. Millican, E. Dyer, M. Glaese, T. Sottiaux, B. Lee, F. Viola, et al, J. Dean, and O. Vinyals. Gemini 1.5: Unlocking multimodal understanding across millions of tokens of context, 2024.
+
+Y. Hao, Y. Chen, Y. Zhang, and C. Fan. Large language models can plan your travels rigorously with formal verification tools, 2024. URL https://arxiv.org/abs/2404.11891.
+
+J. Huang, X. Chen, S. Mishra, H. S. Zheng, A. W. Yu, X. Song, and D. Zhou. Large language models cannot self-correct reasoning yet, 2024. URL https://arxiv.org/abs/2310.01798.
+
+A. Madaan, N. Tandon, P. Gupta, S. Hallinan, L. Gao, S. Wiegreffe, U. Alon, N. Dziri, S. Prabhumoye, Y. Yang, S. Gupta, B. P. Majumder, K. Hermann, S. Welleck, A. Yazdanbakhsh, and P. Clark. Selfrefine: Iterative refinement with self-feedback. In Thirty-seventh Conference on Neural Information Processing Systems, 2023. URL https://openreview.net/forum?id=S37hOerQLB.
+
+D. McDermott, M. Ghallab, A. Howe, C. Knoblock, A. Ram, M. Veloso, D. Weld, and D. Wilkins. Pddl-the planning domain definition language. Technical Report CVC TR-98-003/DCS TR-1165, Yale Center for Computational Vision and Control, 1998.
+
+OpenAI, J. Achiam, S. Adler, S. Agarwal, L. Ahmad, I. Akkaya, F. L. Aleman, D. Almeida, J. Altenschmidt, S. Altman, S. Anadkat, R. Avila, I. Babuschkin, S. Balaji, V. Balcom, P. Baltescu, H. Bao, M. Bavarian, J. Belgum, I. Bello, J. Berdine, et al., , W. Zhuk, and B. Zoph. Gpt-4 technical report, 2024.
+
+N. Shinn, F. Cassano, B. Labash, A. Gopinath, K. Narasimhan, and S. Yao. Reflexion: Language agents with verbal reinforcement learning. In Advances in Neural Information Processing Systems, 2023.
+
+A. Singh, J. D. Co-Reyes, R. Agarwal, A. Anand, P. Patil, X. Garcia, P. J. Liu, J. Harrison, J. Lee, K. Xu, A. Parisi, A. Kumar, A. Alemi, A. Rizkowsky, A. Nova, B. Adlam, B. Bohnet, G. Elsayed, H. Sedghi, I. Mordatch, I. Simpson, I. Gur, J. Snoek, J. Pennington, J. Hron, K. Kenealy, K. Swersky, K. Mahajan, L. Culp, L. Xiao, M. L. Bileschi, N. Constant, R. Novak, R. Liu, T. Warkentin, Y. Qian, Y. Bansal, E. Dyer, B. Neyshabur, J. Sohl-Dickstein, and N. Fiedel. Beyond human data: Scaling self-training for problem-solving with language models, Apr 2024. URL https://arxiv.org/abs/2312.06585.
+
+13
+
+Enhancing LLM Planning Capabilities through Intrinsic Self-Critique
+
+K. Stechly, K. Valmeekam, and S. Kambhampati. Chain of thoughtlessness: An analysis of cot in planning. arXiv preprint arXiv:2405.04776, 2024a. K. Stechly, K. Valmeekam, and S. Kambhampati. On the self-verification limitations of large language models on reasoning and planning tasks, 2024b. URL https://arxiv.org/abs/2402.08115. K. Stein, D. Fišer, J. Hoffmann, and A. Koller. Autoplanbench: Automatically generating benchmarks for llm planners from pddl, 2024. URL https://arxiv.org/abs/2311.09830. G. Team, M. Riviere, S. Pathak, P. G. Sessa, C. Hardin, S. Bhupatiraju, L. Hussenot, T. Mesnard, B. Shahriari, A. Ramé, J. Ferret, P. Liu, P. Tafti, A. Friesen, M. Casbon, S. Ramos, R. Kumar, C. L. Lan, S. Jerome, A. Tsitsulin, N. Vieillard, P. Stanczyk, S. Girgin, N. Momchev, M. Hoffman, S. Thakoor, J.-B. Grill, B. Neyshabur, O. Bachem, A. Walton, A. Severyn, A. Parrish, A. Ahmad, A. Hutchison, A. Abdagic, A. Carl, A. Shen, A. Brock, A. Coenen, A. Laforge, A. Paterson, B. Bastian, B. Piot, B. Wu, B. Royal, C. Chen, C. Kumar, C. Perry, C. Welty, C. A. Choquette-Choo, D. Sinopalnikov, D. Weinberger, D. Vijaykumar, D. Rogozińska, D. Herbison, E. Bandy, E. Wang, E. Noland, E. Moreira, E. Senter, E. Eltyshev, F. Visin, G. Rasskin, G. Wei, G. Cameron, G. Martins, H. Hashemi, H. Klimczak-Plucińska, H. Batra, H. Dhand, I. Nardini, J. Mein, J. Zhou, J. Svensson, J. Stanway, J. Chan, J. P. Zhou, J. Carrasqueira, J. Iljazi, J. Becker, J. Fernandez, J. van Amersfoort, J. Gordon, J. Lipschultz, J. Newlan, J. yeong Ji, K. Mohamed, K. Badola, K. Black, K. Millican, K. McDonell, K. Nguyen, K. Sodhia, K. Greene, L. L. Sjoesund, L. Usui, L. Sifre, L. Heuermann, L. Lago, L. McNealus, L. B. Soares, L. Kilpatrick, L. Dixon, L. Martins, M. Reid, M. Singh, M. Iverson, M. Görner, M. Velloso, M. Wirth, M. Davidow, M. Miller, M. Rahtz, M. Watson, M. Risdal, M. Kazemi, M. Moynihan, M. Zhang, M. Kahng, M. Park, M. Rahman, M. Khatwani, N. Dao, N. Bardoliwalla, N. Devanathan, N. Dumai, N. Chauhan, O. Wahltinez, P. Botarda, P. Barnes, P. Barham, P. Michel, P. Jin, P. Georgiev, P. Culliton, P. Kuppala, R. Comanescu, R. Merhej, R. Jana, R. A. Rokni, R. Agarwal, R. Mullins, S. Saadat, S. M. Carthy, S. Perrin, S. M. R. Arnold, S. Krause, S. Dai, S. Garg, S. Sheth, S. Ronstrom, S. Chan, T. Jordan, T. Yu, T. Eccles, T. Hennigan, T. Kocisky, T. Doshi, V. Jain, V. Yadav, V. Meshram, V. Dharmadhikari, W. Barkley, W. Wei, W. Ye, W. Han, W. Kwon, X. Xu, Z. Shen, Z. Gong, Z. Wei, V. Cotruta, P. Kirk, A. Rao, M. Giang, L. Peran, T. Warkentin, E. Collins, J. Barral, Z. Ghahramani, R. Hadsell, D. Sculley, J. Banks, A. Dragan, S. Petrov, O. Vinyals, J. Dean, D. Hassabis, K. Kavukcuoglu, C. Farabet, E. Buchatskaya, S. Borgeaud, N. Fiedel, A. Joulin, K. Kenealy, R. Dadashi, and A. Andreev. Gemma 2: Improving open language models at a practical size, 2024. URL https://arxiv.org/ abs/2408.00118. K. Valmeekam, M. Marquez, and S. Kambhampati. Can large language models really improve by self-critiquing their own plans?, 2023a. URL https://arxiv.org/abs/2310.08118. K. Valmeekam, M. Marquez, S. Sreedharan, and S. Kambhampati. On the planning abilities of large language models-a critical investigation. Advances in Neural Information Processing Systems, 36: 75993–76005, 2023b. K. Valmeekam, S. Sreedharan, M. Marquez, A. Olmo, and S. Kambhampati. On the planning abilities of large language models (a critical investigation with a proposed benchmark), 2023c. URL https://arxiv.org/abs/2302.06706. X. Wang, J. Wei, D. Schuurmans, Q. Le, E. Chi, S. Narang, A. Chowdhery, and D. Zhou. Self-consistency improves chain of thought reasoning in language models, 2023. URL https://arxiv.org/abs/ 2203.11171. J. Wei, X. Wang, D. Schuurmans, M. Bosma, F. Xia, E. Chi, Q. V. Le, D. Zhou, et al. Chain-of-thought prompting elicits reasoning in large language models. Advances in neural information processing systems, 35:24824–24837, 2022.
+
+14
+
+Enhancing LLM Planning Capabilities through Intrinsic Self-Critique
+
+S. Welleck, X. Lu, P. West, F. Brahman, T. Shen, D. Khashabi, and Y. Choi. Generating sequences by learning to self-correct. In The Eleventh International Conference on Learning Representations, 2023. URL https://openreview.net/forum?id=hH36JeQZDaO.
+
+S. Yao, D. Yu, J. Zhao, I. Shafran, T. L. Griffiths, Y. Cao, and K. Narasimhan. Tree of thoughts: Deliberate problem solving with large language models, 2023a.
+
+S. Yao, J. Zhao, D. Yu, N. Du, I. Shafran, K. R. Narasimhan, and Y. Cao. React: Synergizing reasoning and acting in language models. In The Eleventh International Conference on Learning Representations, 2023b. URL https://openreview.net/forum?id=WE_vluYUL-X.
+
+15
+
+Enhancing LLM Planning Capabilities through Intrinsic Self-Critique
+
+A. Implementation details
+
+A.1. Prompts
+
+A.1: Self-Critique Prompt with few-shot exemplars
+
+Given the domain definition: {domain_pddl}
+
+For instance, we verify the following steps. {self_evaluations_exemplars}
+
+So, for each action: 1. Take the action and its preconditions from the domain definition for the specific action. 2. Verify whether the preconditions are met for the action. 3. Apply the action and provide the resulting state.
+
+The problem to solve: {instance}
+
+The suggested solution: {plan}
+
+Please carefully evaluate the plan. Verify each step as described above. Do not stop until each action is verified; please *do not* omit steps. Conclude with the assessment literally either with ’the plan is correct’, ’the plan is wrong’, or ’goal not reached’.
+
+A.2: Self-Critique 0-shot Prompt (without exemplars) with Domain Definition
+
+Given the domain definition: {domain_pddl}
+
+So, for each action: 1. Take the action and its preconditions from the domain definition for the specific action. 2. Verify whether the preconditions are met for the action. 3. Apply the action and provide the resulting state.
+
+The problem to solve: {instance}
+
+The suggested solution: {plan}
+
+Please carefully evaluate the plan. Verify each step as described above. Do not stop until each action is verified; please *do not* omit steps. Conclude with the assessment literally either with ’the plan is correct’, ’the plan is wrong’, or ’goal not reached’.
+
+16
+
+Enhancing LLM Planning Capabilities through Intrinsic Self-Critique
+
+A.3: Self-Critique 0-shot Prompt without Domain Definition
+
+So, for each action: 1. Take the action and its preconditions from the domain definition for the specific action. 2. Verify whether the preconditions are met for the action. 3. Apply the action and provide the resulting state.
+
+The problem to solve: {instance}
+
+The suggested solution: {plan}
+
+Please carefully evaluate the plan. Verify each step as described above. Do not stop until each action is verified; please *do not* omit steps. Conclude with the assessment literally either with ’the plan is correct’, ’the plan is wrong’, or ’goal not reached’.
+
+A.4: Self-Critique Prompt: Ablation of Domain Definition and numbered Instructions
+
+The problem to solve: {instance}
+
+The suggested solution: {plan}
+
+Please carefully evaluate the plan. Verify each action. Do not stop until each action is verified; please *do not* omit steps. Conclude with the assessment literally either with ’the plan is correct’, ’the plan is wrong’, or ’goal not reached’.
+
+A.5: Self-Critique Prompt: Ablation of Domain Definition and numbered Instructions
+
+The problem to solve: {instance}
+
+The suggested solution: {plan}
+
+Please carefully evaluate the plan. Verify the plan as chain-of-thought. Conclude with the assessment literally either with ’the plan is correct’, ’the plan is wrong’, or ’goal not reached’.
+
+B. Few-shot prompts
+
+B.1: Few-shot Planning Prompt Example
+
+The domain definition: (define (domain blocksworld-4ops) (:requirements :strips)
+
+17
+
+Enhancing LLM Planning Capabilities through Intrinsic Self-Critique
+
+(:predicates (clear ?x) (ontable ?x) (handempty) (holding ?x) (on ?x ?y))
+
+(:action pick-up :parameters (?ob) :precondition (and (clear ?ob) (ontable ?ob) (handempty)) :effect (and (holding ?ob) (not (clear ?ob)) (not (ontable ?ob)) (not (handempty))))
+
+(:action put-down :parameters (?ob) :precondition (holding ?ob) :effect (and (clear ?ob) (handempty) (ontable ?ob) (not (holding ?ob))))
+
+(:action stack :parameters (?ob ?underob) :precondition (and (clear ?underob) (holding ?ob)) :effect (and (handempty) (clear ?ob) (on ?ob ?underob) (not (clear ?underob)) (not (holding ?ob))))
+
+(:action unstack :parameters (?ob ?underob) :precondition (and (on ?ob ?underob) (clear ?ob) (handempty)) :effect (and (holding ?ob) (clear ?underob) (not (on ?ob ?underob)) (not (clear ?ob)) (not (handempty))))
+
+Example of a problem and its solution (plan): (define (problem BW-rand-6) (:domain blocksworld-4ops) (:objects b1 b6 b4 b3 b5 b2) (:init (clear b5) (clear b2) (clear b3) (ontable b1) (on b6 b1) (on b3 b4) (ontable b2) (ontable b5) (on b4 b6) (handempty) ) (:goal (and (on b3 b2) (on b1 b3) (on b6 b1) (on b4 b5) )) ) The plan without formatting:
+
+18
+
+Enhancing LLM Planning Capabilities through Intrinsic Self-Critique
+
+(unstack b3 b4) (stack b3 b2) (unstack b4 b6) (stack b4 b5) (unstack b6 b1) (put-down b6) (pick-up b1) (stack b1 b3) (pick-up b6) (stack b6 b1)
+
+... ; more few-shots
+
+And now the problem for you to solve. Please solve the following problem: (define (problem BW-rand-6) (:domain blocksworld-4ops) (:objects b5 b1 b4 b2 b3 b6) (:init (on b4 b1) (handempty) (ontable b6) (on b2 b4) (clear b3) (ontable b5) (on b3 b2) (clear b6) (on b1 b5) ) (:goal (and (on b4 b2) (on b1 b4) (on b5 b1) (on b3 b5) ))
+
+Provide only the plan. Do not add numbers, items or any additional text. Your plan as plain text without formatting:
+
+B.1. LLM details
+
+If a prompt exceeds this length limit at any 𝑠𝑡𝑒𝑝, we prematurely terminate the process and conduct the final assessment during that iteration, which may result in a suboptimal solution and reduced accuracy. This limitation impacts the datasets Mini-grid, due to the extensive length of its problem definitions, but it does not affect Blocksworld when limited to 10 iterations.
+
+19
+
+Enhancing LLM Planning Capabilities through Intrinsic Self-Critique
+
+Table 6 | Natural Language and PDDL using Blocksworld 3-5. We use the 1-shot prompts for natural language Valmeekam et al. (2023b) and the self-critique templates from Stechly et al. (2024b) for this study. The presented results on PDDL also employ 1-shot prompts and templates from Stechly et al. (2024b). Natural Language and PDDL using Blocksworld 3-5.
+
+Dataset Prompt No-Critique Self-Critic Natural Language Formatted 18.5±3.1 19.2±3.1 Natural Language CoT+Formatted 20.3±3.2 29.7±3.7 PDDL Formatted 40.3±3.9 47.3±4.0 PDDL CoT+Formatted 39.2±4.0 65.0±3.8
+
+C. Additional Results
+
+C.1. Gemma results
+
+0 1 2 4 8 16 32 64
+
+Few-shot exemplars
+
+0 5 10 15 20 25 30 35 40 45
+
+Accuracy (%)
+
+Blocksworld 3-7
+
+Gemma 2-27b Gemma 2-27b + Self-Critic Gemma 2-27b + Validator
+
+0 1 2 4 8 16 32 64
+
+Few-shot exemplars
+
+0 10 20 30 40 50 60
+
+Accuracy (%)
+
+Logistic easy
+
+Gemma 2-27b Gemma 2-27b + Self-Critic Gemma 2-27b + Validator
+
+Figure 5 | Exploration of planning performance using Gemma 2-27b.
+
+C.2. Scaling the context length
+
+We conduct ablation studies on the context length of the model. Given that these experiments are resource-intensive, we limit them to the Minigrid environment.
+
+C.3. Natural Language and PDDL
+
+Table 6 compares results for Gemini 1.5 Pro using the prompts of Valmeekam et al. (2023b) in Natural Language as well as PDDL. The performance of the Natural Language version is lower than that of the PDDL version when employing a 1-shot approach. The table also confirms the efficacy of the self-critique method in Natural Language applications, as demonstrated by an improvement in accuracy from 20.3 to 29.7.
+
+C.4. Error analysis (full)
+
+20
+
+Enhancing LLM Planning Capabilities through Intrinsic Self-Critique
+
+0 1 2 3 4 5 6 7 8 9 10
+
+Iterations
+
+50 55 60 65 70 75 80 85 90
+
+Percentage
+
+Percentage of Correct Instances on Minigrid Self-Critique @16 shots (32k context) Oracle @16 shots (32k context) Self-Critique @16 shots (1M context) Self-Critique @8 shots (1M context)
+
+Figure 6 | Performance on Minigrid using 8-shot and 16-shot examples for the planning prompts, with a context length limit of 32k vs 1 million tokens, plotted across self-improvement iterations.
+
+D. Example of self-improvement trace Blocksworld
+
+D.1: Self-Improvment Trace
+
+The domain definition: (define (domain blocksworld-4ops) (:requirements :strips) (:predicates (clear ?x)
+
+(ontable ?x) (handempty) (holding ?x) (on ?x ?y))
+
+(:action pick-up :parameters (?ob) :precondition (and (clear ?ob) (ontable ?ob) (handempty)) :effect (and (holding ?ob) (not (clear ?ob)) (not (ontable ?ob))
+
+(not (handempty))))
+
+(:action put-down :parameters (?ob) :precondition (holding ?ob) :effect (and (clear ?ob) (handempty) (ontable ?ob)
+
+(not (holding ?ob))))
+
+(:action stack :parameters (?ob ?underob) :precondition (and (clear ?underob) (holding ?ob))
+
+21
+
+Enhancing LLM Planning Capabilities through Intrinsic Self-Critique
+
+0 20 40 60 80 100
+
+Oracle Self-Critique Self-{Critique+Consitency} No domain definition
+
+0 20 40 60 80 100
+
+No 3-Step Instruction No verify each action
+
+8-shot self-critique with self-consistency 5 votes
+
+8-shot self-critique with self-consistency 2 votes
+
+0 1 2 3 4 5 6 7 8 9 10 0 20 40 60 80
+
+100
+
+Without self-consistency, 8-shot self-critique
+
+0 1 2 3 4 5 6 7 8 9 10 0-shot plan generator and
+
+self-critique
+
+0 1 2 3 4 5 6 7 8 9 10
+
+Temperature 0.2
+
+0 1 2 3 4 5 6 7 8 9 10
+
+Temperature 0.5
+
+Iterations
+
+Percentage
+
+True Positive False Positive False Negative True Negative
+
+Figure 7 | Analysis of the Self-Critique over 11 rounds of improvement steps. For these exploitative experiments, we used the Blocksworld validation set with 3-7 blocks, a 16-shot plan prediction prompt, and an 8-shot self-critique prompt. Overall, we observe relatively high accuracy and recall, but lower precision.
+
+:effect (and (handempty) (clear ?ob) (on ?ob ?underob)
+
+(not (clear ?underob)) (not (holding ?ob))))
+
+(:action unstack :parameters (?ob ?underob) :precondition (and (on ?ob ?underob) (clear ?ob) (handempty)) :effect (and (holding ?ob) (clear ?underob)
+
+(not (on ?ob ?underob)) (not (clear ?ob)) (not (handempty)))))
+
+Example of a problem and its solution (plan): (define (problem BW-rand-7) (:domain blocksworld-4ops) (:objects b6 b3 b1 b7 b4 b2 b5) (:init (on b7 b1) (ontable b6) (clear b3) (ontable b4) (on b5 b2) (clear b6) (clear b7) (ontable b3) (handempty) (clear b5) (on b2 b4)
+
+22
+
+Enhancing LLM Planning Capabilities through Intrinsic Self-Critique
+
+(ontable b1) ) (:goal (and (on b3 b2) (on b5 b1) )) )
+
+The plan without formatting: (unstack b7 b1) (put-down b7) (unstack b5 b2) (stack b5 b1) (pick-up b3) (stack b3 b2)
+
+Example of a problem and its solution (plan): (define (problem BW-rand-5) (:domain blocksworld-4ops) (:objects b4 b1 b2 b5 b3) (:init (handempty) (on b2 b1) (clear b2) (ontable b4) (clear b3) (on b3 b5) (on b1 b4) (ontable b5) ) (:goal (and (on b2 b1) (on b5 b4) (on b3 b5) )) )
+
+The plan without formatting: (unstack b2 b1) (put-down b2) (unstack b1 b4) (put-down b1) (pick-up b2) (stack b2 b1) (unstack b3 b5) (put-down b3) (pick-up b5) (stack b5 b4) (pick-up b3) (stack b3 b5)
+
+; ; further few-shots omitted. ; ...
+
+And now the problem for you to solve. Please solve the following problem: (define (problem BW-rand-5)
+
+23
+
+Enhancing LLM Planning Capabilities through Intrinsic Self-Critique
+
+(:domain blocksworld-4ops) (:objects b4 b1 b2 b5 b3) (:init (on b1 b4) (handempty) (ontable b4) (on b2 b1) (on b5 b2) (ontable b3) (clear b3) (clear b5) ) (:goal (and (on b2 b5) (on b3 b2) (on b1 b4) )) )
+
+Provide only the plan. Do not add numbers, items or any additional text. Your plan as plain text without formatting: The clean plan: (unstack b5 b2) (put-down b5) (unstack b2 b1) (put-down b2) (pick-up b3) (stack b3 b2) (pick-up b5) (stack b5 b3) (pick-up b2) (stack b2 b5) (pick-up b1) (stack b1 b4) ## plan evaluation:
+
+**step 1: (unstack b5 b2)**
+
+1. **action and preconditions:**
+
+- action: unstack ?ob ?underob - preconditions: (and (on ?ob ?underob) (clear ?ob) (handempty))
+
+2. **verification:**
+
+- (on b5 b2): **true** (from initial state) - (clear b5): **true** (from initial state) - (handempty): **true** (from initial state) - **all preconditions are met.**
+
+3. **resulting state:**
+
+- (holding b5) - (clear b2) - (not (on b5 b2)) - (not (clear b5)) - (not (handempty)) - **other facts from the initial state remain unchanged.**
+
+**step 2: (put-down b5)**
+
+24
+
+Enhancing LLM Planning Capabilities through Intrinsic Self-Critique
+
+1. **action and preconditions:**
+
+- action: put-down ?ob - preconditions: (holding ?ob)
+
+2. **verification:**
+
+- (holding b5): **true** (from the previous step) - **precondition is met.**
+
+3. **resulting state:**
+
+- (clear b5) - (handempty) - (ontable b5) - (not (holding b5)) - **other facts from the previous step remain unchanged.**
+
+**step 3: (unstack b2 b1)**
+
+1. **action and preconditions:**
+
+- action: unstack ?ob ?underob - preconditions: (and (on ?ob ?underob) (clear ?ob) (handempty))
+
+2. **verification:**
+
+- (on b2 b1): **true** (from initial state) - (clear b2): **true** (from the previous step) - (handempty): **true** (from the previous step) - **all preconditions are met.**
+
+3. **resulting state:**
+
+- (holding b2) - (clear b1) - (not (on b2 b1)) - (not (clear b2)) - (not (handempty)) - **other facts from the previous step remain unchanged.**
+
+**step 4: (put-down b2)**
+
+1. **action and preconditions:**
+
+- action: put-down ?ob - preconditions: (holding ?ob)
+
+2. **verification:**
+
+- (holding b2): **true** (from the previous step) - **precondition is met.**
+
+3. **resulting state:**
+
+- (clear b2) - (handempty) - (ontable b2) - (not (holding b2)) - **other facts from the previous step remain unchanged.**
+
+**step 5: (pick-up b3)**
+
+1. **action and preconditions:**
+
+- action: pick-up ?ob - preconditions: (and (clear ?ob) (ontable ?ob) (handempty))
+
+2. **verification:**
+
+25
+
+Enhancing LLM Planning Capabilities through Intrinsic Self-Critique
+
+- (clear b3): **true** (from initial state) - (ontable b3): **true** (from initial state) - (handempty): **true** (from the previous step) - **all preconditions are met.**
+
+3. **resulting state:**
+
+- (holding b3) - (not (clear b3)) - (not (ontable b3)) - (not (handempty)) - **other facts from the previous step remain unchanged.**
+
+**step 6: (stack b3 b2)**
+
+1. **action and preconditions:**
+
+- action: stack ?ob ?underob - preconditions: (and (clear ?underob) (holding ?ob))
+
+2. **verification:**
+
+- (clear b2): **true** (from the previous step) - (holding b3): **true** (from the previous step) - **all preconditions are met.**
+
+3. **resulting state:**
+
+- (handempty) - (clear b3) - (on b3 b2) - (not (clear b2)) - (not (holding b3)) - **other facts from the previous step remain unchanged.**
+
+**step 7: (pick-up b5)**
+
+1. **action and preconditions:**
+
+- action: pick-up ?ob - preconditions: (and (clear ?ob) (ontable ?ob) (handempty))
+
+2. **verification:**
+
+- (clear b5): **true** (from step 2) - (ontable b5): **true** (from step 2) - (handempty): **true** (from the previous step) - **all preconditions are met.**
+
+3. **resulting state:**
+
+- (holding b5) - (not (clear b5)) - (not (ontable b5)) - (not (handempty)) - **other facts from the previous step remain unchanged.**
+
+**step 8: (stack b5 b3)**
+
+1. **action and preconditions:**
+
+- action: stack ?ob ?underob - preconditions: (and (clear ?underob) (holding ?ob))
+
+2. **verification:**
+
+- (clear b3): **true** (from step 6) - (holding b5): **true** (from the previous step)
+
+26
+
+Enhancing LLM Planning Capabilities through Intrinsic Self-Critique
+
+- **all preconditions are met.**
+
+3. **resulting state:**
+
+- (handempty) - (clear b5) - (on b5 b3) - (not (clear b3)) - (not (holding b5)) - **other facts from the previous step remain unchanged.**
+
+**step 9: (pick-up b2)**
+
+1. **action and preconditions:**
+
+- action: pick-up ?ob - preconditions: (and (clear ?ob) (ontable ?ob) (handempty))
+
+2. **verification:**
+
+- (clear b2): **false** (on b3 b2 from step 6) - (ontable b2): **false** (on b3 b2 from step 6) - (handempty): **true** (from the previous step) - **preconditions are not met.**
+
+**the plan is wrong** because the preconditions for picking up b2 in step 9 are not met.
+
+Please can you explain the error and fix it. The clean plan: (unstack b5 b2) (put-down b5) (unstack b2 b1) (put-down b2) (pick-up b3) (stack b3 b2) (pick-up b5) (stack b5 b3) (unstack b3 b2) (put-down b3) (pick-up b2) (stack b2 b5) (pick-up b1) (stack b1 b4) ## plan verification:
+
+**step 1: (unstack b5 b2)**
+
+1. **action and preconditions:**
+
+- action: unstack ?ob ?underob - preconditions: (and (on ?ob ?underob) (clear ?ob) (handempty))
+
+2. **verification:**
+
+- (on b5 b2): **true** (from initial state) - (clear b5): **true** (from initial state) - (handempty): **true** (from initial state) - **preconditions met**
+
+3. **resulting state:**
+
+- (on b1 b4) - (ontable b4) - (on b2 b1) - (ontable b3) - (clear b3)
+
+27
+
+Enhancing LLM Planning Capabilities through Intrinsic Self-Critique
+
+- **(holding b5)** - **(clear b2)** - **(not (on b5 b2))** - **(not (clear b5))** - **(not (handempty))**
+
+**step 2: (put-down b5)**
+
+1. **action and preconditions:**
+
+- action: put-down ?ob - preconditions: (holding ?ob)
+
+2. **verification:**
+
+- (holding b5): **true** (from previous step) - **preconditions met**
+
+3. **resulting state:**
+
+- (on b1 b4) - (ontable b4) - (on b2 b1) - (ontable b3) - (clear b3) - **(ontable b5)** - (clear b2) - **(clear b5)** - **(handempty)**
+
+**step 3: (unstack b2 b1)**
+
+1. **action and preconditions:**
+
+- action: unstack ?ob ?underob - preconditions: (and (on ?ob ?underob) (clear ?ob) (handempty))
+
+2. **verification:**
+
+- (on b2 b1): **true** (from previous step) - (clear b2): **true** (from previous step) - (handempty): **true** (from previous step) - **preconditions met**
+
+3. **resulting state:**
+
+- (on b1 b4) - (ontable b4) - (ontable b3) - (ontable b5) - (clear b3) - (clear b5) - **(holding b2)** - **(clear b1)** - **(not (on b2 b1))** - **(not (clear b2))** - **(not (handempty))**
+
+**step 4: (put-down b2)**
+
+1. **action and preconditions:**
+
+- action: put-down ?ob - preconditions: (holding ?ob)
+
+2. **verification:**
+
+- (holding b2): **true** (from previous step) - **preconditions met**
+
+3. **resulting state:**
+
+- (on b1 b4) - (ontable b4)
+
+28
+
+Enhancing LLM Planning Capabilities through Intrinsic Self-Critique
+
+- (ontable b3) - (ontable b5) - (clear b3) - (clear b5) - **(ontable b2)** - (clear b1) - **(clear b2)** - **(handempty)**
+
+**step 5: (pick-up b3)**
+
+1. **action and preconditions:**
+
+- action: pick-up ?ob - preconditions: (and (clear ?ob) (ontable ?ob) (handempty))
+
+2. **verification:**
+
+- (clear b3): **true** (from previous step) - (ontable b3): **true** (from previous step) - (handempty): **true** (from previous step) - **preconditions met**
+
+3. **resulting state:**
+
+- (on b1 b4) - (ontable b4) - (ontable b5) - (ontable b2) - (clear b5) - (clear b2) - (clear b1) - **(holding b3)** - **(not (clear b3))** - **(not (ontable b3))** - **(not (handempty))**
+
+**step 6: (stack b3 b2)**
+
+1. **action and preconditions:**
+
+- action: stack ?ob ?underob - preconditions: (and (clear ?underob) (holding ?ob))
+
+2. **verification:**
+
+- (clear b2): **true** (from previous step) - (holding b3): **true** (from previous step) - **preconditions met**
+
+3. **resulting state:**
+
+- (on b1 b4) - (ontable b4) - (ontable b5) - **(on b3 b2)** - (clear b5) - **(clear b3)** - (clear b1) - **(handempty)** - **(not (clear b2))**
+
+**step 7: (pick-up b5)**
+
+1. **action and preconditions:**
+
+- action: pick-up ?ob - preconditions: (and (clear ?ob) (ontable ?ob) (handempty))
+
+2. **verification:**
+
+- (clear b5): **true** (from previous step)
+
+29
+
+Enhancing LLM Planning Capabilities through Intrinsic Self-Critique
+
+- (ontable b5): **true** (from previous step) - (handempty): **true** (from previous step) - **preconditions met**
+
+3. **resulting state:**
+
+- (on b1 b4) - (ontable b4) - (on b3 b2) - (clear b3) - (clear b1) - **(holding b5)** - **(not (clear b5))** - **(not (ontable b5))** - **(not (handempty))**
+
+**step 8: (stack b5 b3)**
+
+1. **action and preconditions:**
+
+- action: stack ?ob ?underob - preconditions: (and (clear ?underob) (holding ?ob))
+
+2. **verification:**
+
+- (clear b3): **true** (from previous step) - (holding b5): **true** (from previous step) - **preconditions met**
+
+3. **resulting state:**
+
+- (on b1 b4) - (ontable b4) - **(on b5 b3)** - (on b3 b2) - (clear b1) - **(clear b5)** - **(handempty)** - **(not (clear b3))**
+
+**step 9: (unstack b3 b2)**
+
+1. **action and preconditions:**
+
+- action: unstack ?ob ?underob - preconditions: (and (on ?ob ?underob) (clear ?ob) (handempty))
+
+2. **verification:**
+
+- (on b3 b2): **true** (from previous step) - (clear b3): **false** (from previous step) - (handempty): **true** (from previous step) - **preconditions not met**
+
+**the plan is wrong.**
+
+the plan fails at step 9 because the precondition (clear b3) is not met. block b5 is on top of b3, making it not clear.
+
+Please can you explain the error and fix it. The clean plan: (unstack b5 b2) (put-down b5) (unstack b2 b1) (stack b2 b5) (pick-up b3) (stack b3 b2) (pick-up b1)
+
+30
+
+Enhancing LLM Planning Capabilities through Intrinsic Self-Critique
+
+(stack b1 b4) ## plan verification:
+
+**step 1: (unstack b5 b2)**
+
+1. **action and preconditions:**
+
+- action: unstack ?ob ?underob - preconditions: (and (on ?ob ?underob) (clear ?ob) (handempty))
+
+2. **verification:**
+
+- (on b5 b2): **true** (from initial state) - (clear b5): **true** (from initial state) - (handempty): **true** (from initial state) - **all preconditions met.**
+
+3. **resulting state:**
+
+- (holding b5) - (clear b2) - (not (on b5 b2)) - (not (clear b5)) - (not (handempty))
+
+**step 2: (put-down b5)**
+
+1. **action and preconditions:**
+
+- action: put-down ?ob - preconditions: (holding ?ob)
+
+2. **verification:**
+
+- (holding b5): **true** (from previous step) - **precondition met.**
+
+3. **resulting state:**
+
+- (clear b5) - (handempty) - (ontable b5) - (not (holding b5))
+
+**step 3: (unstack b2 b1)**
+
+1. **action and preconditions:**
+
+- action: unstack ?ob ?underob - preconditions: (and (on ?ob ?underob) (clear ?ob) (handempty))
+
+2. **verification:**
+
+- (on b2 b1): **true** (from initial state) - (clear b2): **true** (from previous step) - (handempty): **true** (from previous step) - **all preconditions met.**
+
+3. **resulting state:**
+
+- (holding b2) - (clear b1) - (not (on b2 b1)) - (not (clear b2)) - (not (handempty))
+
+**step 4: (stack b2 b5)**
+
+1. **action and preconditions:**
+
+- action: stack ?ob ?underob - preconditions: (and (clear ?underob) (holding ?ob))
+
+2. **verification:**
+
+- (clear b5): **true** (from step 2) - (holding b2): **true** (from previous step)
+
+31
+
+Enhancing LLM Planning Capabilities through Intrinsic Self-Critique
+
+- **all preconditions met.**
+
+3. **resulting state:**
+
+- (handempty) - (clear b2) - (on b2 b5) - (not (clear b5)) - (not (holding b2))
+
+**step 5: (pick-up b3)**
+
+1. **action and preconditions:**
+
+- action: pick-up ?ob - preconditions: (and (clear ?ob) (ontable ?ob) (handempty))
+
+2. **verification:**
+
+- (clear b3): **true** (from initial state) - (ontable b3): **true** (from initial state) - (handempty): **true** (from previous step) - **all preconditions met.**
+
+3. **resulting state:**
+
+- (holding b3) - (not (clear b3)) - (not (ontable b3)) - (not (handempty))
+
+**step 6: (stack b3 b2)**
+
+1. **action and preconditions:**
+
+- action: stack ?ob ?underob - preconditions: (and (clear ?underob) (holding ?ob))
+
+2. **verification:**
+
+- (clear b2): **true** (from step 4) - (holding b3): **true** (from previous step) - **all preconditions met.**
+
+3. **resulting state:**
+
+- (handempty) - (clear b3) - (on b3 b2) - (not (clear b2)) - (not (holding b3))
+
+**step 7: (pick-up b1)**
+
+1. **action and preconditions:**
+
+- action: pick-up ?ob - preconditions: (and (clear ?ob) (ontable ?ob) (handempty))
+
+2. **verification:**
+
+- (clear b1): **true** (from step 3) - (ontable b1): **false** (b1 is not on the table) - (handempty): **true** (from previous step) - **precondition not met: (ontable b1) is false.**
+
+**conclusion:** **the plan is wrong.** the plan fails at step 7 because b1 is not on the table, violating the precondition for the pick-up action.
+
+Please can you explain the error and fix it.
+
+; Extract plan of the LLM output for the above prompt ;
+
+32
+
+Enhancing LLM Planning Capabilities through Intrinsic Self-Critique
+
+(unstack b5 b2) (put-down b5) (unstack b2 b1) (put-down b2) (pick-up b3) (stack b3 b2) (pick-up b5) (stack b5 b3) (pick-up b2) (stack b2 b5) (pick-up b1) (stack b1 b4)
+
+; LLM output for zero-shot self-critique prompt ; ## Plan Verification:
+
+**Step 1: (unstack b5 b2)**
+
+1. **Action and Preconditions:**
+
+- Action: unstack (?ob ?underob) - Preconditions: (and (on ?ob ?underob) (clear ?ob) (handempty))
+
+2. **Verification:**
+
+- (on b5 b2): **True** (from initial state) - (clear b5): **True** (from initial state) - (handempty): **True** (from initial state) - **All preconditions met.**
+
+3. **Resulting State:**
+
+- (on b1 b4) - (ontable b4) - (on b2 b1) - **(holding b5)** - **(clear b2)** - ontable b3 - clear b3 - **(not (on b5 b2))** - **(not (handempty))**
+
+**Step 2: (put-down b5)**
+
+1. **Action and Preconditions:**
+
+- Action: put-down (?ob) - Preconditions: (holding ?ob)
+
+2. **Verification:**
+
+- (holding b5): **True** (from previous step) - **Precondition met.**
+
+3. **Resulting State:**
+
+- (on b1 b4) - (ontable b4) - (on b2 b1) - **(clear b5)** - (clear b2) - ontable b3 - clear b3 - **(ontable b5)**
+
+33
+
+Enhancing LLM Planning Capabilities through Intrinsic Self-Critique
+
+- **(handempty)**
+
+**Step 3: (unstack b2 b1)**
+
+1. **Action and Preconditions:**
+
+- Action: unstack (?ob ?underob) - Preconditions: (and (on ?ob ?underob) (clear ?ob) (handempty))
+
+2. **Verification:**
+
+- (on b2 b1): **True** (from previous step) - (clear b2): **True** (from previous step) - (handempty): **True** (from previous step) - **All preconditions met.**
+
+3. **Resulting State:**
+
+- (on b1 b4) - (ontable b4) - **(holding b2)** - (clear b5) - **(clear b1)** - ontable b3 - clear b3 - ontable b5 - **(not (on b2 b1))** - **(not (handempty))**
+
+**Step 4: (stack b2 b5)**
+
+1. **Action and Preconditions:**
+
+- Action: stack (?ob ?underob) - Preconditions: (and (clear ?underob) (holding ?ob))
+
+2. **Verification:**
+
+- (clear b5): **True** (from previous step) - (holding b2): **True** (from previous step) - **All preconditions met.**
+
+3. **Resulting State:**
+
+- (on b1 b4) - (ontable b4) - (clear b1) - **(on b2 b5)** - **(clear b2)** - ontable b3 - clear b3 - **(not (clear b5))** - ontable b5 - **(handempty)**
+
+**Step 5: (pick-up b3)**
+
+1. **Action and Preconditions:**
+
+- Action: pick-up (?ob) - Preconditions: (and (clear ?ob) (ontable ?ob) (handempty))
+
+2. **Verification:**
+
+- (clear b3): **True** (from previous step) - (ontable b3): **True** (from previous step) - (handempty): **True** (from previous step)
+
+34
+
+Enhancing LLM Planning Capabilities through Intrinsic Self-Critique
+
+- **All preconditions met.**
+
+3. **Resulting State:**
+
+- (on b1 b4) - (ontable b4) - (clear b1) - (on b2 b5) - (clear b2) - **(holding b3)** - **(not (clear b3))** - **(not (ontable b3))** - (not (clear b5)) - ontable b5 - **(not (handempty))**
+
+**Step 6: (stack b3 b2)**
+
+1. **Action and Preconditions:**
+
+- Action: stack (?ob ?underob) - Preconditions: (and (clear ?underob) (holding ?ob))
+
+2. **Verification:**
+
+- (clear b2): **True** (from previous step) - (holding b3): **True** (from previous step) - **All preconditions met.**
+
+3. **Resulting State:**
+
+- (on b1 b4) - (ontable b4) - (clear b1) - **(on b3 b2)** - **(clear b3)** - **(not (clear b2))** - (not (clear b3)) - (not (ontable b3)) - (not (clear b5)) - ontable b5 - **(handempty)**
+
+**Step 7: (unstack b1 b4)**
+
+1. **Action and Preconditions:**
+
+- Action: unstack (?ob ?underob) - Preconditions: (and (on ?ob ?underob) (clear ?ob) (handempty))
+
+2. **Verification:**
+
+- (on b1 b4): **True** (from previous step) - (clear b1): **True** (from previous step) - (handempty): **True** (from previous step) - **All preconditions met.**
+
+3. **Resulting State:**
+
+- **(holding b1)** - (ontable b4) - **(clear b4)** - (on b3 b2) - (clear b3) - (not (clear b2)) - (not (clear b3))
+
+35
+
+Enhancing LLM Planning Capabilities through Intrinsic Self-Critique
+
+- (not (ontable b3)) - (not (clear b5)) - ontable b5 - **(not (on b1 b4))** - **(not (handempty))**
+
+**Step 8: (stack b1 b4)**
+
+1. **Action and Preconditions:**
+
+- Action: stack (?ob ?underob) - Preconditions: (and (clear ?underob) (holding ?ob))
+
+2. **Verification:**
+
+- (clear b4): **True** (from previous step) - (holding b1): **True** (from previous step) - **All preconditions met.**
+
+3. **Resulting State:**
+
+- **(on b1 b4)** - **(not (clear b4))** - (ontable b4) - (on b3 b2) - (clear b3) - (not (clear b2)) - (not (clear b3)) - (not (ontable b3)) - (not (clear b5)) - ontable b5 - **(clear b1)** - **(handempty)**
+
+## Conclusion:
+
+The final state includes: - (on b2 b5) - (on b3 b2) - (on b1 b4)
+
+This matches the goal state. Therefore, **the plan is correct**.
+
+E. Excerpt from self-improvement trace for Mystery Blocksworld
+
+E.1: Mystery Blocksworld few-shot prompt
+
+The domain definition: (define (domain mystery-4ops) (:requirements :strips) (:predicates (province ?x)
+
+(planet ?x) (harmony) (pain ?x) (craves ?x ?y))
+
+(:action attack :parameters (?ob) :precondition (and (province ?ob) (planet ?ob) (harmony))
+
+36
+
+Enhancing LLM Planning Capabilities through Intrinsic Self-Critique
+
+:effect (and (pain ?ob) (not (province ?ob)) (not (planet ?ob))
+
+(not (harmony))))
+
+(:action succumb :parameters (?ob) :precondition (pain ?ob) :effect (and (province ?ob) (harmony) (planet ?ob)
+
+(not (pain ?ob))))
+
+(:action overcome :parameters (?ob ?underob) :precondition (and (province ?underob) (pain ?ob)) :effect (and (harmony) (province ?ob) (craves ?ob ?underob)
+
+(not (province ?underob)) (not (pain ?ob))))
+
+(:action feast :parameters (?ob ?underob) :precondition (and (craves ?ob ?underob) (province ?ob) (harmony)) :effect (and (pain ?ob) (province ?underob)
+
+(not (craves ?ob ?underob)) (not (province ?ob)) (not (harmony)))))
+
+Example of a problem and its solution (plan): (define (problem MY-rand-7) (:domain mystery-4ops) (:objects b6 b3 b1 b7 b4 b2 b5) (:init (craves b7 b1) (planet b6) (province b3) (planet b4) (craves b5 b2) (province b6) (province b7) (planet b3) (harmony) (province b5) (craves b2 b4) (planet b1) ) (:goal (and (craves b3 b2) (craves b5 b1) )) )
+
+The plan without formatting: (feast b7 b1) (succumb b7) (feast b5 b2) (overcome b5 b1) (attack b3) (overcome b3 b2)
+
+; rest of few-shot exemplars omitted. ;
+
+And now the problem for you to solve. Please solve the following problem:
+
+37
+
+Enhancing LLM Planning Capabilities through Intrinsic Self-Critique
+
+(define (problem MY-rand-4) (:domain mystery-4ops) (:objects b1 b2 b3 b4 ) (:init (harmony) (craves b1 b4) (craves b2 b3) (planet b3) (craves b4 b2) (province b1) ) (:goal (and (craves b1 b3) (craves b3 b2) (craves b4 b1)) ) )
+
+Provide only the plan. Do not add numbers, items or any additional text. Your plan as plain text without formatting:
+
+; LLM responce ; (feast b1 b4) (succumb b1) (feast b4 b2) (succumb b4) (feast b2 b3) (overcome b2 b1) (attack b3) (overcome b3 b2) (attack b4) (overcome b4 b1)
+
+; LLM Self-Critique responce (see prompt template 0-shot) ; ## plan verification
+
+**step 1: (feast b1 b4)**
+
+; Verification omitted ... ;
+
+## conclusion
+
+**the plan is wrong.** the action ‘(overcome b4 b1)‘ cannot be executed in step 10 because the precondition ‘(province b1)‘ is not met.
+
+Please can you explain the error and fix it.
+
+; LLM responce extract plan only as provided to the self-critique ;
+
+(feast b1 b4) (succumb b1) (feast b4 b2) (succumb b4) (feast b2 b3)
+
+38
+
+Enhancing LLM Planning Capabilities through Intrinsic Self-Critique
+
+(overcome b2 b1) (attack b3) (overcome b3 b2) (attack b4) (overcome b4 b1)
+
+## Plan Verification
+
+**Initial State:**
+
+; Verification omitted ;
+
+**Goal State:**
+
+* (craves b1 b3) * (craves b3 b2) * (craves b4 b1)
+
+**Plan:**
+
+1. **(overcome b1 b4)**
+
+* **Action Definition:**
+
+* **Parameters:** (?ob ?underob) * **Precondition:** (and (province ?underob) (pain ?ob)) * **Effect:** (and (harmony) (province ?ob) (craves ?ob ?underob) (not (province ?underob)) (not (pain ?ob)))
+
+* **Verification:**
+
+* ‘?ob = b1‘, ‘?underob = b4‘ * **Precondition Check:**
+
+* (province b4) - **FALSE** (b4 does not have a province) * (pain b1) - **FALSE** (b1 does not have pain)
+
+* **Preconditions are NOT met.**
+
+* **Action cannot be applied. The plan is wrong.**
+
+Since the first action of the plan cannot be applied, there is no need to evaluate the rest of the plan.
+
+**Conclusion: The plan is wrong.** ; ; Rest omitted.
+
+39
