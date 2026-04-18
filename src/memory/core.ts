@@ -1,0 +1,473 @@
+import os from "os";
+import path from "path";
+import fs from "fs";
+import crypto from "crypto";
+import Fuse from "fuse.js";
+import type { MemoryFragment, MemoryStats, AuditResult } from "../types.js";
+
+let MEMORY_DIR = path.join(os.homedir(), ".lemma");
+let MEMORY_FILE = path.join(MEMORY_DIR, "memory.jsonl");
+
+export function setMemoryDir(dir: string): void {
+  MEMORY_DIR = dir;
+  MEMORY_FILE = path.join(MEMORY_DIR, "memory.jsonl");
+}
+
+export function generateId(): string {
+  return "m" + crypto.randomUUID().replace(/-/g, "").substring(0, 12);
+}
+
+export function detectProject(): string | null {
+  try {
+    const cwd = process.cwd();
+    const projectName = path.basename(cwd);
+    return projectName || null;
+  } catch {
+    return null;
+  }
+}
+
+function generateDescription(fragment: string, title: string): string {
+  if (fragment.length <= 80) {
+    return fragment;
+  }
+
+  const firstSentence = fragment.split(/[.!?\n]/)[0];
+  if (firstSentence && firstSentence.length <= 100) {
+    return firstSentence.trim() + (firstSentence.endsWith('.') ? '' : '...');
+  }
+
+  return fragment.substring(0, 80).trim() + '...';
+}
+
+export function createFragment(fragment: string, source: "user" | "ai", title: string | null = null, project: string | null = null, description: string | null = null): MemoryFragment {
+  const autoTitle = title || (fragment.length > 40 ? fragment.substring(0, 40) + "..." : fragment);
+  const autoDescription = description || generateDescription(fragment, autoTitle);
+
+  const now = new Date();
+
+  return {
+    id: generateId(),
+    title: autoTitle,
+    description: autoDescription,
+    fragment: fragment,
+    project: project,
+    confidence: 1.0,
+    source: source,
+    created: now.toISOString().split("T")[0] ?? "",
+    lastAccessed: now.toISOString(),
+    accessed: 0,
+    tags: [],
+    associatedWith: [],
+    negativeHits: 0,
+    quality_score: null,
+    refinement_count: 0,
+    parent_id: null,
+    child_ids: [],
+    session_id: null,
+    task_type: null,
+    outcome: null,
+    positive_feedback: 0,
+    negative_feedback: 0,
+    last_refined: null
+  };
+}
+
+export function findSimilarFragment(fragments: MemoryFragment[], fragmentText: string, project: string | null, threshold = 0.65): MemoryFragment | null {
+  const scopedFragments = filterByProject(fragments, project);
+  if (scopedFragments.length === 0) return null;
+
+  const fuse = new Fuse(scopedFragments, {
+    keys: ['fragment', 'title'],
+    threshold: 0.3,
+    includeScore: true,
+    ignoreLocation: true,
+  });
+
+  const fuseResults = fuse.search(fragmentText, { limit: 3 });
+
+  for (const result of fuseResults) {
+    const similarity = 1 - (result.score || 1);
+    if (similarity >= threshold) {
+      return result.item;
+    }
+  }
+
+  return null;
+}
+
+export function boostOnAccess(fragment: MemoryFragment, context: string | null = null): MemoryFragment {
+  const boosted = { ...fragment };
+  boosted.confidence = Math.min(1.0, boosted.confidence + 0.1);
+  boosted.accessed++;
+  boosted.lastAccessed = new Date().toISOString();
+
+  if (context && typeof context === "string") {
+    const tags = boosted.tags || [];
+    const newTag = context.trim().toLowerCase();
+    if (newTag && !tags.includes(newTag)) {
+      boosted.tags = [...tags, newTag];
+    }
+  }
+
+  return boosted;
+}
+
+export function recordNegativeHit(fragment: MemoryFragment): MemoryFragment {
+  return {
+    ...fragment,
+    confidence: Math.max(0, fragment.confidence - 0.1),
+    negativeHits: (fragment.negativeHits || 0) + 1,
+    lastAccessed: new Date().toISOString()
+  };
+}
+
+export function trackAssociations(fragments: MemoryFragment[], accessedId: string, sessionIds: string[]): void {
+  if (!sessionIds || sessionIds.length === 0) return;
+
+  const target = fragments.find(f => f.id === accessedId);
+  if (!target) return;
+
+  const existing = new Set(target.associatedWith || []);
+  for (const id of sessionIds) {
+    if (id !== accessedId && !existing.has(id)) {
+      existing.add(id);
+      const other = fragments.find(f => f.id === id);
+      if (other) {
+        const otherAssoc = new Set(other.associatedWith || []);
+        otherAssoc.add(accessedId);
+        other.associatedWith = [...otherAssoc];
+      }
+    }
+  }
+  target.associatedWith = [...existing];
+}
+
+export function loadMemory(): MemoryFragment[] {
+  try {
+    if (!fs.existsSync(MEMORY_FILE)) {
+      return [];
+    }
+    const content = fs.readFileSync(MEMORY_FILE, "utf-8");
+    if (!content.trim()) {
+      return [];
+    }
+    return content
+      .trim()
+      .split("\n")
+      .map(line => JSON.parse(line));
+  } catch (error: unknown) {
+    const msg = error instanceof Error ? error.message : String(error);
+    console.error("Error loading memory:", msg);
+    return [];
+  }
+}
+
+export function saveMemory(fragments: MemoryFragment[], options: { force?: boolean } = {}): void {
+  try {
+    const dir = path.dirname(MEMORY_FILE);
+    if (!fs.existsSync(dir)) {
+      fs.mkdirSync(dir, { recursive: true });
+    }
+
+    if ((!fragments || fragments.length === 0) && !options.force) {
+      console.warn("WARNING: Attempted to save empty memory array - ABORTED to prevent data loss");
+      return;
+    }
+
+    const jsonl = fragments && fragments.length > 0 ? fragments.map(f => JSON.stringify(f)).join("\n") : "";
+
+    const backupFile = MEMORY_FILE + ".bak";
+    if (fs.existsSync(backupFile)) {
+      try {
+        const backupContent = fs.readFileSync(backupFile, "utf-8");
+        const backupEntries = backupContent.trim().split("\n").filter(Boolean).map(l => JSON.parse(l));
+        const backupIds = new Set(backupEntries.map((e: MemoryFragment) => e.id));
+        const newEntries = fragments.filter(f => !backupIds.has(f.id));
+        if (newEntries.length > 0) {
+          const merged = [...backupEntries, ...newEntries];
+          fs.writeFileSync(backupFile, merged.map(f => JSON.stringify(f)).join("\n"), "utf-8");
+        }
+      } catch {
+        fs.writeFileSync(backupFile, jsonl, "utf-8");
+      }
+    } else {
+      fs.writeFileSync(backupFile, jsonl, "utf-8");
+    }
+
+    fs.writeFileSync(MEMORY_FILE, jsonl, "utf-8");
+  } catch (error: unknown) {
+    const msg = error instanceof Error ? error.message : String(error);
+    console.error("Error saving memory:", msg);
+    throw error;
+  }
+}
+
+let writeLock = false;
+let writeQueue: Array<() => void> = [];
+
+function acquireLock(): Promise<void> {
+  return new Promise((resolve) => {
+    if (!writeLock) {
+      writeLock = true;
+      resolve();
+    } else {
+      writeQueue.push(resolve);
+    }
+  });
+}
+
+function releaseLock(): void {
+  writeLock = false;
+  if (writeQueue.length > 0) {
+    writeLock = true;
+    const next = writeQueue.shift()!;
+    next();
+  }
+}
+
+export async function saveMemorySafe(fragments: MemoryFragment[], options: { force?: boolean } = {}): Promise<void> {
+  await acquireLock();
+  try {
+    saveMemory(fragments, options);
+  } finally {
+    releaseLock();
+  }
+}
+
+export function applySessionDecay(): MemoryFragment[] {
+  const memory = loadMemory();
+  const decayed = decayConfidence(memory);
+  saveMemory(decayed);
+  return decayed;
+}
+
+export function filterByProject(fragments: MemoryFragment[], currentProject: string | null): MemoryFragment[] {
+  const project = (typeof currentProject === 'string')
+    ? currentProject.trim().toLowerCase() || null
+    : null;
+
+  if (!project) {
+    return fragments.filter(f => f.project === null || f.project === undefined);
+  }
+  return fragments.filter(f =>
+    (f.project && f.project.toLowerCase() === project) ||
+    (f.project === null || f.project === undefined)
+  );
+}
+
+export function decayConfidence(fragments: MemoryFragment[]): MemoryFragment[] {
+  return fragments
+    .map(frag => {
+      const sessionDecay = Math.max(0.005, 0.05 - (frag.accessed * 0.005));
+      const newConfidence = frag.confidence - sessionDecay;
+
+      return {
+        ...frag,
+        confidence: Math.max(0, newConfidence),
+        accessed: 0,
+        negativeHits: 0
+      };
+    });
+}
+
+export function searchAndSortFragments(fragments: MemoryFragment[], query: string | null = null, topK = 30): MemoryFragment[] {
+  const nowDate = new Date().toISOString();
+
+  if (!query) {
+    const sorted = [...fragments]
+      .sort((a, b) => b.confidence - a.confidence)
+      .slice(0, topK);
+
+    sorted.forEach(frag => { frag.lastAccessed = nowDate; });
+    return sorted;
+  }
+
+  const fuseOptions = {
+    keys: [
+      { name: 'title', weight: 0.4 },
+      { name: 'fragment', weight: 0.6 }
+    ],
+    threshold: 0.3,
+    distance: 100,
+    minMatchCharLength: 2,
+    includeScore: true,
+    ignoreLocation: true,
+    findAllMatches: true
+  };
+
+  const fuse = new Fuse(fragments, fuseOptions);
+  const fuseResults = fuse.search(query, { limit: topK });
+
+  if (fuseResults.length > 0) {
+    const topResults = fuseResults.map(r => r.item);
+    topResults.sort((a, b) => b.confidence - a.confidence);
+    topResults.forEach(frag => { frag.lastAccessed = nowDate; });
+    return topResults;
+  }
+
+  const fallback = [...fragments]
+    .sort((a, b) => b.confidence - a.confidence)
+    .slice(0, topK);
+
+  fallback.forEach(frag => { frag.lastAccessed = nowDate; });
+  return fallback;
+}
+
+export function formatMemoryForLLM(fragments: MemoryFragment[], currentProject: string | null = null): string {
+  const projectHeader = currentProject ? ` (${currentProject})` : "";
+
+  if (fragments.length === 0) {
+    return `## Memory Fragments${projectHeader}\n---\n(no fragments)\n---`;
+  }
+
+  const lines = fragments.map(frag => {
+    const scopeTag = frag.project || "global";
+    const summary = frag.description || frag.title;
+    return `[${frag.id}] [${scopeTag}] ${frag.title} — ${summary}`;
+  });
+
+  return `## Memory Fragments${projectHeader}\n---\n${lines.join("\n")}\n---`;
+}
+
+export function formatMemoryDetail(fragment: MemoryFragment | null): string {
+  if (!fragment) {
+    return "Fragment not found.";
+  }
+
+  const barCount = Math.round(fragment.confidence / 0.2);
+  const confidenceBar = "█".repeat(barCount) + "░".repeat(5 - barCount);
+  const sourceIcon = fragment.source === "ai" ? "🤖" : "👤";
+  const scopeTag = fragment.project ? `[${fragment.project}]` : "[global]";
+
+  let detail = `=== MEMORY FRAGMENT DETAIL ===\n`;
+  detail += `ID: [${fragment.id}] ${confidenceBar} (${sourceIcon}) ${scopeTag}\n`;
+  detail += `Title: ${fragment.title}\n`;
+  if (fragment.description && fragment.description !== fragment.title) {
+    detail += `Summary: ${fragment.description}\n`;
+  }
+  detail += `Created: ${fragment.created} | Confidence: ${fragment.confidence.toFixed(2)}\n`;
+  if (fragment.tags && fragment.tags.length > 0) {
+    detail += `Tags: ${fragment.tags.join(", ")}\n`;
+  }
+  if (fragment.associatedWith && fragment.associatedWith.length > 0) {
+    detail += `Related: ${fragment.associatedWith.join(", ")}\n`;
+  }
+  if (fragment.positive_feedback > 0 || fragment.negative_feedback > 0) {
+    detail += `Feedback: ${fragment.positive_feedback || 0} positive, ${fragment.negative_feedback || 0} negative\n`;
+  }
+  if (fragment.refinement_count > 0) {
+    detail += `Refinements: ${fragment.refinement_count}\n`;
+  }
+  if (fragment.parent_id) {
+    detail += `Refined from: [${fragment.parent_id}]\n`;
+  }
+  if (fragment.child_ids && fragment.child_ids.length > 0) {
+    detail += `Refined into: ${fragment.child_ids.map(id => `[${id}]`).join(", ")}\n`;
+  }
+  detail += `--- CONTENT ---\n${fragment.fragment}\n==============`;
+
+  return detail;
+}
+
+export function calculateStats(fragments: MemoryFragment[], project: string | null = null): MemoryStats {
+  const filtered = project
+    ? filterByProject(fragments, project)
+    : fragments;
+
+  if (filtered.length === 0) {
+    return {
+      total: 0,
+      avg_confidence: 0,
+      by_source: {},
+      by_project: {},
+      low_confidence: 0,
+      high_confidence: 0,
+    };
+  }
+
+  const avgConf = filtered.reduce((sum, f) => sum + f.confidence, 0) / filtered.length;
+  const bySource: Record<string, number> = {};
+  const byProject: Record<string, number> = {};
+
+  for (const f of filtered) {
+    bySource[f.source] = (bySource[f.source] || 0) + 1;
+    const scope = f.project || "global";
+    byProject[scope] = (byProject[scope] || 0) + 1;
+  }
+
+  return {
+    total: filtered.length,
+    avg_confidence: Math.round(avgConf * 100) / 100,
+    by_source: bySource,
+    by_project: byProject,
+    low_confidence: filtered.filter(f => f.confidence < 0.3).length,
+    high_confidence: filtered.filter(f => f.confidence > 0.8).length,
+  };
+}
+
+export function formatStats(stats: MemoryStats): string {
+  let output = `## Memory Stats\n`;
+  output += `Total: ${stats.total} fragments | Avg confidence: ${stats.avg_confidence}\n`;
+  if (stats.total > 0) {
+    output += `High confidence (>0.8): ${stats.high_confidence} | Low (<0.3): ${stats.low_confidence}\n`;
+    const sources = Object.entries(stats.by_source).map(([k, v]) => `${k}: ${v}`).join(", ");
+    output += `Sources: ${sources}\n`;
+    const projects = Object.entries(stats.by_project).map(([k, v]) => `${k}: ${v}`).join(", ");
+    output += `Projects: ${projects}\n`;
+  }
+  return output;
+}
+
+export function auditMemory(fragments: MemoryFragment[]): AuditResult {
+  const issues: string[] = [];
+  const ids = new Set<string>();
+  const duplicates: string[] = [];
+
+  for (const f of fragments) {
+    if (ids.has(f.id)) {
+      duplicates.push(f.id);
+    }
+    ids.add(f.id);
+
+    if (typeof f.confidence !== "number" || f.confidence < 0 || f.confidence > 1) {
+      issues.push(`Fragment [${f.id}] has invalid confidence: ${f.confidence}`);
+    }
+
+    if (!f.fragment || typeof f.fragment !== "string") {
+      issues.push(`Fragment [${f.id}] has missing or invalid fragment text`);
+    }
+
+    if (f.associatedWith) {
+      for (const assocId of f.associatedWith) {
+        if (!ids.has(assocId) && !fragments.find(x => x.id === assocId)) {
+          issues.push(`Fragment [${f.id}] references non-existent associated fragment [${assocId}]`);
+        }
+      }
+    }
+  }
+
+  if (duplicates.length > 0) {
+    issues.push(`Duplicate IDs found: ${duplicates.join(", ")}`);
+  }
+
+  return {
+    total_fragments: fragments.length,
+    issues_found: issues.length,
+    issues,
+    healthy: issues.length === 0,
+  };
+}
+
+export function formatAuditReport(result: AuditResult): string {
+  let output = `## Memory Audit\n`;
+  output += `Total fragments: ${result.total_fragments} | Issues: ${result.issues_found}\n`;
+  if (result.issues.length > 0) {
+    for (const issue of result.issues) {
+      output += `  ! ${issue}\n`;
+    }
+  } else {
+    output += `All clear — no issues found.\n`;
+  }
+  return output;
+}

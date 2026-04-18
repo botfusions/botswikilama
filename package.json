@@ -1,26 +1,34 @@
 {
   "name": "lemma-mcp",
-  "version": "0.6.1",
+  "version": "0.7.0",
   "description": "Persistent memory layer for LLMs via MCP",
   "type": "module",
-  "main": "src/index.js",
+  "main": "dist/index.js",
   "bin": {
-    "lemma": "./src/index.js"
+    "lemma": "./dist/index.js"
   },
   "exports": {
-    ".": "./src/index.js",
-    "./memory": "./src/memory/index.js",
-    "./guides": "./src/guides/index.js",
-    "./server": "./src/server/index.js"
+    ".": "./dist/index.js",
+    "./memory": "./dist/memory/index.js",
+    "./guides": "./dist/guides/index.js",
+    "./server": "./dist/server/index.js"
   },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
   "scripts": {
-    "start": "node src/index.js",
-    "test": "node --test tests/memory/*.test.js tests/guides/*.test.js tests/sessions/*.test.js tests/server/*.test.js",
-    "test:memory": "node --test tests/memory/*.test.js",
-    "test:guides": "node --test tests/guides/*.test.js",
-    "test:sessions": "node --test tests/sessions/*.test.js",
-    "test:server": "node --test tests/server/*.test.js",
-    "test:original": "echo 'test.js removed — use npm test'"
+    "build": "tsc",
+    "prepare": "npm run build",
+    "typecheck": "tsc --noEmit --project tsconfig.test.json",
+    "start": "node dist/index.js",
+    "prepublishOnly": "npm run build",
+    "test": "tsx --test tests/memory/*.test.ts tests/guides/*.test.ts tests/sessions/*.test.ts tests/server/*.test.ts",
+    "test:memory": "tsx --test tests/memory/*.test.ts",
+    "test:guides": "tsx --test tests/guides/*.test.ts",
+    "test:sessions": "tsx --test tests/sessions/*.test.ts",
+    "test:server": "tsx --test tests/server/*.test.ts"
   },
   "keywords": [
     "mcp",
@@ -43,5 +51,12 @@
   "repository": {
     "type": "git",
     "url": "https://github.com/xenitV1/lemma.git"
+  },
+  "devDependencies": {
+    "@types/node": "^25.6.0",
+    "tsup": "^8.5.1",
+    "tsx": "^4.21.0",
+    "typescript": "^6.0.3",
+    "vitest": "^4.1.4"
   }
 }

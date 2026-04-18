@@ -1,5 +1,49 @@
 # Changelog
 
+## [0.7.0] - 2026-04-19
+
+### Breaking Changes
+- **TypeScript Migration** — Entire codebase migrated from JavaScript to TypeScript (strict mode)
+  - All source files: `.js` → `.ts`
+  - Shared type definitions in `src/types.ts` (15+ interfaces)
+  - Full type annotations on all function parameters and return types
+  - `noUncheckedIndexedAccess` and `noImplicitOverride` enabled
+
+### Added
+- **npm Package** — Published to [npmjs.com/package/lemma-mcp](https://www.npmjs.com/package/lemma-mcp)
+  - Install: `npx lemma-mcp` or `npm install lemma-mcp`
+  - SDK exports: `import { ... } from "lemma-mcp/memory"`
+- **TypeScript Infrastructure**
+  - `tsconfig.json` — strict mode, Node16 module resolution, ES2022 target
+  - `tsconfig.test.json` — type checking for test files
+  - Build: `tsc` compiles to `dist/` with declarations and source maps
+  - Test runner: `tsx` (replaces `node --test` for .ts files)
+- **Shared Types** (`src/types.ts`)
+  - `MemoryFragment`, `Guide`, `Session`, `VirtualSession`
+  - `MemoryStats`, `AuditResult`, `GuideSuggestion`, `SuggestResult`
+  - `LemmaConfig`, `HookContext`, `PromptContext`
+  - `TaskType`, `TaskOutcome` union types
+- **`files` field** in package.json — Only `dist/`, `README.md`, `LICENSE` included in npm package
+- **`prepare` script** — Auto-builds on `npm install` (for GitHub installs)
+
+### Changed
+- **Import paths** — Hook/PromptModifier examples now use `lemma-mcp/server` instead of `@lemma/lemma/server`
+- **Quick Start** — Changed from `npx github:xenitV1/lemma` to `npx lemma-mcp` (npm package)
+- **Manual Installation** — Entry point changed from `src/index.js` to `dist/index.js`
+- **Test runner** — From `node --test *.test.js` to `tsx --test *.test.ts`
+- **Project structure** — All `.js` → `.ts` in README
+
+### Removed
+- **`tsup`** as primary build tool — Replaced with `tsc` for proper module structure
+- **`vitest`** dependency — Not used, tests use `node:test` via `tsx`
+
+### Tests
+- 360 tests passing (all converted to TypeScript)
+- 25 test files, 0 failures
+- `npm run typecheck` — Zero errors across src + tests
+
+---
+
 ## [0.6.1] - 2026-04-19
 
 ### Added
@@ -323,6 +367,7 @@
 
 ---
 
+[0.7.0]: https://github.com/xenitV1/lemma/compare/v0.6.1...v0.7.0
 [0.6.1]: https://github.com/xenitV1/lemma/compare/v0.6.0...v0.6.1
 [0.6.0]: https://github.com/xenitV1/lemma/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/xenitV1/lemma/compare/v0.4.1...v0.5.0

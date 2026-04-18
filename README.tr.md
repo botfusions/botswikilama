@@ -6,7 +6,7 @@
 
 [English](README.md) | [Türkçe](README.tr.md)
 
-Lemma, Büyük Dil Modelleri (LLM) için kalıcı bir bellek katmanı sağlayan bir Model Bağlam Protokolü (MCP) sunucusudur. LLM'lerin oturumlar arasında gerçekleri, tercihleri ve bağlamı hatırlamasını sağlar; otomatik bellek çürümesi ve öğrenme ile şık bir arayüz sunar.
+Lemma, Büyük Dil Modelleri (LLM) için kalıcı bir bellek katmanı sağlayan bir Model Bağlam Protokolü (MCP) sunucusudur. LLM'lerin oturumlar arasında gerçekleri, tercihleri ve bağlamı hatırlamasını sağlar; otomatik çürüme, öğrenme ve evrensel enjeksiyon ile biyolojik bir bellek modeli sunar.
 
 ## Lemma Nedir?
 
@@ -17,18 +17,33 @@ Lemma aynı prensiple çalışır:
 - **Ham konuşmalar asla saklanmaz** — sadece sentezlenmiş fragmanlar
 - **Fragmanlar zamanla çürür** — sık erişilenler güçlenir
 - **Kullanılan bilgi bağlam kazanır** — etiketler ve ilişkiler otomatik oluşturulur
-- **LLM her oturumda fragmanları okur** ve kim olduğunu hatırlar
+- **Bellekler otomatik enjekte edilir** — LLM araç çağırmadan onları görür
 
 ## Nasıl Çalışır?
 
-### Dinamik Sistem İstemi
+### Evrensel Bellek Enjeksiyonu (Universal Memory Injection)
 
-Lemma, ilgili bağlamı LLM'nin sistem istemine çalışma zamanında otomatik enjekte eder:
+Lemma, bellekleri `tools/list` üzerinden doğrudan araç açıklamalarına enjekte eder. Bu **her MCP istemcisinde** çalışır — Claude Desktop, Cursor, VS Code, opencode, Gemini CLI ve diğerleri.
 
-- **Küresel Bağlam**: Projeler arası öğrenimler ve tercihler (maksimum 10 fragman)
-- **Proje Bağlamı**: Projeye özel fragmanlar, güven görselleştirmesi ile (maksimum 20 fragman)
-- **Görsel Formatlama**: Güven çubukları (`███░░`) ve kaynak ikonları (🤖/👤)
-- **İstem Değiştiricileri**: Özel istem dönüşümleri için genişletilebilir sistem
+```
+tools/list → memory_read description includes:
+  "YOUR MEMORIES (you already know these):
+   [m8f728] React Architecture (95%)
+   Full content here...
+   [m1bbea] Clean Code Research (77%)
+   Full content here..."
+```
+
+LLM her oturuma en önemli belleklerini zaten bilerek başlar. Açık bir araç çağrısına gerek yoktur.
+
+**Çift katmanlı enjeksiyon:**
+1. **Açıklamalar (Tool descriptions)** — evrensel, her yerde çalışır
+2. **`instructions` alanı** — MCP başlatma talimatlarını destekleyen istemciler için
+
+**3 katmanlı mimari:**
+- Katman 1: En önemli bellekler için tam içerik (~3000 token, yapılandırılabilir)
+- Katman 2: Kalan bellekler için özet indeksi
+- Katman 3: Açıklamaları ve öğrenimleriyle aktif rehberler
 
 ### Bellek Yapısı
 
@@ -36,7 +51,7 @@ Her bellek fragmanı şu alanlara sahiptir:
 
 | Alan | Tip | Açıklama |
 |-------|------|-------------|
-| `id` | string | Benzersiz kimlik (format: `m` + 6 hex karakter) |
+| `id` | string | Benzersiz kimlik (`m` + crypto.randomUUID'den 12 hex karakter) |
 | `title` | string | Hızlı tarama için kısa başlık |
 | `fragment` | string | Sentezlenmiş bellek metni |
 | `project` | string | Proje kapsamı (küresel için `null`) |
@@ -56,7 +71,7 @@ Statik belleğin aksine, Lemma bilginin kullanım yoluyla evrildiği biyolojik b
 **Güçlendirme (erişimde):**
 ```
 confidence = min(1.0, confidence + 0.1)
-tags += context_tag  (örn. "debugging")
+tags += context_tag  (e.g., "debugging")
 associatedWith += co_accessed_fragment_ids
 ```
 
@@ -70,35 +85,73 @@ confidence = confidence - decay
 - **Kullanılmayan öğeler** temel oran olan oturum başına 0.05 çürür
 - **İlişkiler**: Birlikte kullanılan fragmanlar gelecekteki hatırlama için çapraz referanslar oluşturur
 
-### Bellek Dosyası Konumu
+### Tekilleştirme (Deduplication)
 
-Bellekler JSONL formatında şu konumda saklanır:
+Lemma, tekilleştirme için **Fuse.js bulanık eşleştirme** (Jaccard değil) kullanır:
+- "Use React hooks" vs "Don't use React hooks" — doğru şekilde farklı algılanır
+- "react", "reactjs", "React.js" — doğru şekilde aynı algılanır (rehberler için)
+- Hem kullanıcı hem de AI kaynaklı belleklere uygulanır
 
-| İşletim Sistemi | Yol |
-|---|---|
-| **Windows** | `C:\Users\{kullanıcı}\.lemma\memory.jsonl` |
-| **macOS** | `/Users/{kullanıcı}/.lemma/memory.jsonl` |
-| **Linux** | `/home/{kullanıcı}/.lemma/memory.jsonl` |
+### Sanal Oturumlar (Virtual Sessions)
 
-## Hızlı Başlangıç
+Araç çağrıları otomatik olarak sanal oturumlara dönüştürülür:
+- İlk araç çağrısında otomatik başlar
+- 30 dakikalık işlem yapılmadığında otomatik sonlanır
+- Karşılaşılan teknolojileri, kullanılan rehberleri, oluşturulan bellekleri izler
+- Açık `session_start`/`session_end` gerekmez
+- Oturumlar `~/.lemma/sessions/` dizininde saklanır
 
-Lemma'yı kullanmanın önerilen yolu **JSR** üzerindendir. MCP istemci konfigürasyonunuza ekleyin:
+### Veri Güvenliği
 
-**Claude Desktop (Windows):** `%APPDATA%\Claude\claude_desktop_config.json`
-**Claude Desktop (macOS):** `~/Library/Application Support/Claude/claude_desktop_config.json`
+- **Kümülatif yedekleme**: `.bak` dosyaları ID tabanlı birleştirmedir — mevcut girdilerin üzerine asla yazmaz
+- **Dosya kilitleme**: Modül düzeyinde yazma kilidi eşzamanlı veri bozulmasını önler
+- **Güvenli I/O**: Boş/null diziler yazılmadan önce reddedilir
+- **Örtük silme yok**: Çürüme sadece güveni azaltır, fragmanları asla kaldırmaz
+
+### Yapılandırma
+
+`~/.lemma/config.json` konumunda isteğe bağlı yapılandırma dosyası:
 
 ```json
 {
-  "mcpServers": {
-    "lemma": {
-      "command": "npx",
-      "args": ["-y", "jsr", "@lemma/lemma"]
-    }
+  "token_budget": {
+    "full_content": 3000,
+    "summary_index": 1000,
+    "guides_detail": 1000
+  },
+  "injection": {
+    "max_full_content_fragments": 15,
+    "max_summary_fragments": 30,
+    "max_guides": 20,
+    "max_guide_detail": 3
+  },
+  "virtual_session": {
+    "timeout_minutes": 30
   }
 }
 ```
 
-### Alternatif: Doğrudan GitHub'dan çalıştır
+### Dosya Konumları
+
+| İşletim Sistemi | Yol |
+|---|---|
+| **Windows** | `C:\Users\{username}\.lemma\` |
+| **macOS** | `/Users/{username}/.lemma/` |
+| **Linux** | `/home/{username}/.lemma/` |
+
+Dosyalar:
+- `memory.jsonl` — bellek fragmanları
+- `guides.jsonl` — deneyim rehberleri
+- `config.json` — kullanıcı yapılandırması (isteğe bağlı)
+- `sessions/` — sanal oturum kayıtları
+- `.bak` dosyaları — kümülatif yedekler
+
+## Hızlı Başlangıç
+
+Lemma'yı MCP istemci yapılandırmanıza ekleyin:
+
+**Claude Desktop (Windows):** `%APPDATA%\Claude\claude_desktop_config.json`
+**Claude Desktop (macOS):** `~/Library/Application Support/Claude/claude_desktop_config.json`
 
 ```json
 {
@@ -122,14 +175,12 @@ Lemma, sunucu davranışını genişletmek için eklenti tabanlı bir hook siste
 ```javascript
 import { registerHook, HookTypes } from "@lemma/lemma/server";
 
-// Sunucu başlangıcında callback kaydet
 registerHook(HookTypes.ON_START, async (context) => {
-  console.log("Sunucu başladı!", context);
+  console.log("Server started!", context);
 });
 
-// Proje bağlamı değişikliğinde callback kaydet
 registerHook(HookTypes.ON_PROJECT_CHANGE, async (context) => {
-  console.log(`Proje değişti: ${context.project}`);
+  console.log(`Project changed to: ${context.project}`);
 });
 ```
 
@@ -138,12 +189,11 @@ registerHook(HookTypes.ON_PROJECT_CHANGE, async (context) => {
 Sistem istemi oluşturmayı özel dönüşümlerle genişletin:
 
 ```javascript
-import { registerPromptModifier } from "@lemma/lemma/server";
+import { registerPromptModifier } from "lemma-mcp/server";
 
 registerPromptModifier(async (prompt, context) => {
-  // İsteme özel bağlam ekle
-  if (context.project === "uygulamam") {
-    return prompt + "\n\n<custom>Not: Deneysel özellikler kullanılıyor.</custom>";
+  if (context.project === "my-app") {
+    return prompt + "\n\n<custom>Note: Using experimental features.</custom>";
   }
   return prompt;
 });
@@ -151,7 +201,7 @@ registerPromptModifier(async (prompt, context) => {
 
 ---
 
-## Manuel Kurulum (Geliştiriciler İçin)
+## Manuel Kurulum
 
 ```bash
 git clone https://github.com/xenitV1/lemma
@@ -161,14 +211,14 @@ npm install
 
 **Gereksinimler:** Node.js 18.0.0 veya üzeri
 
-### Yerel Konfigürasyon
+### Yerel Yapılandırma
 
 ```json
 {
   "mcpServers": {
     "lemma": {
       "command": "node",
-      "args": ["C:\\yol\\to\\Lemma\\src\\index.js"]
+      "args": ["C:\\path\\to\\Lemma\\src\\index.js"]
     }
   }
 }
@@ -176,9 +226,9 @@ npm install
 
 ---
 
-## Mevcut Araçlar
+## Mevcut Araçlar (20)
 
-### Bellek Araçları
+### Bellek Araçları (10)
 
 #### `memory_read`
 
@@ -188,17 +238,9 @@ Bellek fragmanlarını okur. ÖZET MODU sadece başlık + açıklama gösterir; 
 - `project` (string, opsiyonel): Filtrelenecek proje adı
 - `query` (string, opsiyonel): Semantik arama anahtar kelimesi
 - `id` (string, opsiyonel): Belirli bir fragmanın tam detayını al
-- `context` (string, opsiyonel): Bu erişimi bir bağlamla etiketle (örn. "debugging") — güveni artırır
+- `ids` (string[], opsiyonel): Birden fazla fragmanın tam detaylarını al
+- `context` (string, opsiyonel): Bu erişimi bir bağlamla etiketle (örn. "debugging")
 - `all` (boolean, opsiyonel): Tüm projelerden fragmanları göster (varsayılan: false)
-
-**Dönüş:** Güven çubuklarıyla formatlanmış string:
-
-```
-=== LEMMA BELLEK FRAGMANLARI (project: myapp) ===
-[m1a2b3] ████░ (🤖) [myapp] React Hooks
-    useState ve useEffect pattern'leri
-==============================
-```
 
 #### `memory_add`
 
@@ -223,7 +265,7 @@ Mevcut bir fragmanı ID ile güncelle.
 
 #### `memory_feedback`
 
-Kullanımdan sonra bir bellek fragmanı hakkında geri bildirim ver. Pozitif geri bildirim güveni artırır; negatif geri bildirim doğrudan düşürür (-0.1).
+Kullanımdan sonra bir bellek fragmanı hakkında geri bildirim ver. Pozitif geri bildirim güveni artırır; negatif -0.1 düşürür.
 
 **Parametreler:**
 - `id` (string, zorunlu): Fragman ID'si
@@ -246,7 +288,18 @@ Birden fazla fragmanı birleştir. Yeni ID oluşturur, orijinalleri siler.
 - `fragment` (string, zorunlu): Birleştirilmiş içerik
 - `project` (string, opsiyonel): Proje kapsamı
 
-### Rehber Araçları
+#### `memory_stats`
+
+Bellek deposu istatistiklerini getir: fragman sayıları, ortalama güven, proje dağılımı.
+
+**Parametreler:**
+- `project` (string, opsiyonel): Projeye göre filtrele
+
+#### `memory_audit`
+
+Bellek deposunda bütünlük sorunlarını denetle: yetim referanslar, yinelenen ID'ler, güven anomalileri.
+
+### Rehber Araçları (8)
 
 #### `guide_get`
 
@@ -267,6 +320,7 @@ Kullanım istatistikleriyle takip edilen rehberleri getir. Kullanım sayısına 
 - `description` (string, opsiyonel): Detaylı kılavuz/protokoller
 - `contexts` (string[], zorunlu): Kullanıldığı bağlamlar
 - `learnings` (string[], zorunlu): Keşfedilen yeni öğrenimler
+- `outcome` (string, opsiyonel): "success" veya "failure" — başarı oranını izler
 
 #### `guide_create`
 
@@ -297,6 +351,10 @@ Mevcut bir rehberin özelliklerini güncelle.
 - `new_name` (string, opsiyonel): Yeni ad
 - `category` (string, opsiyonel): Yeni kategori
 - `description` (string, opsiyonel): Yeni açıklama/kılavuz
+- `add_anti_patterns` (string[], opsiyonel): Anti-pattern'ler ekle
+- `add_pitfalls` (string[], opsiyonel): Bilinen tuzaklar ekle
+- `superseded_by` (string, opsiyonel): Başka bir rehberle değiştirildi olarak işaretle
+- `deprecated` (boolean, opsiyonel): Kullanımdan kaldırıldı olarak işaretle
 
 #### `guide_forget`
 
@@ -316,6 +374,33 @@ Birden fazla rehberi birleştir. Kullanım sayıları toplanır.
 - `description` (string, opsiyonel): Birleştirilmiş açıklama
 - `contexts` (string[], opsiyonel): Birleştirilmiş bağlamlar
 - `learnings` (string[], opsiyonel): Birleştirilmiş öğrenimler
+
+### Oturum Araçları (2)
+
+#### `session_start`
+
+İzlenen bir çalışma oturumu başlat. Görev metaverisini kaydeder ve ilgili rehberleri getirir.
+
+**Parametreler:**
+- `task_type` (string, zorunlu): "debugging", "implementation", "refactoring", "testing", "research", "documentation", "optimization" veya "other"
+- `technologies` (string[], opsiyonel): İlgili teknolojiler
+- `initial_approach` (string, opsiyonel): İlk plan
+
+#### `session_end`
+
+Mevcut oturumu sonlandır. Sonucu kaydeder ve rehber başarı takibini günceller.
+
+**Parametreler:**
+- `outcome` (string, zorunlu): "success", "partial", "failure" veya "abandoned"
+- `final_approach` (string, opsiyonel): Hangi yaklaşım işe yaradı
+- `lessons` (string[], opsiyonel): Öğrenilenler
+
+#### `session_stats`
+
+Sanal oturum istatistiklerini getir: son araç kullanım örüntüleri ve teknolojiler.
+
+**Parametreler:**
+- `count` (number, opsiyonel): Son oturum sayısı (varsayılan 10)
 
 ## Felsefe
 
@@ -346,38 +431,53 @@ Birden fazla rehberi birleştir. Kullanım sayıları toplanır.
 npm test
 ```
 
-Kapsamlı test paketi: bellek çekirdeği, rehber çekirdeği, işleyiciler, öğrenme yaşam döngüsü, hook sistemi ve dinamik istem oluşturma. Tüm I/O geçici dizinlere izole edilir — gerçek verilere dokunulmaz.
+360 test: bellek çekirdeği, rehber çekirdeği, işleyiciler, öğrenme yaşam döngüsü, hook sistemi, dinamik istem oluşturma ve sanal oturumları kapsar. Tüm I/O geçici dizinlere izole edilir.
+
+```bash
+npm run typecheck   # TypeScript tip kontrolü
+npm run build       # TypeScript'i dist/ dizinine derle
+```
 
 ### Proje Yapısı
 
 ```
 Lemma/
 ├── src/
-│   ├── index.js          # MCP sunucu giriş noktası
+│   ├── index.ts              # MCP sunucu giriş noktası
+│   ├── types.ts              # Paylaşılan TypeScript arayüzleri
 │   ├── memory/
-│   │   ├── index.js      # Bellek modülü yeniden dışa aktarmalar
-│   │   └── core.js       # Temel bellek mantığı
+│   │   ├── index.ts          # Bellek modülü yeniden dışa aktarmalar
+│   │   ├── core.ts           # Temel bellek mantığı, çürüme, arama, tekilleştirme
+│   │   └── config.ts         # Kullanıcı yapılandırma yükleyici
 │   ├── guides/
-│   │   ├── index.js      # Rehber modülü yeniden dışa aktarmalar
-│   │   ├── core.js       # Temel rehber mantığı
-│   │   └── task-map.js   # Görev-rehber eşlemesi
-│   └── server/
-│       ├── index.js      # Sunucu kurulumu
-│       ├── handlers.js   # Araç işleyicileri
-│       ├── tools.js      # Araç tanımları
-│       ├── hooks.js      # Hook sistemi ve istem değiştiriciler
-│       └── system-prompt.js
+│   │   ├── index.ts          # Rehber modülü yeniden dışa aktarmalar
+│   │   ├── core.ts           # Temel rehber mantığı, bulanık tekilleştirme
+│   │   └── task-map.ts       # Görev-rehber eşlemesi
+│   ├── server/
+│   │   ├── index.ts          # Sunucu kurulumu, enjeksiyon, bildirimler
+│   │   ├── handlers.ts       # Araç işleyicileri (20 araç)
+│   │   ├── tools.ts          # Araç tanımları
+│   │   ├── hooks.ts          # Hook sistemi ve istem değiştiriciler
+│   │   └── system-prompt.ts  # Dinamik sistem istemi
+│   └── sessions/
+│       ├── index.ts          # Oturum modülü yeniden dışa aktarmalar
+│       ├── core.ts           # Oturum yaşam döngüsü
+│       └── virtual.ts        # Sanal oturum izleme
 ├── tests/
-│   └── test.js           # Test paketi
+│   ├── memory/               # 7 test dosyası
+│   ├── guides/               # 6 test dosyası
+│   ├── sessions/             # 2 test dosyası
+│   └── server/               # 10 test dosyası
+├── docs/                     # Araştırma makaleleri ve referanslar
 ├── package.json
-├── jsr.json
+├── tsconfig.json
 ├── CHANGELOG.md
 └── README.md
 ```
 
 ## Güvenlik
 
-`memory.jsonl` ve `guides.jsonl` yerel dosyalardır ve asla hiçbir yere gönderilmez. Kullanıcılar içeriklerini inceleyebilir veya MCP araçları üzerinden istedikleri zaman temizleyebilirler.
+Tüm veriler yerel olarak `~/.lemma/` dizininde saklanır. Hiçbir şey harici sunuculara gönderilmez. Kullanıcılar istedikleri zaman MCP araçları üzerinden veya doğrudan verileri inceleyebilir, düzenleyebilir veya temizleyebilir.
 
 ## Lisans
 

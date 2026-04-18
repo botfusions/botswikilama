@@ -189,7 +189,7 @@ registerHook(HookTypes.ON_PROJECT_CHANGE, async (context) => {
 Extend the system prompt generation with custom transformations:
 
 ```javascript
-import { registerPromptModifier } from "@lemma/lemma/server";
+import { registerPromptModifier } from "lemma-mcp/server";
 
 registerPromptModifier(async (prompt, context) => {
   if (context.project === "my-app") {
@@ -431,36 +431,46 @@ Get virtual session statistics: recent tool usage patterns and technologies.
 npm test
 ```
 
-110 tests covering memory core, guides core, handlers, learning lifecycle, hook system, dynamic prompt generation, and virtual sessions. All I/O is isolated to temp directories.
+360 tests covering memory core, guides core, handlers, learning lifecycle, hook system, dynamic prompt generation, and virtual sessions. All I/O is isolated to temp directories.
+
+```bash
+npm run typecheck   # TypeScript type checking
+npm run build       # Compile TypeScript to dist/
+```
 
 ### Project Structure
 
 ```
 Lemma/
 ├── src/
-│   ├── index.js              # MCP server entry point
+│   ├── index.ts              # MCP server entry point
+│   ├── types.ts              # Shared TypeScript interfaces
 │   ├── memory/
-│   │   ├── index.js          # Memory module re-exports
-│   │   ├── core.js           # Core memory logic, decay, search, dedup
-│   │   └── config.js         # User configuration loader
+│   │   ├── index.ts          # Memory module re-exports
+│   │   ├── core.ts           # Core memory logic, decay, search, dedup
+│   │   └── config.ts         # User configuration loader
 │   ├── guides/
-│   │   ├── index.js          # Guides module re-exports
-│   │   ├── core.js           # Core guides logic, fuzzy dedup
-│   │   └── task-map.js       # Task-to-guide mapping
+│   │   ├── index.ts          # Guides module re-exports
+│   │   ├── core.ts           # Core guides logic, fuzzy dedup
+│   │   └── task-map.ts       # Task-to-guide mapping
 │   ├── server/
-│   │   ├── index.js          # Server setup, injection, notifications
-│   │   ├── handlers.js       # Tool handlers (20 tools)
-│   │   ├── tools.js          # Tool definitions
-│   │   ├── hooks.js          # Hook system & prompt modifiers
-│   │   └── system-prompt.js  # Dynamic system prompt
+│   │   ├── index.ts          # Server setup, injection, notifications
+│   │   ├── handlers.ts       # Tool handlers (20 tools)
+│   │   ├── tools.ts          # Tool definitions
+│   │   ├── hooks.ts          # Hook system & prompt modifiers
+│   │   └── system-prompt.ts  # Dynamic system prompt
 │   └── sessions/
-│       ├── index.js          # Sessions module re-exports
-│       ├── core.js           # Session lifecycle
-│       └── virtual.js        # Virtual session tracking
+│       ├── index.ts          # Sessions module re-exports
+│       ├── core.ts           # Session lifecycle
+│       └── virtual.ts        # Virtual session tracking
 ├── tests/
-│   └── test.js               # Test suite (110 tests)
+│   ├── memory/               # 7 test files
+│   ├── guides/               # 6 test files
+│   ├── sessions/             # 2 test files
+│   └── server/               # 10 test files
 ├── docs/                     # Research papers and references
 ├── package.json
+├── tsconfig.json
 ├── CHANGELOG.md
 └── README.md
 ```
