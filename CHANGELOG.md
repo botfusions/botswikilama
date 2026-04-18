@@ -2,6 +2,24 @@
 
 ## [0.6.0] - 2026-04-18
 
+### Karpathy LLM Wiki Parity
+After analyzing [Karpathy's LLM Wiki concept](https://gist.github.com/karpathy/442a6bf555914893e9891c11519de94f), Lemma now covers the core vision with key differences:
+
+| Karpathy's Concept | Lemma Implementation |
+|---|---|
+| **Persistent wiki** — knowledge compiled once, not re-derived per query | ✅ Memory fragments persist across sessions in JSONL |
+| **Incremental synthesis** — new sources integrated into existing knowledge | ✅ `memory_add` + `memory_merge` for consolidation |
+| **Cross-references** — interlinked pages, not isolated chunks | ✅ `associatedWith` bidirectional links + fuzzy dedup |
+| **Schema** — document telling LLM how to use the system | ✅ `<critical_rules>` in system prompt + tool descriptions |
+| **Ingest** — read source, extract key info, update knowledge | ✅ `memory_add` with auto-title, description, project scope |
+| **Query** — search wiki, synthesize answer with citations | ✅ `memory_read` with Fuse.js fuzzy search + confidence ranking |
+| **Lint** — health-check for contradictions, orphans, gaps | ✅ `memory_audit` — orphan refs, duplicate IDs, confidence anomalies |
+| **Auto-maintenance** — LLM does bookkeeping, human doesn't | ✅ Auto decay, auto boost, auto dedup, virtual sessions |
+| **Compounding knowledge** — wiki gets richer with every interaction | ✅ Feedback loop: `memory_feedback` → confidence adjust → better ranking |
+| **Universal access** — works across all LLM clients | ✅ Tool description injection (guaranteed on all MCP clients) |
+
+**Where Lemma goes beyond:** Confidence decay/boost (biological memory model), guide system (procedural knowledge tracking), virtual sessions (automatic activity correlation), configurable token budgets.
+
 ### Added
 - **Universal Memory Injection** — Memories are now injected into tool descriptions via `tools/list`, guaranteeing ALL MCP clients (opencode, Claude Desktop, Cursor, VS Code, Gemini CLI) see full memory content without requiring explicit tool calls.
   - Top N memories injected as full content into `memory_read` tool description (~4000 tokens budget)
