@@ -142,6 +142,10 @@ describe("Virtual Sessions", () => {
     });
 
     test("respects count limit", () => {
+      const limitDir = path.join(TMPDIR, "limit-test");
+      fs.mkdirSync(limitDir, { recursive: true });
+      setSessionLogDir(limitDir);
+
       for (let i = 0; i < 5; i++) {
         recordToolCall("memory_read", { query: `q${i}` }, null);
         finalizeVirtualSession();
