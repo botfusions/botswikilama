@@ -4,6 +4,7 @@
 import os from "os";
 import path from "path";
 import fs from "fs";
+import crypto from "crypto";
 import Fuse from "fuse.js";
 
 let MEMORY_DIR = path.join(os.homedir(), ".lemma");
@@ -23,8 +24,7 @@ export function setMemoryDir(dir) {
  * @returns {string} ID in format "m" + 6 hex characters
  */
 export function generateId() {
-  const hexChars = Math.random().toString(16).substring(2, 8);
-  return `m${hexChars}`;
+  return "m" + crypto.randomUUID().replace(/-/g, "").substring(0, 12);
 }
 
 /**
@@ -119,49 +119,27 @@ export function createFragment(fragment, source, title = null, project = null, d
  * @param {string} text2
  * @returns {number} Score between 0.0 and 1.0
  */
-function calculateSimilarity(text1, text2) {
-  if (!text1 || !text2) return 0.0;
-
-  // Basic tokenization
-  const getTokens = (str) => new Set(str.toLowerCase()
-    .replace(/[^\w\s]/g, "")
-    .split(/\s+/)
-    .filter(Boolean));
-
-  const set1 = getTokens(text1);
-  const set2 = getTokens(text2);
-
-  if (set1.size === 0 && set2.size === 0) return 1.0;
-  if (set1.size === 0 || set2.size === 0) return 0.0;
-
-  const intersection = new Set([...set1].filter(x => set2.has(x)));
-  const union = new Set([...set1, ...set2]);
-
-  return intersection.size / union.size;
-}
-
-/**
- * Look for similar existing fragments preventing duplication
- * @param {Array<object>} fragments - Memory fragments to check against
- * @param {string} fragmentText - The text trying to be added
- * @param {string|null} project - Project scope (null = global, string = project-specific)
- * @param {number} threshold - Minimum similarity score (0-1) to trigger a match
- * @returns {object|null} The most similar fragment if similarity >= threshold, otherwise null
- */
-export function findSimilarFragment(fragments, fragmentText, project, threshold = 0.55) {
+export function findSimilarFragment(fragments, fragmentText, project, threshold = 0.65) {
   const scopedFragments = filterByProject(fragments, project);
-  let bestMatch = null;
-  let highestScore = 0;
+  if (scopedFragments.length === 0) return null;
 
-  for (const frag of scopedFragments) {
-    const score = calculateSimilarity(frag.fragment, fragmentText);
-    if (score > highestScore) {
-      highestScore = score;
-      bestMatch = frag;
+  const fuse = new Fuse(scopedFragments, {
+    keys: ['fragment', 'title'],
+    threshold: 0.3,
+    includeScore: true,
+    ignoreLocation: true,
+  });
+
+  const fuseResults = fuse.search(fragmentText, { limit: 3 });
+
+  for (const result of fuseResults) {
+    const similarity = 1 - (result.score || 1);
+    if (similarity >= threshold) {
+      return result.item;
     }
   }
 
-  return highestScore >= threshold ? bestMatch : null;
+  return null;
 }
 
 /**
@@ -310,6 +288,45 @@ export function saveMemory(fragments, options = {}) {
   }
 }
 
+let writeLock = false;
+let writeQueue = [];
+
+function acquireLock() {
+  return new Promise((resolve) => {
+    if (!writeLock) {
+      writeLock = true;
+      resolve();
+    } else {
+      writeQueue.push(resolve);
+    }
+  });
+}
+
+function releaseLock() {
+  writeLock = false;
+  if (writeQueue.length > 0) {
+    writeLock = true;
+    const next = writeQueue.shift();
+    next();
+  }
+}
+
+export async function saveMemorySafe(fragments, options = {}) {
+  await acquireLock();
+  try {
+    saveMemory(fragments, options);
+  } finally {
+    releaseLock();
+  }
+}
+
+export function applySessionDecay() {
+  const memory = loadMemory();
+  const decayed = decayConfidence(memory);
+  saveMemory(decayed);
+  return decayed;
+}
+
 /**
  * Filter memory fragments by project scope (STRICT ISOLATION)
  * @param {Array<object>} fragments - Array of memory fragments
@@ -431,17 +448,16 @@ export function formatMemoryForLLM(fragments, currentProject = null) {
   const projectHeader = currentProject ? ` (${currentProject})` : "";
 
   if (fragments.length === 0) {
-    return `╔══════════════════════════════════════╗\n║         MEMORY FRAGMENTS${projectHeader.padEnd(18)}║\n╠══════════════════════════════════════╣\n║  (no fragments)                      ║\n╚══════════════════════════════════════╝`;
+    return `## Memory Fragments${projectHeader}\n---\n(no fragments)\n---`;
   }
 
   const lines = fragments.map(frag => {
     const scopeTag = frag.project || "global";
     const summary = frag.description || frag.title;
-    // Include the ID for follow-up retrieval
-    return `  [${frag.id}] [${scopeTag}] ${frag.title}\n              ${summary}`;
+    return `[${frag.id}] [${scopeTag}] ${frag.title} — ${summary}`;
   });
 
-  return `╔══════════════════════════════════════╗\n║         MEMORY FRAGMENTS${projectHeader.padEnd(18)}║\n╠══════════════════════════════════════╣\n${lines.join("\n")}\n╚══════════════════════════════════════╝`;
+  return `## Memory Fragments${projectHeader}\n---\n${lines.join("\n")}\n---`;
 }
 
 /**
@@ -488,4 +504,106 @@ export function formatMemoryDetail(fragment) {
   detail += `--- CONTENT ---\n${fragment.fragment}\n==============`;
 
   return detail;
+}
+
+export function calculateStats(fragments, project = null) {
+  const filtered = project
+    ? filterByProject(fragments, project)
+    : fragments;
+
+  if (filtered.length === 0) {
+    return {
+      total: 0,
+      avg_confidence: 0,
+      by_source: {},
+      by_project: {},
+      low_confidence: 0,
+      high_confidence: 0,
+    };
+  }
+
+  const avgConf = filtered.reduce((sum, f) => sum + f.confidence, 0) / filtered.length;
+  const bySource = {};
+  const byProject = {};
+
+  for (const f of filtered) {
+    bySource[f.source] = (bySource[f.source] || 0) + 1;
+    const scope = f.project || "global";
+    byProject[scope] = (byProject[scope] || 0) + 1;
+  }
+
+  return {
+    total: filtered.length,
+    avg_confidence: Math.round(avgConf * 100) / 100,
+    by_source: bySource,
+    by_project: byProject,
+    low_confidence: filtered.filter(f => f.confidence < 0.3).length,
+    high_confidence: filtered.filter(f => f.confidence > 0.8).length,
+  };
+}
+
+export function formatStats(stats) {
+  let output = `## Memory Stats\n`;
+  output += `Total: ${stats.total} fragments | Avg confidence: ${stats.avg_confidence}\n`;
+  if (stats.total > 0) {
+    output += `High confidence (>0.8): ${stats.high_confidence} | Low (<0.3): ${stats.low_confidence}\n`;
+    const sources = Object.entries(stats.by_source).map(([k, v]) => `${k}: ${v}`).join(", ");
+    output += `Sources: ${sources}\n`;
+    const projects = Object.entries(stats.by_project).map(([k, v]) => `${k}: ${v}`).join(", ");
+    output += `Projects: ${projects}\n`;
+  }
+  return output;
+}
+
+export function auditMemory(fragments) {
+  const issues = [];
+  const ids = new Set();
+  const duplicates = [];
+
+  for (const f of fragments) {
+    if (ids.has(f.id)) {
+      duplicates.push(f.id);
+    }
+    ids.add(f.id);
+
+    if (typeof f.confidence !== "number" || f.confidence < 0 || f.confidence > 1) {
+      issues.push(`Fragment [${f.id}] has invalid confidence: ${f.confidence}`);
+    }
+
+    if (!f.fragment || typeof f.fragment !== "string") {
+      issues.push(`Fragment [${f.id}] has missing or invalid fragment text`);
+    }
+
+    if (f.associatedWith) {
+      for (const assocId of f.associatedWith) {
+        if (!ids.has(assocId) && !fragments.find(x => x.id === assocId)) {
+          issues.push(`Fragment [${f.id}] references non-existent associated fragment [${assocId}]`);
+        }
+      }
+    }
+  }
+
+  if (duplicates.length > 0) {
+    issues.push(`Duplicate IDs found: ${duplicates.join(", ")}`);
+  }
+
+  return {
+    total_fragments: fragments.length,
+    issues_found: issues.length,
+    issues,
+    healthy: issues.length === 0,
+  };
+}
+
+export function formatAuditReport(result) {
+  let output = `## Memory Audit\n`;
+  output += `Total fragments: ${result.total_fragments} | Issues: ${result.issues_found}\n`;
+  if (result.issues.length > 0) {
+    for (const issue of result.issues) {
+      output += `  ! ${issue}\n`;
+    }
+  } else {
+    output += `All clear — no issues found.\n`;
+  }
+  return output;
 }

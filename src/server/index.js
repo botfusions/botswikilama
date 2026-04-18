@@ -10,7 +10,7 @@ import {
 } from "@modelcontextprotocol/sdk/types.js";
 import * as core from "../memory/index.js";
 import * as guides from "../guides/index.js";
-import { getDynamicSystemPrompt } from "./system-prompt.js";
+import { BASE_SYSTEM_PROMPT } from "./system-prompt.js";
 import { TOOLS } from "./tools.js";
 import { handleCallTool } from "./handlers.js";
 import { triggerHook, HookTypes } from "./hooks.js";
@@ -44,17 +44,14 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
  */
 function buildDynamicInstructions(projectName) {
   const memory = core.loadMemory();
-  const decayedMemory = core.decayConfidence(memory);
 
-  // Get project-specific fragments
   const projectFragments = projectName
-    ? core.filterByProject(decayedMemory, projectName)
+    ? core.filterByProject(memory, projectName)
         .sort((a, b) => b.confidence - a.confidence)
         .slice(0, 20)
     : [];
 
-  // Get global fragments (always include top 10)
-  const globalFragments = core.filterByProject(decayedMemory, null)
+  const globalFragments = core.filterByProject(memory, null)
     .sort((a, b) => b.confidence - a.confidence)
     .slice(0, 10);
 
@@ -104,7 +101,7 @@ function buildDynamicInstructions(projectName) {
     instructions += `\nUse \`guide_get guide="<name>"\` to see full details.\n\n`;
   }
 
-  instructions += `**Tip:** Call \`memory_read\` to refresh memories or \`guide_get task="<your task>"\` to find relevant guides.`;
+  instructions += `\n**CRITICAL:** Call \`memory_read\` BEFORE exploring files — you may already know the answer. Call \`memory_add\` AFTER learning something new — otherwise knowledge is lost forever.`;
 
   return instructions;
 }
@@ -160,14 +157,12 @@ server.setRequestHandler(ReadResourceRequestSchema, async (request) => {
   const { uri } = request.params;
 
   if (uri === "lemma://system-prompt") {
-    // Return dynamic system prompt with project context injection
-    const dynamicPrompt = await getDynamicSystemPrompt(detectedProject);
     return {
       contents: [
         {
           uri,
           mimeType: "text/markdown",
-          text: dynamicPrompt,
+          text: BASE_SYSTEM_PROMPT,
         },
       ],
     };
@@ -227,7 +222,8 @@ server.setRequestHandler(CallToolRequestSchema, handleCallTool);
  * - Trigger onStart hooks
  */
 async function initializeContext() {
-  // Detect project from current working directory
+  core.applySessionDecay();
+
   detectedProject = core.detectProject();
 
   if (detectedProject) {

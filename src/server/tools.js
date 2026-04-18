@@ -73,6 +73,11 @@ export const TOOLS = [
           type: "boolean",
           description: "If true, show fragments from all projects. Default: false (current project + global only)",
         },
+        ids: {
+          type: "array",
+          items: { type: "string" },
+          description: "Get full details for multiple fragment IDs at once. Optional.",
+        },
       },
     },
   },
@@ -195,6 +200,27 @@ export const TOOLS = [
     },
   },
   {
+    name: "memory_stats",
+    description: "Get memory store statistics: fragment counts, average confidence, project breakdown, and health metrics.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        project: {
+          type: "string",
+          description: "Project name to filter stats (optional, defaults to all projects)",
+        },
+      },
+    },
+  },
+  {
+    name: "memory_audit",
+    description: "Audit memory store for integrity issues: orphan references, duplicate IDs, confidence anomalies.",
+    inputSchema: {
+      type: "object",
+      properties: {},
+    },
+  },
+  {
     name: "guide_get",
     description: "Get guides with usage statistics. Returns guides sorted by usage count (most used first). Use task parameter to get suggestions based on a task description.",
     inputSchema: {
@@ -242,6 +268,11 @@ export const TOOLS = [
           type: "array",
           items: { type: "string" },
           description: "REQUIRED: New learnings discovered during use (e.g., ['useCallback prevents re-renders']). Provide at least one learning or empty array [].",
+        },
+        outcome: {
+          type: "string",
+          enum: ["success", "failure"],
+          description: "Optional outcome when using this guide. Tracks success rate.",
         },
       },
       required: ["guide", "category", "contexts", "learnings"],
@@ -322,6 +353,24 @@ export const TOOLS = [
         description: {
           type: "string",
           description: "New description/manual for the guide (optional)",
+        },
+        add_anti_patterns: {
+          type: "array",
+          items: { type: "string" },
+          description: "Add anti-patterns to this guide. Optional.",
+        },
+        add_pitfalls: {
+          type: "array",
+          items: { type: "string" },
+          description: "Add known pitfalls to this guide. Optional.",
+        },
+        superseded_by: {
+          type: "string",
+          description: "Mark this guide as superseded by another guide name. Optional.",
+        },
+        deprecated: {
+          type: "boolean",
+          description: "Mark this guide as deprecated. Optional.",
         },
       },
       required: ["guide"],

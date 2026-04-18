@@ -124,9 +124,26 @@ export async function handleMemoryRead(args) {
   const showAll = args?.all === true;
 
   let memory = core.loadMemory();
-  memory = core.decayConfidence(memory);
 
-  // If specific ID requested, return full detail
+  const detailIds = args?.ids || null;
+  if (detailIds && Array.isArray(detailIds) && detailIds.length > 0) {
+    const results = [];
+    for (const did of detailIds) {
+      const fragment = memory.find(f => f.id === did);
+      if (fragment) {
+        const boosted = core.boostOnAccess(fragment, context);
+        Object.assign(fragment, boosted);
+        results.push(core.formatMemoryDetail(fragment));
+      } else {
+        results.push(`Fragment [${did}] not found.`);
+      }
+    }
+    core.saveMemory(memory);
+    return {
+      content: [{ type: "text", text: results.join("\n\n") }],
+    };
+  }
+
   if (detailId) {
     const fragment = memory.find(f => f.id === detailId);
     if (!fragment) {
@@ -191,11 +208,11 @@ export async function handleMemoryAdd(args) {
 
   // --- Duplication Prevention Feature ---
   const similarMatch = core.findSimilarFragment(memory, fragment, project);
-  if (similarMatch && source === "ai") {
+  if (similarMatch) {
     return {
       content: [{
         type: "text",
-        text: `Error: A highly similar memory already exists. Please use the 'memory_update' tool on ID [${similarMatch.id}] instead of adding a new one.\nExisting Memory Title: "${similarMatch.title}"\nExisting Content: "${similarMatch.fragment}"`
+        text: `A similar memory already exists [${similarMatch.id}]: "${similarMatch.title}"\nUse memory_update on [${similarMatch.id}] if you want to modify it.`
       }],
       isError: true,
     };
@@ -476,7 +493,7 @@ export async function handleGuidePractice(args) {
   }
 
   const allGuides = guides.loadGuides();
-  const updated = guides.practiceGuide(allGuides, guideName, category, description, contexts, learnings);
+  const updated = guides.practiceGuide(allGuides, guideName, category, description, contexts, learnings, args?.outcome);
 
   if (activeSessionId) {
     const allSessions = sessions.loadSessions();
@@ -494,9 +511,7 @@ export async function handleGuidePractice(args) {
 
   const isNew = updated.usage_count === 1;
   const action = isNew ? "Created" : "Updated";
-
-  let response = `${action} guide "${updated.guide}" (${updated.category}): ${updated.usage_count}x usage\n\n`;
-  response += guides.formatGuideDetail(updated);
+  const response = `${action} guide "${updated.guide}" (${updated.category}): ${updated.usage_count}x usage, ${updated.learnings.length} learnings, ${updated.contexts.length} contexts`;
 
   return {
     content: [{ type: "text", text: response }],
@@ -521,7 +536,7 @@ export async function handleGuideCreate(args) {
   }
 
   const allGuides = guides.loadGuides();
-  const existing = guides.findGuide(allGuides, guideName);
+  const existing = guides.findSimilarGuide(allGuides, guideName);
 
   if (existing) {
     existing.description = description;
@@ -592,7 +607,11 @@ export async function handleGuideUpdate(args) {
   const updates = {
     guide: args?.new_name,
     category: args?.category,
-    description: args?.description
+    description: args?.description,
+    add_anti_patterns: args?.add_anti_patterns,
+    add_pitfalls: args?.add_pitfalls,
+    superseded_by: args?.superseded_by,
+    deprecated: args?.deprecated,
   };
 
   if (!guideName) {
@@ -701,12 +720,15 @@ export async function handleGuideMerge(args) {
     learnings = [...new Set(sourceGuides.flatMap(g => g.learnings))];
   }
 
-  // Sum usage counts
+  const antiPatterns = [...new Set(sourceGuides.flatMap(g => g.anti_patterns || []))];
+  const pitfalls = [...new Set(sourceGuides.flatMap(g => g.known_pitfalls || []))];
+
   const totalUsage = sourceGuides.reduce((sum, g) => sum + g.usage_count, 0);
 
-  // Create new merged guide
   const newGuide = guides.createGuide(newGuideName, category, description, contexts, learnings);
   newGuide.usage_count = totalUsage;
+  newGuide.anti_patterns = antiPatterns;
+  newGuide.known_pitfalls = pitfalls;
   allGuides.push(newGuide);
 
   // Remove old guides
@@ -725,6 +747,23 @@ export async function handleGuideMerge(args) {
 /**
  * Main call tool handler - dispatches to appropriate handler
  */
+export async function handleMemoryStats(args) {
+  const project = args?.project || null;
+  const memory = core.loadMemory();
+  const stats = core.calculateStats(memory, project);
+  return {
+    content: [{ type: "text", text: core.formatStats(stats) }],
+  };
+}
+
+export async function handleMemoryAudit(args) {
+  const memory = core.loadMemory();
+  const result = core.auditMemory(memory);
+  return {
+    content: [{ type: "text", text: core.formatAuditReport(result) }],
+  };
+}
+
 export async function handleCallTool(request) {
   const { name, arguments: args } = request.params;
 
@@ -746,6 +785,10 @@ export async function handleCallTool(request) {
         return await handleMemoryFeedback(args);
       case "memory_merge":
         return await handleMemoryMerge(args);
+      case "memory_stats":
+        return await handleMemoryStats(args);
+      case "memory_audit":
+        return await handleMemoryAudit(args);
       case "guide_get":
         return await handleGuideGet(args);
       case "guide_practice":

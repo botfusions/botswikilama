@@ -6,6 +6,8 @@ export {
   findSimilarFragment,
   loadMemory,
   saveMemory,
+  saveMemorySafe,
+  applySessionDecay,
   filterByProject,
   decayConfidence,
   searchAndSortFragments,
@@ -14,5 +16,9 @@ export {
   boostOnAccess,
   recordNegativeHit,
   trackAssociations,
-  setMemoryDir
+  setMemoryDir,
+  calculateStats,
+  formatStats,
+  auditMemory,
+  formatAuditReport
 } from "./core.js";

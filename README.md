@@ -36,7 +36,7 @@ Each memory fragment has:
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `id` | string | Unique identifier (format: `m` + 6 hex chars) |
+| `id` | string | Unique identifier (format: `m` + 12 hex chars) |
 | `title` | string | Short title for quick scanning |
 | `fragment` | string | Synthesized memory text |
 | `project` | string | Project scope (`null` for global) |
@@ -82,23 +82,10 @@ Memories are stored in JSONL format at:
 
 ## Quick Start
 
-The recommended way to use Lemma is via **JSR**. Add this to your MCP client configuration:
+Add Lemma to your MCP client configuration:
 
 **Claude Desktop (Windows):** `%APPDATA%\Claude\claude_desktop_config.json`
 **Claude Desktop (macOS):** `~/Library/Application Support/Claude/claude_desktop_config.json`
-
-```json
-{
-  "mcpServers": {
-    "lemma": {
-      "command": "npx",
-      "args": ["-y", "jsr", "@lemma/lemma"]
-    }
-  }
-}
-```
-
-### Alternative: Run directly from GitHub
 
 ```json
 {
@@ -370,7 +357,6 @@ Lemma/
 ├── tests/
 │   └── test.js           # Test suite
 ├── package.json
-├── jsr.json
 ├── CHANGELOG.md
 └── README.md
 ```

@@ -4,6 +4,7 @@
 import os from "os";
 import path from "path";
 import fs from "fs";
+import crypto from "crypto";
 import Fuse from "fuse.js";
 import { TASK_GUIDE_MAP } from "./task-map.js";
 
@@ -24,8 +25,7 @@ export function setGuidesDir(dir) {
  * @returns {string} ID in format "g" + 6 hex characters
  */
 export function generateGuideId() {
-  const hexChars = Math.random().toString(16).substring(2, 8);
-  return `g${hexChars}`;
+  return "g" + crypto.randomUUID().replace(/-/g, "").substring(0, 12);
 }
 
 /**
@@ -83,12 +83,11 @@ export function createGuide(guide, category, description = "", contexts = [], le
     failure_count: 0,
     anti_patterns: [],
     known_pitfalls: [],
-    feedback_patterns: [],
-    improvement_log: [],
     last_refined: null,
     depends_on: [],
     enables: [],
-    superseded_by: null
+    superseded_by: null,
+    deprecated: false
   };
 }
 
@@ -210,6 +209,29 @@ export function findGuide(guides, guideName) {
   return guides.find(g => g.guide === normalized) || null;
 }
 
+export function findSimilarGuide(guides, guideName) {
+  const normalized = guideName.toLowerCase().trim();
+
+  const exact = guides.find(g => g.guide === normalized);
+  if (exact) return exact;
+
+  if (guides.length === 0) return null;
+
+  const fuse = new Fuse(guides, {
+    keys: ['guide'],
+    threshold: 0.3,
+    includeScore: true,
+    ignoreLocation: true,
+  });
+
+  const results = fuse.search(normalized, { limit: 1 });
+  if (results.length > 0 && (results[0].score || 1) < 0.25) {
+    return results[0].item;
+  }
+
+  return null;
+}
+
 /**
  * Update an existing guide's basic fields (id, guide, category, description)
  * @param {Array<object>} guides - Array of guide objects
@@ -224,6 +246,18 @@ export function updateGuide(guides, guideName, updates) {
   if (updates.guide) guide.guide = updates.guide.toLowerCase().trim();
   if (updates.category) guide.category = updates.category.toLowerCase().trim();
   if (updates.description) guide.description = updates.description.trim();
+  if (updates.add_anti_patterns) {
+    guide.anti_patterns = [...(guide.anti_patterns || []), ...updates.add_anti_patterns];
+  }
+  if (updates.add_pitfalls) {
+    guide.known_pitfalls = [...(guide.known_pitfalls || []), ...updates.add_pitfalls];
+  }
+  if (updates.superseded_by) {
+    guide.superseded_by = updates.superseded_by;
+  }
+  if (updates.deprecated === true) {
+    guide.deprecated = true;
+  }
 
   return guide;
 }
@@ -257,8 +291,8 @@ export function deleteGuide(guides, guideName) {
  * @param {string[]} newLearnings - Additional learnings to add
  * @returns {object} The updated or created guide
  */
-export function practiceGuide(guides, guideName, category, description = "", newContexts = [], newLearnings = []) {
-  let guide = findGuide(guides, guideName);
+export function practiceGuide(guides, guideName, category, description = "", newContexts = [], newLearnings = [], outcome = null) {
+  let guide = findSimilarGuide(guides, guideName);
 
   if (!guide) {
     // Create new guide
@@ -296,6 +330,12 @@ export function practiceGuide(guides, guideName, category, description = "", new
     }
   }
 
+  if (outcome === "success") {
+    guide.success_count = (guide.success_count || 0) + 1;
+  } else if (outcome === "failure") {
+    guide.failure_count = (guide.failure_count || 0) + 1;
+  }
+
   return guide;
 }
 
@@ -329,16 +369,16 @@ export function getGuidesByCategory(guides, category) {
  */
 export function formatGuidesForLLM(guides) {
   if (guides.length === 0) {
-    return `╔══════════════════════════════════════╗\n║              GUIDES                   ║\n╠══════════════════════════════════════╣\n║  (no guides tracked yet)              ║\n╚══════════════════════════════════════╝`;
+    return `## Guides\n---\n(no guides tracked yet)\n---`;
   }
 
   const sorted = getTopGuides(guides, 30);
 
   const lines = sorted.map(guide => {
-    return `  [${guide.category}] ${guide.guide}\n              ${guide.usage_count}x usage, ${guide.learnings.length} learnings`;
+    return `[${guide.category}] ${guide.guide} — ${guide.usage_count}x usage, ${guide.learnings.length} learnings`;
   });
 
-  return `╔══════════════════════════════════════╗\n║              GUIDES                   ║\n╠══════════════════════════════════════╣\n${lines.join("\n")}\n╚══════════════════════════════════════╝`;
+  return `## Guides\n---\n${lines.join("\n")}\n---`;
 }
 
 /**

@@ -1,6 +1,7 @@
 import os from "os";
 import path from "path";
 import fs from "fs";
+import crypto from "crypto";
 
 let SESSIONS_DIR = path.join(os.homedir(), ".lemma");
 let SESSIONS_FILE = path.join(SESSIONS_DIR, "sessions.jsonl");
@@ -11,13 +12,11 @@ export function setSessionsDir(dir) {
 }
 
 export function generateSessionId() {
-  const hexChars = Math.random().toString(16).substring(2, 8);
-  return `s${hexChars}`;
+  return "s" + crypto.randomUUID().replace(/-/g, "").substring(0, 12);
 }
 
 export function generateTraceId() {
-  const hexChars = Math.random().toString(16).substring(2, 8);
-  return `t${hexChars}`;
+  return "t" + crypto.randomUUID().replace(/-/g, "").substring(0, 12);
 }
 
 export function loadSessions() {

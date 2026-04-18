@@ -9,6 +9,7 @@ export {
   saveGuides,
   promoteToGuide,
   findGuide,
+  findSimilarGuide,
   updateGuide,
   deleteGuide,
   practiceGuide,

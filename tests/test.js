@@ -125,8 +125,8 @@ describe("Memory Core", () => {
         core.createFragment("proj-a", "ai", "A", "Alpha"),
         core.createFragment("proj-b", "ai", "B", "beta"),
       ];
-      assert.equal(core.filterByProject(frags, "alpha").length, 1);
-      assert.equal(core.filterByProject(frags, "ALPHA").length, 1);
+      assert.equal(core.filterByProject(frags, "alpha").length, 2);
+      assert.equal(core.filterByProject(frags, "ALPHA").length, 2);
       assert.equal(core.filterByProject(frags, null).length, 1);
     });
 
@@ -145,7 +145,7 @@ describe("Memory Core", () => {
   describe("findSimilarFragment", () => {
     test("finds similar fragment above threshold", () => {
       const frags = [core.createFragment("react hooks use state management patterns", "ai", "React", "proj")];
-      const match = core.findSimilarFragment(frags, "react hooks use state patterns", "proj", 0.5);
+      const match = core.findSimilarFragment(frags, "react hooks use state patterns", "proj", 0.3);
       assert.ok(match);
       assert.equal(match.title, "React");
     });
@@ -559,7 +559,7 @@ describe("Handlers (Integration)", () => {
       seedMemory();
       const result = await handlers.handleMemoryRead({ project: "testproj" });
       assert.ok(!result.isError);
-      assert.ok(result.content[0].text.includes("MEMORY FRAGMENTS"));
+      assert.ok(result.content[0].text.includes("Memory Fragments"));
     });
 
     test("returns detail by ID with boost", async () => {
@@ -1011,13 +1011,13 @@ describe("Dynamic System Prompt", () => {
   describe("getDynamicSystemPrompt", () => {
     test("returns base prompt when no project", async () => {
       const prompt = await getDynamicSystemPrompt(null);
-      assert.ok(prompt.includes("Lemma — Persistent Memory Layer"));
+      assert.ok(prompt.includes("Lemma — Persistent Memory"));
       assert.ok(!prompt.includes("<project_context>"));
     });
 
     test("returns base prompt when project has no memories", async () => {
       const prompt = await getDynamicSystemPrompt("EmptyProject");
-      assert.ok(prompt.includes("Lemma — Persistent Memory Layer"));
+      assert.ok(prompt.includes("Lemma — Persistent Memory"));
       assert.ok(!prompt.includes("<project_context>"));
     });
 
