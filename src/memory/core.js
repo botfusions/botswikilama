@@ -99,7 +99,17 @@ export function createFragment(fragment, source, title = null, project = null, d
     accessed: 0,
     tags: [],
     associatedWith: [],
-    negativeHits: 0
+    negativeHits: 0,
+    quality_score: null,
+    refinement_count: 0,
+    parent_id: null,
+    child_ids: [],
+    session_id: null,
+    task_type: null,
+    outcome: null,
+    positive_feedback: 0,
+    negative_feedback: 0,
+    last_refined: null
   };
 }
 
@@ -462,6 +472,18 @@ export function formatMemoryDetail(fragment) {
   }
   if (fragment.associatedWith && fragment.associatedWith.length > 0) {
     detail += `Related: ${fragment.associatedWith.join(", ")}\n`;
+  }
+  if (fragment.positive_feedback > 0 || fragment.negative_feedback > 0) {
+    detail += `Feedback: ${fragment.positive_feedback || 0} positive, ${fragment.negative_feedback || 0} negative\n`;
+  }
+  if (fragment.refinement_count > 0) {
+    detail += `Refinements: ${fragment.refinement_count}\n`;
+  }
+  if (fragment.parent_id) {
+    detail += `Refined from: [${fragment.parent_id}]\n`;
+  }
+  if (fragment.child_ids && fragment.child_ids.length > 0) {
+    detail += `Refined into: ${fragment.child_ids.map(id => `[${id}]`).join(", ")}\n`;
   }
   detail += `--- CONTENT ---\n${fragment.fragment}\n==============`;
 

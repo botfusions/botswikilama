@@ -78,7 +78,17 @@ export function createGuide(guide, category, description = "", contexts = [], le
     usage_count: 1,
     last_used: getToday(),
     contexts: contexts.map(c => c.toLowerCase().trim()).filter(Boolean),
-    learnings: learnings.map(l => l.trim()).filter(Boolean)
+    learnings: learnings.map(l => l.trim()).filter(Boolean),
+    success_count: 0,
+    failure_count: 0,
+    anti_patterns: [],
+    known_pitfalls: [],
+    feedback_patterns: [],
+    improvement_log: [],
+    last_refined: null,
+    depends_on: [],
+    enables: [],
+    superseded_by: null
   };
 }
 
@@ -563,6 +573,34 @@ export function formatGuideDetail(guide) {
     for (const l of guide.learnings) {
       detail += `  - ${l}\n`;
     }
+  }
+
+  const totalAttempts = (guide.success_count || 0) + (guide.failure_count || 0);
+  if (totalAttempts > 0) {
+    const rate = (guide.success_count || 0) / totalAttempts;
+    detail += `Success Rate: ${rate.toFixed(2)} (${guide.success_count || 0}/${totalAttempts})\n`;
+  }
+
+  if (guide.anti_patterns && guide.anti_patterns.length > 0) {
+    detail += `Anti-patterns:\n`;
+    for (const ap of guide.anti_patterns) {
+      detail += `  - ${ap}\n`;
+    }
+  }
+
+  if (guide.known_pitfalls && guide.known_pitfalls.length > 0) {
+    detail += `Known Pitfalls:\n`;
+    for (const kp of guide.known_pitfalls) {
+      detail += `  - ${kp}\n`;
+    }
+  }
+
+  if (guide.depends_on && guide.depends_on.length > 0) {
+    detail += `Depends on: ${guide.depends_on.join(", ")}\n`;
+  }
+
+  if (guide.superseded_by) {
+    detail += `Superseded by: ${guide.superseded_by}\n`;
   }
 
   detail += `====================`;

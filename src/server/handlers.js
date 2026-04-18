@@ -1,6 +1,117 @@
 // Tool handler functions for MCP server
 import * as core from "../memory/index.js";
 import * as guides from "../guides/index.js";
+import * as sessions from "../sessions/index.js";
+
+let activeSessionId = null;
+
+export async function handleSessionStart(args) {
+  const taskType = args?.task_type;
+  const technologies = args?.technologies || [];
+  const initialApproach = args?.initial_approach || null;
+
+  if (!taskType) {
+    return {
+      content: [{ type: "text", text: "Error: 'task_type' parameter is required" }],
+      isError: true,
+    };
+  }
+
+  const allSessions = sessions.loadSessions();
+  const existing = sessions.findActiveSession(allSessions);
+  if (existing) {
+    existing.status = "abandoned";
+    existing.task_outcome = "abandoned";
+  }
+
+  const session = sessions.createSession(taskType, technologies);
+  session.initial_approach = initialApproach;
+  activeSessionId = session.session_id;
+  allSessions.push(session);
+  sessions.saveSessions(allSessions);
+
+  const allGuides = guides.loadGuides();
+  const taskDesc = [taskType, ...technologies].join(" ");
+  const suggestions = guides.suggestGuides(taskDesc, allGuides);
+  const formattedSuggestions = guides.formatSuggestions(suggestions);
+
+  let response = `Session started: ${session.session_id} (${taskType})\n`;
+  if (technologies.length > 0) {
+    response += `Technologies: ${technologies.join(", ")}\n`;
+  }
+  response += `\n${formattedSuggestions}`;
+
+  return {
+    content: [{ type: "text", text: response }],
+  };
+}
+
+export async function handleSessionEnd(args) {
+  const outcome = args?.outcome;
+  const finalApproach = args?.final_approach || null;
+  const lessons = args?.lessons || [];
+
+  if (!outcome) {
+    return {
+      content: [{ type: "text", text: "Error: 'outcome' parameter is required" }],
+      isError: true,
+    };
+  }
+
+  const allSessions = sessions.loadSessions();
+  const session = activeSessionId
+    ? sessions.findSession(allSessions, activeSessionId)
+    : sessions.findActiveSession(allSessions);
+
+  if (!session) {
+    return {
+      content: [{ type: "text", text: "Error: No active session to end." }],
+      isError: true,
+    };
+  }
+
+  sessions.endSession(session, outcome, finalApproach, lessons);
+
+  const allGuides = guides.loadGuides();
+  const improvementLines = [];
+
+  if (session.guides_used && session.guides_used.length > 0) {
+    for (const guideName of session.guides_used) {
+      const guide = guides.findGuide(allGuides, guideName);
+      if (guide) {
+        if (outcome === "success") {
+          guide.success_count = (guide.success_count || 0) + 1;
+        } else if (outcome === "failure") {
+          guide.failure_count = (guide.failure_count || 0) + 1;
+          const total = (guide.success_count || 0) + (guide.failure_count || 0);
+          if (total >= 3) {
+            const rate = guide.success_count / total;
+            if (rate < 0.4) {
+              improvementLines.push(`  [!] Guide "${guideName}" success rate is ${rate.toFixed(2)} (${guide.success_count}/${total}). Consider refining with guide_update.`);
+            }
+          }
+        }
+      }
+    }
+    guides.saveGuides(allGuides);
+  }
+
+  sessions.saveSessions(allSessions);
+  activeSessionId = null;
+
+  let response = `Session ${session.session_id} ended: ${outcome}\n`;
+  response += `Task: ${session.task_type} | Duration: ${session.timestamp} → ${session.completed_at}\n`;
+  if (lessons.length > 0) {
+    response += `Lessons: ${lessons.length} recorded\n`;
+  }
+  if (improvementLines.length > 0) {
+    response += `\nIMPROVEMENT SUGGESTIONS:\n${improvementLines.join("\n")}\n`;
+  }
+
+  return {
+    content: [{ type: "text", text: response }],
+  };
+}
 
 /**
  * Handle memory_read tool (unified: read, list, search)
@@ -91,6 +202,17 @@ export async function handleMemoryAdd(args) {
   }
 
   const newFragment = core.createFragment(fragment, source, title, project, description);
+  if (activeSessionId) {
+    const allSessions = sessions.loadSessions();
+    const session = sessions.findSession(allSessions, activeSessionId);
+    if (session) {
+      newFragment.session_id = activeSessionId;
+      newFragment.task_type = session.task_type;
+      session.memories_created = session.memories_created || [];
+      session.memories_created.push(newFragment.id);
+      sessions.saveSessions(allSessions);
+    }
+  }
   memory.push(newFragment);
   core.saveMemory(memory);
 
@@ -228,6 +350,7 @@ export async function handleMemoryFeedback(args) {
   if (useful) {
     const boosted = core.boostOnAccess(memory[targetIndex]);
     Object.assign(memory[targetIndex], boosted);
+    memory[targetIndex].positive_feedback = (memory[targetIndex].positive_feedback || 0) + 1;
     core.saveMemory(memory);
     return {
       content: [{ type: "text", text: `Positive feedback recorded for [${id}]. Confidence boosted to ${memory[targetIndex].confidence.toFixed(2)}.` }],
@@ -235,6 +358,7 @@ export async function handleMemoryFeedback(args) {
   } else {
     const penalized = core.recordNegativeHit(memory[targetIndex]);
     Object.assign(memory[targetIndex], penalized);
+    memory[targetIndex].negative_feedback = (memory[targetIndex].negative_feedback || 0) + 1;
     core.saveMemory(memory);
     return {
       content: [{ type: "text", text: `Negative feedback recorded for [${id}]. Confidence reduced to ${memory[targetIndex].confidence.toFixed(2)}.` }],
@@ -353,6 +477,19 @@ export async function handleGuidePractice(args) {
 
   const allGuides = guides.loadGuides();
   const updated = guides.practiceGuide(allGuides, guideName, category, description, contexts, learnings);
+
+  if (activeSessionId) {
+    const allSessions = sessions.loadSessions();
+    const session = sessions.findSession(allSessions, activeSessionId);
+    if (session) {
+      if (!session.guides_used) session.guides_used = [];
+      if (!session.guides_used.includes(guideName.toLowerCase())) {
+        session.guides_used.push(guideName.toLowerCase());
+      }
+      sessions.saveSessions(allSessions);
+    }
+  }
+
   guides.saveGuides(allGuides);
 
   const isNew = updated.usage_count === 1;
@@ -593,6 +730,10 @@ export async function handleCallTool(request) {
 
   try {
     switch (name) {
+      case "session_start":
+        return await handleSessionStart(args);
+      case "session_end":
+        return await handleSessionEnd(args);
       case "memory_read":
         return await handleMemoryRead(args);
       case "memory_add":

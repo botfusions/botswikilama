@@ -1,6 +1,53 @@
 // Tool definitions for MCP server
 export const TOOLS = [
   {
+    name: "session_start",
+    description: "Start a traced work session. Records task metadata and returns relevant guides and memories for the task.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        task_type: {
+          type: "string",
+          description: "Type of task: 'debugging', 'implementation', 'refactoring', 'testing', 'research', 'documentation', 'optimization', or 'other'",
+        },
+        technologies: {
+          type: "array",
+          items: { type: "string" },
+          description: "Technologies involved (e.g., ['react', 'typescript']). Optional.",
+        },
+        initial_approach: {
+          type: "string",
+          description: "Your initial plan or approach for this task. Optional.",
+        },
+      },
+      required: ["task_type"],
+    },
+  },
+  {
+    name: "session_end",
+    description: "End the current traced session. Records outcome, updates guide success/failure tracking, and generates improvement suggestions if patterns are detected.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        outcome: {
+          type: "string",
+          enum: ["success", "partial", "failure", "abandoned"],
+          description: "How the task turned out",
+        },
+        final_approach: {
+          type: "string",
+          description: "What approach actually worked (or didn't). Optional.",
+        },
+        lessons: {
+          type: "array",
+          items: { type: "string" },
+          description: "What was learned during this session. Optional.",
+        },
+      },
+      required: ["outcome"],
+    },
+  },
+  {
     name: "memory_read",
     description: "Read memory fragments. SUMMARY MODE: Shows title + description only (not full content). Use id parameter to get full detail of a specific fragment. Use all=true to see fragments from all projects.",
     inputSchema: {
