@@ -141,7 +141,7 @@ describe("Virtual Sessions", () => {
       assert.equal(recent.length, 1);
     });
 
-    test("respects count limit", () => {
+    test("respects count limit", async () => {
       const limitDir = path.join(TMPDIR, "limit-test");
       fs.mkdirSync(limitDir, { recursive: true });
       setSessionLogDir(limitDir);
@@ -149,6 +149,7 @@ describe("Virtual Sessions", () => {
       for (let i = 0; i < 5; i++) {
         recordToolCall("memory_read", { query: `q${i}` }, null);
         finalizeVirtualSession();
+        await new Promise((r) => setTimeout(r, 5));
       }
 
       const recent = getRecentSessions(3);
