@@ -158,7 +158,7 @@ Lemma'yı MCP istemci yapılandırmanıza ekleyin:
   "mcpServers": {
     "lemma": {
       "command": "npx",
-      "args": ["-y", "github:xenitV1/lemma"]
+      "args": ["-y", "lemma-mcp"]
     }
   }
 }

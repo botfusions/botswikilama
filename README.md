@@ -158,7 +158,7 @@ Add Lemma to your MCP client configuration:
   "mcpServers": {
     "lemma": {
       "command": "npx",
-      "args": ["-y", "github:xenitV1/lemma"]
+      "args": ["-y", "lemma-mcp"]
     }
   }
 }
