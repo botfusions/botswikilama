@@ -2,8 +2,19 @@
 import * as core from "../memory/index.js";
 import * as guides from "../guides/index.js";
 import * as sessions from "../sessions/index.js";
+import * as virtualSession from "../sessions/virtual.js";
 
 let activeSessionId = null;
+
+let _notifyChange = null;
+
+export function setNotifyChange(fn) {
+  _notifyChange = fn;
+}
+
+function notifyMemoryChange() {
+  if (_notifyChange) _notifyChange();
+}
 
 export async function handleSessionStart(args) {
   const taskType = args?.task_type;
@@ -139,6 +150,7 @@ export async function handleMemoryRead(args) {
       }
     }
     core.saveMemory(memory);
+    notifyMemoryChange();
     return {
       content: [{ type: "text", text: results.join("\n\n") }],
     };
@@ -156,13 +168,13 @@ export async function handleMemoryRead(args) {
     const boosted = core.boostOnAccess(fragment, context);
     Object.assign(fragment, boosted);
     core.saveMemory(memory);
+    notifyMemoryChange();
 
     return {
       content: [{ type: "text", text: core.formatMemoryDetail(fragment) }],
     };
   }
 
-  // Filter by project (or show all if all=true)
   const filteredMemory = showAll
     ? memory
     : core.filterByProject(memory, currentProject);
@@ -182,6 +194,7 @@ export async function handleMemoryRead(args) {
   const scopeInfo = showAll ? "all projects" : currentProject || "global";
   const formatted = core.formatMemoryForLLM(results, scopeInfo);
   core.saveMemory(memory);
+  notifyMemoryChange();
   return {
     content: [{ type: "text", text: formatted }],
   };
@@ -232,6 +245,7 @@ export async function handleMemoryAdd(args) {
   }
   memory.push(newFragment);
   core.saveMemory(memory);
+  notifyMemoryChange();
 
   const scopeInfo = newFragment.project ? ` (project: ${newFragment.project})` : " (global)";
   return {
@@ -297,6 +311,7 @@ export async function handleMemoryUpdate(args) {
   }
 
   core.saveMemory(memory);
+  notifyMemoryChange();
 
   return {
     content: [{ type: "text", text: `Updated fragment [${id}]: "${memory[targetIndex].title}"` }],
@@ -328,6 +343,7 @@ export async function handleMemoryForget(args) {
   }
 
   core.saveMemory(filtered, { force: true });
+  notifyMemoryChange();
 
   return {
     content: [{ type: "text", text: `Forgot fragment with ID: ${id}` }],
@@ -369,6 +385,7 @@ export async function handleMemoryFeedback(args) {
     Object.assign(memory[targetIndex], boosted);
     memory[targetIndex].positive_feedback = (memory[targetIndex].positive_feedback || 0) + 1;
     core.saveMemory(memory);
+    notifyMemoryChange();
     return {
       content: [{ type: "text", text: `Positive feedback recorded for [${id}]. Confidence boosted to ${memory[targetIndex].confidence.toFixed(2)}.` }],
     };
@@ -377,6 +394,7 @@ export async function handleMemoryFeedback(args) {
     Object.assign(memory[targetIndex], penalized);
     memory[targetIndex].negative_feedback = (memory[targetIndex].negative_feedback || 0) + 1;
     core.saveMemory(memory);
+    notifyMemoryChange();
     return {
       content: [{ type: "text", text: `Negative feedback recorded for [${id}]. Confidence reduced to ${memory[targetIndex].confidence.toFixed(2)}.` }],
     };
@@ -431,6 +449,7 @@ export async function handleMemoryMerge(args) {
   // Remove old fragments
   const mergedMemory = memory.filter(f => !ids.includes(f.id));
   core.saveMemory(mergedMemory);
+  notifyMemoryChange();
 
   const scopeInfo = newFragment.project ? ` (project: ${newFragment.project})` : " (global)";
   return {
@@ -764,6 +783,37 @@ export async function handleMemoryAudit(args) {
   };
 }
 
+export async function handleSessionStats(args) {
+  const count = args?.count || 10;
+  const recentSessions = virtualSession.getRecentSessions(count);
+  const current = virtualSession.getCurrentVirtualSession();
+
+  let output = `## Session Stats\n`;
+  
+  if (current) {
+    output += `Active session: ${current.tool_calls.length} tool calls\n`;
+    if (current.technologies_seen.size > 0) {
+      output += `Technologies: ${[...current.technologies_seen].join(", ")}\n`;
+    }
+    if (current.guides_used.size > 0) {
+      output += `Guides used: ${[...current.guides_used].join(", ")}\n`;
+    }
+    output += `\n`;
+  }
+
+  if (recentSessions.length > 0) {
+    output += `Recent sessions (${recentSessions.length}):\n`;
+    for (const s of recentSessions.slice(0, 5)) {
+      const techs = s.technologies?.length > 0 ? ` [${s.technologies.join(", ")}]` : "";
+      output += `  ${s.id}: ${s.duration_tool_calls} calls${techs}\n`;
+    }
+  } else {
+    output += `No past sessions recorded yet.\n`;
+  }
+
+  return { content: [{ type: "text", text: output }] };
+}
+
 export async function handleCallTool(request) {
   const { name, arguments: args } = request.params;
 
@@ -803,6 +853,8 @@ export async function handleCallTool(request) {
         return await handleGuideForget(args);
       case "guide_merge":
         return await handleGuideMerge(args);
+      case "session_stats":
+        return await handleSessionStats(args);
       default:
         return {
           content: [{ type: "text", text: `Error: Unknown tool '${name}'` }],

@@ -427,4 +427,17 @@ export const TOOLS = [
       required: ["guides", "guide", "category"],
     },
   },
+  {
+    name: "session_stats",
+    description: "Get virtual session statistics: recent tool usage patterns, technologies encountered, and memory activity.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        count: {
+          type: "number",
+          description: "Number of recent sessions to analyze (default 10)",
+        },
+      },
+    },
+  },
 ];

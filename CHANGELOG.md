@@ -1,5 +1,41 @@
 # Changelog
 
+## [0.6.0] - 2026-04-18
+
+### Added
+- **Universal Memory Injection** — Memories are now injected into tool descriptions via `tools/list`, guaranteeing ALL MCP clients (opencode, Claude Desktop, Cursor, VS Code, Gemini CLI) see full memory content without requiring explicit tool calls.
+  - Top N memories injected as full content into `memory_read` tool description (~4000 tokens budget)
+  - Remaining memories shown as compact index
+  - Top 5 guides shown with learnings
+  - Dual injection: `instructions` field (for clients that support it) + tool descriptions (universal fallback)
+- **Config System** (`~/.lemma/config.json`) — User-configurable token budgets and injection limits
+  - `token_budget.full_content` (default: 3000)
+  - `token_budget.summary_index` (default: 1000)
+  - `token_budget.guides_detail` (default: 1000)
+  - `injection.max_full_content_fragments` (default: 15)
+  - `virtual_session.timeout_minutes` (default: 30)
+- **Virtual Session Tracking** (`src/sessions/virtual.js`) — Automatic session correlation without requiring explicit `session_start`/`session_end`
+  - Auto-starts on first tool call, auto-finalizes after 30 min inactivity
+  - Tracks tool calls, technologies seen, guides used, memories created/accessed
+  - Sessions persisted to `~/.lemma/sessions/` as JSON files
+  - `session_stats` tool to view virtual session statistics
+- **3-Layer Injection Architecture** — `buildDynamicInstructions` rewritten with:
+  - Layer 1: Base rules (~500 tokens)
+  - Layer 2: Full content for high-confidence memories (token-budgeted)
+  - Layer 3: Summary index for remaining memories
+  - Layer 4: Active guides with descriptions
+- **MCP Resource Notifications** — `notifications/resources/updated` sent after every memory change
+  - New `lemma://context/current` resource with dynamically generated context
+  - Clients that support resource subscriptions get live updates
+- **`session_stats` tool** — View virtual session activity, technologies, and guide usage
+
+### Changed
+- **`ListToolsRequestSchema` handler** — Now dynamically builds tool descriptions with injected memory context on every `tools/list` call
+- **System prompt** — Added `<critical_rules>` section with mandatory behavior rules (always call `memory_read` first, always call `memory_add` after learning)
+- **`buildDynamicInstructions`** — Removed redundant `decayConfidence` call (already applied at startup)
+
+---
+
 ## [0.5.0] - 2026-04-18
 
 ### Breaking Changes
@@ -256,6 +292,7 @@
 
 ---
 
+[0.6.0]: https://github.com/xenitV1/lemma/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/xenitV1/lemma/compare/v0.4.1...v0.5.0
 [0.4.1]: https://github.com/xenitV1/lemma/compare/v0.4.0...v0.4.1
 [0.4.0]: https://github.com/xenitV1/lemma/compare/v0.3.2...v0.4.0
