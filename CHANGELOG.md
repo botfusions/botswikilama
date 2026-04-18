@@ -1,5 +1,32 @@
 # Changelog
 
+## [0.6.1] - 2026-04-19
+
+### Added
+- **GitHub Actions CI** — Automated test pipeline on push/PR to main, Node.js 18/20/22 matrix
+- **Modular Test Suite** — Tests refactored from single file to 28 modular files across 4 directories
+  - `tests/memory/` — core, lifecycle, persistence, audit, stats, config, edge-cases (7 files)
+  - `tests/guides/` — core, suggest, merge, update, fuzzy-match, detail-format (6 files)
+  - `tests/sessions/` — core, virtual (2 files)
+  - `tests/server/` — handlers-core, guide-handlers, guide-advanced, memory-read-advanced, memory-update-advanced, memory-merge-validation, memory-stats-audit, session-handlers, session-guide-interaction, injection (10 files)
+- **250 new tests** — Coverage expanded from 110 to 360 tests
+  - Memory: applySessionDecay, detectProject, generateId, concurrent writes, malformed JSONL, large datasets (1000 fragments), backup integrity, empty/null protection
+  - Guides: formatGuideDetail (anti_patterns, pitfalls, success rate), getGuidesByCategory, getTopGuides, outcome tracking, context deduplication
+  - Handlers: memory_read batch ids, all=true, query search; memory_update fragment/confidence/type validation; memory_merge validation; guide_create similar update; guide_merge auto-merge; guide_practice session linking; session start/end lifecycle with guide interaction
+  - Sessions: core CRUD, virtual session tracking, session-guide interaction, improvement suggestions
+
+### Changed
+- **Test runner** — Migrated from manual `node tests/test.js` to `node --test tests/**/*.test.js` glob pattern
+- **Package scripts** — Added `test:memory`, `test:guides`, `test:sessions`, `test:server` for module-specific runs
+- **Removed monolithic `tests/test.js`** — All tests distributed to modular files
+
+### Tests
+- 360 tests passing (was 110)
+- 28 test files (was 1)
+- ~80% estimated coverage (was ~55%)
+
+---
+
 ## [0.6.0] - 2026-04-18
 
 ### Inspired by Karpathy's LLM Wiki
@@ -296,6 +323,7 @@
 
 ---
 
+[0.6.1]: https://github.com/xenitV1/lemma/compare/v0.6.0...v0.6.1
 [0.6.0]: https://github.com/xenitV1/lemma/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/xenitV1/lemma/compare/v0.4.1...v0.5.0
 [0.4.1]: https://github.com/xenitV1/lemma/compare/v0.4.0...v0.4.1
