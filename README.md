@@ -6,7 +6,7 @@
 
 [English](README.md) | [Türkçe](README.tr.md)
 
-Lemma is a Model Context Protocol (MCP) server that provides a persistent memory layer for Large Language Models. It enables LLMs to remember facts, preferences, and context across sessions through a simple, elegant interface with automatic memory decay and learning.
+Lemma is a Model Context Protocol (MCP) server that provides a persistent memory layer for Large Language Models. It enables LLMs to remember facts, preferences, and context across sessions through a biological memory model with automatic decay, learning, and universal injection.
 
 ## What is Lemma?
 
@@ -17,18 +17,33 @@ Lemma operates on the same principle:
 - **Raw conversations are never stored** — only synthesized fragments
 - **Fragments decay over time** — frequently accessed ones strengthen
 - **Used knowledge gains context** — tags and associations are built automatically
-- **The LLM reads fragments at every session** and remembers who it is
+- **Memories are injected automatically** — LLM sees them without calling tools
 
 ## How It Works
 
-### Dynamic System Prompt
+### Universal Memory Injection
 
-Lemma automatically injects relevant context into the LLM's system prompt at runtime:
+Lemma injects memories directly into tool descriptions via `tools/list`. This works on **every MCP client** — Claude Desktop, Cursor, VS Code, opencode, Gemini CLI, and others.
 
-- **Global Context**: Cross-project learnings and preferences (up to 10 fragments)
-- **Project Context**: Project-specific fragments with confidence visualization (up to 20 fragments)
-- **Visual Formatting**: Confidence bars (`███░░`) and source icons (🤖/👤)
-- **Prompt Modifiers**: Extensible system for custom prompt transformations
+```
+tools/list → memory_read description includes:
+  "YOUR MEMORIES (you already know these):
+   [m8f728] React Architecture (95%)
+   Full content here...
+   [m1bbea] Clean Code Research (77%)
+   Full content here..."
+```
+
+The LLM starts every session already knowing its most important memories. No explicit tool call needed.
+
+**Dual injection:**
+1. **Tool descriptions** — universal, works everywhere
+2. **`instructions` field** — for clients that support MCP initialize instructions
+
+**3-layer architecture:**
+- Layer 1: Full content for top memories (~3000 tokens, configurable)
+- Layer 2: Summary index for remaining memories
+- Layer 3: Active guides with descriptions and learnings
 
 ### Memory Structure
 
@@ -36,7 +51,7 @@ Each memory fragment has:
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `id` | string | Unique identifier (format: `m` + 12 hex chars) |
+| `id` | string | Unique identifier (`m` + 12 hex chars from crypto.randomUUID) |
 | `title` | string | Short title for quick scanning |
 | `fragment` | string | Synthesized memory text |
 | `project` | string | Project scope (`null` for global) |
@@ -70,15 +85,66 @@ confidence = confidence - decay
 - **Unused items** decay at the base rate of 0.05 per session
 - **Associations**: Fragments used together build cross-references for future recall
 
-### Memory File Location
+### Deduplication
 
-Memories are stored in JSONL format at:
+Lemma uses **Fuse.js fuzzy matching** (not Jaccard) for dedup:
+- "Use React hooks" vs "Don't use React hooks" — correctly detected as different
+- "react", "reactjs", "React.js" — correctly detected as same (for guides)
+- Applies to both user and AI sourced memories
+
+### Virtual Sessions
+
+Tool calls are automatically correlated into virtual sessions:
+- Auto-starts on first tool call
+- Auto-finalizes after 30 minutes of inactivity
+- Tracks technologies seen, guides used, memories created
+- No explicit `session_start`/`session_end` required
+- Sessions stored in `~/.lemma/sessions/`
+
+### Data Safety
+
+- **Cumulative backup**: `.bak` files are ID-based merges — never overwrites existing entries
+- **File locking**: Module-level write lock prevents concurrent data corruption
+- **Safe I/O**: Empty/null arrays rejected before writing
+- **No implicit deletion**: Decay only reduces confidence, never removes fragments
+
+### Configuration
+
+Optional config file at `~/.lemma/config.json`:
+
+```json
+{
+  "token_budget": {
+    "full_content": 3000,
+    "summary_index": 1000,
+    "guides_detail": 1000
+  },
+  "injection": {
+    "max_full_content_fragments": 15,
+    "max_summary_fragments": 30,
+    "max_guides": 20,
+    "max_guide_detail": 3
+  },
+  "virtual_session": {
+    "timeout_minutes": 30
+  }
+}
+```
+
+### File Locations
 
 | OS | Path |
 |---|---|
-| **Windows** | `C:\Users\{username}\.lemma\memory.jsonl` |
-| **macOS** | `/Users/{username}/.lemma/memory.jsonl` |
-| **Linux** | `/home/{username}/.lemma/memory.jsonl` |
+| **Windows** | `C:\Users\{username}\.lemma\` |
+| **macOS** | `/Users/{username}/.lemma/` |
+| **Linux** | `/home/{username}/.lemma/` |
+
+Files:
+- `memory.jsonl` — memory fragments
+- `guides.jsonl` — experience guides
+- `config.json` — user configuration (optional)
+- `sessions/` — virtual session logs
+- `.bak` files — cumulative backups
 
 ## Quick Start
 
@@ -109,12 +175,10 @@ Lemma provides a pluggable hook system for extending server behavior:
 ```javascript
 import { registerHook, HookTypes } from "@lemma/lemma/server";
 
-// Register a callback for server start
 registerHook(HookTypes.ON_START, async (context) => {
   console.log("Server started!", context);
 });
 
-// Register a callback for project context changes
 registerHook(HookTypes.ON_PROJECT_CHANGE, async (context) => {
   console.log(`Project changed to: ${context.project}`);
 });
@@ -128,7 +192,6 @@ Extend the system prompt generation with custom transformations:
 import { registerPromptModifier } from "@lemma/lemma/server";
 
 registerPromptModifier(async (prompt, context) => {
-  // Add custom context to the prompt
   if (context.project === "my-app") {
     return prompt + "\n\n<custom>Note: Using experimental features.</custom>";
   }
@@ -138,7 +201,7 @@ registerPromptModifier(async (prompt, context) => {
 
 ---
 
-## Manual Installation (For Developers)
+## Manual Installation
 
 ```bash
 git clone https://github.com/xenitV1/lemma
@@ -163,9 +226,9 @@ npm install
 
 ---
 
-## Available Tools
+## Available Tools (20)
 
-### Memory Tools
+### Memory Tools (10)
 
 #### `memory_read`
 
@@ -175,17 +238,9 @@ Read memory fragments. SUMMARY MODE shows title + description; use `id` for full
 - `project` (string, optional): Project name to filter
 - `query` (string, optional): Semantic search keyword
 - `id` (string, optional): Get full detail for a specific fragment
-- `context` (string, optional): Tag this access with a context (e.g., "debugging") — boosts confidence
+- `ids` (string[], optional): Get full details for multiple fragments at once
+- `context` (string, optional): Tag this access with a context (e.g., "debugging")
 - `all` (boolean, optional): Show fragments from all projects (default: false)
-
-**Returns:** Formatted string with confidence bars:
-
-```
-=== LEMMA MEMORY FRAGMENTS (project: myapp) ===
-[m1a2b3] ████░ (🤖) [myapp] React Hooks
-    useState and useEffect patterns
-==============================
-```
 
 #### `memory_add`
 
@@ -210,7 +265,7 @@ Update an existing fragment by ID.
 
 #### `memory_feedback`
 
-Provide feedback on a memory fragment after use. Positive feedback boosts confidence; negative feedback reduces it directly (-0.1).
+Provide feedback on a memory fragment after use. Positive boosts confidence; negative reduces by -0.1.
 
 **Parameters:**
 - `id` (string, required): Fragment ID
@@ -233,7 +288,18 @@ Merge multiple fragments into one. Creates new ID, deletes originals.
 - `fragment` (string, required): Merged content
 - `project` (string, optional): Project scope
 
-### Guide Tools
+#### `memory_stats`
+
+Get memory store statistics: fragment counts, average confidence, project breakdown.
+
+**Parameters:**
+- `project` (string, optional): Filter by project
+
+#### `memory_audit`
+
+Audit memory store for integrity issues: orphan references, duplicate IDs, confidence anomalies.
+
+### Guide Tools (8)
 
 #### `guide_get`
 
@@ -254,6 +320,7 @@ Get tracked guides with usage statistics. Returns guides sorted by usage count (
 - `description` (string, optional): Detailed manual/protocols
 - `contexts` (string[], required): Contexts where used
 - `learnings` (string[], required): New learnings discovered
+- `outcome` (string, optional): "success" or "failure" — tracks success rate
 
 #### `guide_create`
 
@@ -284,6 +351,10 @@ Update an existing guide's properties.
 - `new_name` (string, optional): New name
 - `category` (string, optional): New category
 - `description` (string, optional): New description/manual
+- `add_anti_patterns` (string[], optional): Add anti-patterns
+- `add_pitfalls` (string[], optional): Add known pitfalls
+- `superseded_by` (string, optional): Mark as superseded by another guide
+- `deprecated` (boolean, optional): Mark as deprecated
 
 #### `guide_forget`
 
@@ -303,6 +374,33 @@ Merge multiple guides into one. Usage counts are summed.
 - `description` (string, optional): Merged description
 - `contexts` (string[], optional): Merged contexts
 - `learnings` (string[], optional): Merged learnings
+
+### Session Tools (2)
+
+#### `session_start`
+
+Start a traced work session. Records task metadata and returns relevant guides.
+
+**Parameters:**
+- `task_type` (string, required): "debugging", "implementation", "refactoring", "testing", "research", "documentation", "optimization", or "other"
+- `technologies` (string[], optional): Technologies involved
+- `initial_approach` (string, optional): Initial plan
+
+#### `session_end`
+
+End the current session. Records outcome and updates guide success tracking.
+
+**Parameters:**
+- `outcome` (string, required): "success", "partial", "failure", or "abandoned"
+- `final_approach` (string, optional): What approach worked
+- `lessons` (string[], optional): What was learned
+
+#### `session_stats`
+
+Get virtual session statistics: recent tool usage patterns and technologies.
+
+**Parameters:**
+- `count` (number, optional): Number of recent sessions (default 10)
 
 ## Philosophy
 
@@ -333,29 +431,35 @@ Merge multiple guides into one. Usage counts are summed.
 npm test
 ```
 
-Comprehensive test suite covering memory core, guides core, handlers, learning lifecycle, hook system, and dynamic prompt generation. All I/O is isolated to temp directories — real data is never touched.
+110 tests covering memory core, guides core, handlers, learning lifecycle, hook system, dynamic prompt generation, and virtual sessions. All I/O is isolated to temp directories.
 
 ### Project Structure
 
 ```
 Lemma/
 ├── src/
-│   ├── index.js          # MCP server entry point
+│   ├── index.js              # MCP server entry point
 │   ├── memory/
-│   │   ├── index.js      # Memory module re-exports
-│   │   └── core.js       # Core memory logic
+│   │   ├── index.js          # Memory module re-exports
+│   │   ├── core.js           # Core memory logic, decay, search, dedup
+│   │   └── config.js         # User configuration loader
 │   ├── guides/
-│   │   ├── index.js      # Guides module re-exports
-│   │   ├── core.js       # Core guides logic
-│   │   └── task-map.js   # Task-to-guide mapping
-│   └── server/
-│       ├── index.js      # Server setup
-│       ├── handlers.js   # Tool handlers
-│       ├── tools.js      # Tool definitions
-│       ├── hooks.js      # Hook system & prompt modifiers
-│       └── system-prompt.js
+│   │   ├── index.js          # Guides module re-exports
+│   │   ├── core.js           # Core guides logic, fuzzy dedup
+│   │   └── task-map.js       # Task-to-guide mapping
+│   ├── server/
+│   │   ├── index.js          # Server setup, injection, notifications
+│   │   ├── handlers.js       # Tool handlers (20 tools)
+│   │   ├── tools.js          # Tool definitions
+│   │   ├── hooks.js          # Hook system & prompt modifiers
+│   │   └── system-prompt.js  # Dynamic system prompt
+│   └── sessions/
+│       ├── index.js          # Sessions module re-exports
+│       ├── core.js           # Session lifecycle
+│       └── virtual.js        # Virtual session tracking
 ├── tests/
-│   └── test.js           # Test suite
+│   └── test.js               # Test suite (110 tests)
+├── docs/                     # Research papers and references
 ├── package.json
 ├── CHANGELOG.md
 └── README.md
@@ -363,7 +467,7 @@ Lemma/
 
 ## Security
 
-`memory.jsonl` and `guides.jsonl` are local files and are never sent anywhere. Users can inspect their contents or clear them at any time via the MCP tools.
+All data is stored locally in `~/.lemma/`. Nothing is ever sent to external servers. Users can inspect, edit, or clear data at any time via the MCP tools or directly.
 
 ## License
 
