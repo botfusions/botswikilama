@@ -230,9 +230,9 @@ npm install
 
 ---
 
-## Available Tools (20)
+## Available Tools (22)
 
-### Memory Tools (10)
+### Memory Tools (8)
 
 #### `memory_read`
 
@@ -303,7 +303,7 @@ Get memory store statistics: fragment counts, average confidence, project breakd
 
 Audit memory store for integrity issues: orphan references, duplicate IDs, confidence anomalies.
 
-### Guide Tools (8)
+### Guide Tools (7)
 
 #### `guide_get`
 
@@ -379,7 +379,7 @@ Merge multiple guides into one. Usage counts are summed.
 - `contexts` (string[], optional): Merged contexts
 - `learnings` (string[], optional): Merged learnings
 
-### Session Tools (2)
+### Session Tools (3)
 
 #### `session_start`
 
@@ -405,6 +405,44 @@ Get virtual session statistics: recent tool usage patterns and technologies.
 
 **Parameters:**
 - `count` (number, optional): Number of recent sessions (default 10)
+
+### Wiki Tools (4)
+
+#### `wiki_setup`
+
+Create a knowledge wiki vault at the specified path.
+
+**Parameters:**
+- `vault_path` (string, required): Absolute path where the wiki vault will be created
+- `project_name` (string, optional): Name for this wiki/project
+- `language` (string, optional): Language for wiki content (default: "Türkçe")
+
+#### `wiki_ingest`
+
+Process raw source files in the wiki vault.
+
+**Parameters:**
+- `vault_path` (string, required): Absolute path to the wiki vault
+- `summary` (string, required): Summary of the source content
+- `file_path` (string, optional): Specific file to ingest
+- `entities` (string[], optional): Entities mentioned
+- `concepts` (string[], optional): Concepts mentioned
+- `decisions` (string[], optional): Decisions documented
+
+#### `wiki_query`
+
+Search the wiki vault and return matching pages.
+
+**Parameters:**
+- `vault_path` (string, required): Absolute path to the wiki vault
+- `query` (string, required): Search query
+
+#### `wiki_lint`
+
+Run a health check on the wiki vault.
+
+**Parameters:**
+- `vault_path` (string, required): Absolute path to the wiki vault
 
 ## Philosophy
 
