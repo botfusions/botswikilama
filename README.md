@@ -4,7 +4,7 @@
 
 # Lemma - Persistent Memory for LLMs via MCP
 
-[English](README.md) | [Türkçe](README.tr.md)
+[English](README.md) | [Türkçe](docs/README.tr.md)
 
 Lemma is a Model Context Protocol (MCP) server that provides a persistent memory layer for Large Language Models. It enables LLMs to remember facts, preferences, and context across sessions through a biological memory model with automatic decay, learning, and universal injection.
 

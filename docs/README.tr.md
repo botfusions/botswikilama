@@ -4,7 +4,7 @@
 
 # Lemma - LLM'ler için Kalıcı Bellek (MCP)
 
-[English](README.md) | [Türkçe](README.tr.md)
+[English](../README.md) | [Türkçe](README.tr.md)
 
 Lemma, Büyük Dil Modelleri (LLM) için kalıcı bir bellek katmanı sağlayan bir Model Bağlam Protokolü (MCP) sunucusudur. LLM'lerin oturumlar arasında gerçekleri, tercihleri ve bağlamı hatırlamasını sağlar; otomatik çürüme, öğrenme ve evrensel enjeksiyon ile biyolojik bir bellek modeli sunar.
 
