@@ -230,9 +230,9 @@ npm install
 
 ---
 
-## Mevcut Araçlar (20)
+## Mevcut Araçlar (22)
 
-### Bellek Araçları (10)
+### Bellek Araçları (8)
 
 #### `memory_read`
 
@@ -303,7 +303,7 @@ Bellek deposu istatistiklerini getir: fragman sayıları, ortalama güven, proje
 
 Bellek deposunda bütünlük sorunlarını denetle: yetim referanslar, yinelenen ID'ler, güven anomalileri.
 
-### Rehber Araçları (8)
+### Rehber Araçları (7)
 
 #### `guide_get`
 
@@ -379,7 +379,7 @@ Birden fazla rehberi birleştir. Kullanım sayıları toplanır.
 - `contexts` (string[], opsiyonel): Birleştirilmiş bağlamlar
 - `learnings` (string[], opsiyonel): Birleştirilmiş öğrenimler
 
-### Oturum Araçları (2)
+### Oturum Araçları (3)
 
 #### `session_start`
 
@@ -405,6 +405,44 @@ Sanal oturum istatistiklerini getir: son araç kullanım örüntüleri ve teknol
 
 **Parametreler:**
 - `count` (number, opsiyonel): Son oturum sayısı (varsayılan 10)
+
+### Wiki Araçları (4)
+
+#### `wiki_setup`
+
+Belirtilen yolda bir bilgi wiki kasası (vault) oluşturur.
+
+**Parametreler:**
+- `vault_path` (string, zorunlu): Wiki kasasının oluşturulacağı mutlak yol
+- `project_name` (string, opsiyonel): Bu wiki/projenin adı
+- `language` (string, opsiyonel): Wiki içeriği için dil (varsayılan: "Türkçe")
+
+#### `wiki_ingest`
+
+Wiki kasasındaki ham kaynak dosyalarını işler.
+
+**Parametreler:**
+- `vault_path` (string, zorunlu): Wiki kasasının mutlak yolu
+- `summary` (string, zorunlu): Kaynak içeriğin özeti
+- `file_path` (string, opsiyonel): İşlenecek belirli dosya
+- `entities` (string[], opsiyonel): Bahsedilen varlıklar (entities)
+- `concepts` (string[], opsiyonel): Bahsedilen kavramlar (concepts)
+- `decisions` (string[], opsiyonel): Belgelenen kararlar
+
+#### `wiki_query`
+
+Wiki kasasında arama yapar ve eşleşen sayfaları döndürür.
+
+**Parametreler:**
+- `vault_path` (string, zorunlu): Wiki kasasının mutlak yolu
+- `query` (string, zorunlu): Arama sorgusu
+
+#### `wiki_lint`
+
+Wiki kasasında bir sağlık kontrolü çalıştırır.
+
+**Parametreler:**
+- `vault_path` (string, zorunlu): Wiki kasasının mutlak yolu
 
 ## Felsefe
 
