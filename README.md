@@ -70,20 +70,24 @@ Unlike static memory, Lemma uses a biological model where knowledge evolves thro
 
 **Boost (on access):**
 ```
-confidence = min(1.0, confidence + 0.1)
+confidence = min(1.0, confidence + 0.015)
 tags += context_tag  (e.g., "debugging")
 associatedWith += co_accessed_fragment_ids
 ```
 
-**Decay (per session):**
+**Decay (per session, only unused fragments):**
 ```
-decay = max(0.005, 0.05 - (accessed * 0.005))
-confidence = confidence - decay
+if accessed == 0:
+    confidence = confidence - 0.002
+if accessed > 0:
+    no decay (shield — used knowledge is protected)
 ```
 
-- **Frequency**: Frequently accessed items decay slower (min 0.005 per session)
-- **Unused items** decay at the base rate of 0.05 per session
+- **Shield**: Frequently accessed items are protected from decay entirely
+- **Unused items** decay very slowly at 0.002 per session
+- **Negative feedback** reduces confidence by -0.02 (was -0.1)
 - **Associations**: Fragments used together build cross-references for future recall
+- **No time-based decay**: Confidence only changes when the system is actively used
 
 ### Deduplication
 
@@ -265,7 +269,7 @@ Update an existing fragment by ID.
 
 #### `memory_feedback`
 
-Provide feedback on a memory fragment after use. Positive boosts confidence; negative reduces by -0.1.
+Provide feedback on a memory fragment after use. Positive boosts confidence; negative reduces by -0.02.
 
 **Parameters:**
 - `id` (string, required): Fragment ID

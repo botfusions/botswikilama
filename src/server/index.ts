@@ -340,6 +340,11 @@ async function initializeContext(): Promise<void> {
   const cfg = core_config.loadConfig();
   virtualSession.setVirtualSessionConfig(cfg.virtual_session);
 
+  const migrated = core.migrateConfidenceFloor();
+  if (migrated > 0) {
+    console.error(`[Lemma] Migration: boosted ${migrated} fragments to 0.3 floor`);
+  }
+
   core.applySessionDecay();
 
   detectedProject = core.detectProject();

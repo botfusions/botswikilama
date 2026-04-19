@@ -7,6 +7,7 @@ export {
   saveMemory,
   saveMemorySafe,
   applySessionDecay,
+  migrateConfidenceFloor,
   filterByProject,
   decayConfidence,
   searchAndSortFragments,

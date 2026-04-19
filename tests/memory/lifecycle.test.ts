@@ -34,7 +34,7 @@ describe("Learning System Lifecycle", () => {
     boosted = core.boostOnAccess(boosted, "refactoring");
     boosted = core.boostOnAccess(boosted, "debugging");
 
-    assert.ok(Math.abs(boosted.confidence - 0.8) < 0.001);
+    assert.ok(Math.abs(boosted.confidence - (0.5 + 0.015 * 3)) < 0.001);
     assert.deepEqual(boosted.tags, ["debugging", "refactoring"]);
     assert.equal(boosted.accessed, 3);
   });
@@ -58,20 +58,22 @@ describe("Learning System Lifecycle", () => {
       frag = core.decayConfidence([frag])[0];
     }
 
-    assert.ok(frag.confidence > 0.7,
-      `Frequently used fragment should stay strong, got ${frag.confidence}`);
+    assert.ok(frag.confidence >= 0.99,
+      `Frequently used fragment should stay strong (shield), got ${frag.confidence}`);
     assert.deepEqual(frag.tags, ["daily-use"]);
   });
 
-  test("unused fragment decays to near zero", () => {
+  test("unused fragment decays slowly", () => {
     let frag: MemoryFragment = { ...core.createFragment("forgotten", "ai"), confidence: 1.0, accessed: 0 };
 
     for (let i = 0; i < 30; i++) {
       frag = core.decayConfidence([frag])[0];
     }
 
-    assert.ok(frag.confidence < 0.1,
-      `Unused fragment should decay significantly, got ${frag.confidence}`);
+    assert.ok(frag.confidence < 0.95,
+      `Unused fragment should decay slowly, got ${frag.confidence}`);
+    assert.ok(frag.confidence > 0.9,
+      `Decay rate should be slow (0.002/session), got ${frag.confidence}`);
   });
 
   test("associations track co-accessed fragments", () => {

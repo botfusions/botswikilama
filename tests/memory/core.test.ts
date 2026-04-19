@@ -129,10 +129,17 @@ describe("Memory Core", () => {
   });
 
   describe("decayConfidence", () => {
-    test("reduces confidence for unused fragments", () => {
+    test("reduces confidence for unused fragments (accessed=0)", () => {
       const frag: MemoryFragment = { ...core.createFragment("test", "ai"), accessed: 0 };
       const [decayed]: MemoryFragment[] = core.decayConfidence([frag]);
       assert.ok(decayed.confidence < frag.confidence);
+      assert.ok(Math.abs(decayed.confidence - (frag.confidence - 0.002)) < 0.001);
+    });
+
+    test("does not decay fragments with accessed > 0 (shield)", () => {
+      const frag: MemoryFragment = { ...core.createFragment("test", "ai"), confidence: 0.8, accessed: 3 };
+      const [decayed]: MemoryFragment[] = core.decayConfidence([frag]);
+      assert.equal(decayed.confidence, 0.8, "accessed>0 fragments should not decay");
     });
 
     test("resets accessed counter after decay", () => {
@@ -172,14 +179,14 @@ describe("Memory Core", () => {
   });
 
   describe("boostOnAccess", () => {
-    test("increases confidence by 0.1", () => {
+    test("increases confidence by 0.015", () => {
       const frag: MemoryFragment = { ...core.createFragment("test", "ai"), confidence: 0.5 };
       const boosted: MemoryFragment = core.boostOnAccess(frag);
-      assert.equal(boosted.confidence, 0.6);
+      assert.ok(Math.abs(boosted.confidence - 0.515) < 0.001);
     });
 
     test("never exceeds 1.0", () => {
-      const frag: MemoryFragment = { ...core.createFragment("test", "ai"), confidence: 0.95 };
+      const frag: MemoryFragment = { ...core.createFragment("test", "ai"), confidence: 0.99 };
       const boosted: MemoryFragment = core.boostOnAccess(frag);
       assert.equal(boosted.confidence, 1.0);
     });
@@ -216,14 +223,14 @@ describe("Memory Core", () => {
   });
 
   describe("recordNegativeHit", () => {
-    test("decreases confidence by 0.1", () => {
+    test("decreases confidence by 0.02", () => {
       const frag: MemoryFragment = { ...core.createFragment("test", "ai"), confidence: 0.8 };
       const penalized: MemoryFragment = core.recordNegativeHit(frag);
-      assert.ok(Math.abs(penalized.confidence - 0.7) < 0.001);
+      assert.ok(Math.abs(penalized.confidence - 0.78) < 0.001);
     });
 
     test("never goes below 0", () => {
-      const frag: MemoryFragment = { ...core.createFragment("test", "ai"), confidence: 0.05 };
+      const frag: MemoryFragment = { ...core.createFragment("test", "ai"), confidence: 0.01 };
       const penalized: MemoryFragment = core.recordNegativeHit(frag);
       assert.equal(penalized.confidence, 0);
     });

@@ -98,7 +98,7 @@ export function findSimilarFragment(fragments: MemoryFragment[], fragmentText: s
 
 export function boostOnAccess(fragment: MemoryFragment, context: string | null = null): MemoryFragment {
   const boosted = { ...fragment };
-  boosted.confidence = Math.min(1.0, boosted.confidence + 0.1);
+  boosted.confidence = Math.min(1.0, boosted.confidence + 0.015);
   boosted.accessed++;
   boosted.lastAccessed = new Date().toISOString();
 
@@ -116,7 +116,7 @@ export function boostOnAccess(fragment: MemoryFragment, context: string | null =
 export function recordNegativeHit(fragment: MemoryFragment): MemoryFragment {
   return {
     ...fragment,
-    confidence: Math.max(0, fragment.confidence - 0.1),
+    confidence: Math.max(0, fragment.confidence - 0.02),
     negativeHits: (fragment.negativeHits || 0) + 1,
     lastAccessed: new Date().toISOString()
   };
@@ -242,6 +242,22 @@ export function applySessionDecay(): MemoryFragment[] {
   return decayed;
 }
 
+export function migrateConfidenceFloor(): number {
+  const memory = loadMemory();
+  let migrated = 0;
+  const updated = memory.map(frag => {
+    if (frag.confidence < 0.3) {
+      migrated++;
+      return { ...frag, confidence: 0.3 };
+    }
+    return frag;
+  });
+  if (migrated > 0) {
+    saveMemory(updated);
+  }
+  return migrated;
+}
+
 export function filterByProject(fragments: MemoryFragment[], currentProject: string | null): MemoryFragment[] {
   const project = (typeof currentProject === 'string')
     ? currentProject.trim().toLowerCase() || null
@@ -257,10 +273,19 @@ export function filterByProject(fragments: MemoryFragment[], currentProject: str
 }
 
 export function decayConfidence(fragments: MemoryFragment[]): MemoryFragment[] {
+  const DECAY_RATE = 0.002;
+
   return fragments
     .map(frag => {
-      const sessionDecay = Math.max(0.005, 0.05 - (frag.accessed * 0.005));
-      const newConfidence = frag.confidence - sessionDecay;
+      if (frag.accessed > 0) {
+        return {
+          ...frag,
+          accessed: 0,
+          negativeHits: 0
+        };
+      }
+
+      const newConfidence = frag.confidence - DECAY_RATE;
 
       return {
         ...frag,

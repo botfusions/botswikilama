@@ -70,20 +70,24 @@ Statik belleğin aksine, Lemma bilginin kullanım yoluyla evrildiği biyolojik b
 
 **Güçlendirme (erişimde):**
 ```
-confidence = min(1.0, confidence + 0.1)
-tags += context_tag  (e.g., "debugging")
+confidence = min(1.0, confidence + 0.015)
+tags += context_tag  (örn. "debugging")
 associatedWith += co_accessed_fragment_ids
 ```
 
-**Çürüme (oturum başına):**
+**Çürüme (oturum başına, sadece kullanılmayan fragmanlar):**
 ```
-decay = max(0.005, 0.05 - (accessed * 0.005))
-confidence = confidence - decay
+if accessed == 0:
+    confidence = confidence - 0.002
+if accessed > 0:
+    çürüme yok (kalkan — kullanılan bilgi korunur)
 ```
 
-- **Sıklık**: Sık erişilen öğeler daha yavaş çürür (minimum oturum başına 0.005)
-- **Kullanılmayan öğeler** temel oran olan oturum başına 0.05 çürür
+- **Kalkan**: Sık erişilen öğeler çürümeden tamamen korunur
+- **Kullanılmayan öğeler** oturum başına sadece 0.002 çürür (çok yavaş)
+- **Olumsuz geri bildirim** güveni -0.02 azaltır (eskiden -0.1 idi)
 - **İlişkiler**: Birlikte kullanılan fragmanlar gelecekteki hatırlama için çapraz referanslar oluşturur
+- **Zaman bazlı çürüme yok**: Güven sadece sistem aktif olarak kullanıldığında değişir
 
 ### Tekilleştirme (Deduplication)
 
@@ -265,7 +269,7 @@ Mevcut bir fragmanı ID ile güncelle.
 
 #### `memory_feedback`
 
-Kullanımdan sonra bir bellek fragmanı hakkında geri bildirim ver. Pozitif geri bildirim güveni artırır; negatif -0.1 düşürür.
+Kullanımdan sonra bir bellek fragmanı hakkında geri bildirim ver. Pozitif geri bildirim güveni artırır; negatif -0.02 düşürür.
 
 **Parametreler:**
 - `id` (string, zorunlu): Fragman ID'si

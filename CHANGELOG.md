@@ -1,5 +1,24 @@
 # Changelog
 
+## [0.7.2] - 2026-04-19
+
+### Fixed
+- **Critical: Confidence death spiral** — Decay was applied to ALL fragments every session start, including actively used ones. Average confidence dropped from 0.52 to 0.04 across 339 fragments. Rewritten with biological memory model:
+  - **Shield**: Fragments with `accessed > 0` are completely protected from decay
+  - **Slow decay**: Unused fragments decay at only -0.002 per session (was 0.005-0.05)
+  - **Slow boost**: Access boost reduced to +0.015 (was +0.1) for gradual, lasting growth
+  - **Slow penalty**: Negative feedback reduced to -0.02 (was -0.1)
+  - **No time-based decay**: Confidence only changes when the system is actively used
+
+### Added
+- **`migrateConfidenceFloor()`** — One-time migration that boosts fragments below 0.3 to 0.3 floor on startup. Runs automatically on first launch after update.
+
+### Changed
+- **README (EN/TR)** — Learning System section updated with new rates and shield behavior
+- **361 tests** — All passing with updated confidence rate assertions
+
+---
+
 ## [0.7.0] - 2026-04-19
 
 ### Breaking Changes
@@ -367,6 +386,7 @@
 
 ---
 
+[0.7.2]: https://github.com/xenitV1/lemma/compare/v0.7.1...v0.7.2
 [0.7.0]: https://github.com/xenitV1/lemma/compare/v0.6.1...v0.7.0
 [0.6.1]: https://github.com/xenitV1/lemma/compare/v0.6.0...v0.6.1
 [0.6.0]: https://github.com/xenitV1/lemma/compare/v0.5.0...v0.6.0

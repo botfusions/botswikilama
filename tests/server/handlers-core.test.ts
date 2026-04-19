@@ -135,7 +135,7 @@ describe("Handlers (Integration)", () => {
       assert.ok(result.content[0].text.includes("Positive"));
 
       const loaded = core.loadMemory().find((f: MemoryFragment) => f.id === frag.id)!;
-      assert.equal(loaded.confidence, 0.6);
+      assert.ok(Math.abs(loaded.confidence - 0.515) < 0.001);
     });
 
     test("negative feedback reduces confidence", async () => {
@@ -150,7 +150,7 @@ describe("Handlers (Integration)", () => {
       assert.ok(result.content[0].text.includes("Negative"));
 
       const loaded = core.loadMemory().find((f: MemoryFragment) => f.id === frag.id)!;
-      assert.ok(Math.abs(loaded.confidence - 0.7) < 0.001);
+      assert.ok(Math.abs(loaded.confidence - 0.78) < 0.001);
       assert.equal(loaded.negativeHits, 1);
     });
 
