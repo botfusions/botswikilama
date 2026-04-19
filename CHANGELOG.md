@@ -1,5 +1,22 @@
 # Changelog
 
+## [0.7.4] - 2026-04-19
+
+### Fixed
+- **Critical: Universal Memory Injection broken in MCP clients (Kilo Code, Cursor, Claude Desktop, etc.)** — Memory fragments were never injected into tool descriptions because clients cache `tools/list` on session start and never re-fetch.
+  - Added `listChanged: true` to server capabilities so clients listen for tool change notifications
+  - Server now sends `notifications/tools/list_changed` on every memory change (`memory_add`, `memory_update`, `memory_forget`, `memory_feedback`, `memory_merge`)
+  - Clients re-fetch `tools/list` → `buildToolsWithMemory()` runs with updated memory → LLM sees current context
+- **Global fragments injected twice** — `filterByProject(projectName)` already includes global fragments, but all 3 injection paths (`buildToolsWithMemory`, `buildDynamicInstructions`, `getDynamicSystemPrompt`) also called `filterByProject(null)` separately and concatenated results. Fixed to use a single filtered list.
+- **Hardcoded injection limits ignoring config** — `buildToolsWithMemory` used hardcoded values (`maxFrags=10→15`, `remaining.slice(0,15)`, `getTopGuides(_,5)`) instead of reading from `config.injection.*`. Now respects `max_full_content_fragments`, `max_summary_fragments`, and `max_guides` from config.
+
+### Changed
+- `buildToolsWithMemory` and `buildDynamicInstructions` exported for testability
+- `setDetectedProject()` helper added for testing
+- Added 5 new tests verifying no duplicate fragment injection and config limit respect
+
+---
+
 ## [0.7.2] - 2026-04-19
 
 ### Fixed

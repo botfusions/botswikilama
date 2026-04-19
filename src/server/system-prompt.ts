@@ -129,7 +129,11 @@ export async function getDynamicSystemPrompt(projectName: string | null): Promis
     globalFragments: [],
   };
 
-  const globalFragmentsRaw = core.filterByProject(memory, null) as MemoryFragment[];
+  const allFragments = projectName
+    ? (core.filterByProject(memory, projectName) as MemoryFragment[])
+    : (core.filterByProject(memory, null) as MemoryFragment[]);
+
+  const globalFragmentsRaw = allFragments.filter(f => f.project === null || f.project === undefined);
   if (globalFragmentsRaw.length > 0) {
     const sortedGlobal = processFragments(globalFragmentsRaw, 10);
     context.globalFragments = sortedGlobal;
@@ -142,7 +146,7 @@ export async function getDynamicSystemPrompt(projectName: string | null): Promis
   }
 
   if (projectName) {
-    const projectFragmentsRaw = core.filterByProject(memory, projectName) as MemoryFragment[];
+    const projectFragmentsRaw = allFragments.filter(f => f.project !== null && f.project !== undefined);
     if (projectFragmentsRaw.length > 0) {
       const sortedProject = processFragments(projectFragmentsRaw, 20);
       context.fragments = sortedProject;

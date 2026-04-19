@@ -19,7 +19,11 @@ import { triggerHook, HookTypes } from "./hooks.js";
 import * as core_config from "../memory/config.js";
 import { setNotifyChange } from "./handlers.js";
 
-let detectedProject: string | null = null;
+export let detectedProject: string | null = null;
+
+export function setDetectedProject(p: string | null): void {
+  detectedProject = p;
+}
 
 const server = new Server(
   {
@@ -28,8 +32,12 @@ const server = new Server(
   },
   {
     capabilities: {
-      tools: {},
-      resources: {},
+      tools: {
+        listChanged: true,
+      },
+      resources: {
+        listChanged: true,
+      },
     },
   }
 );
@@ -42,7 +50,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
   return { tools: buildToolsWithMemory() };
 });
 
-function buildToolsWithMemory(): ToolDefinition[] {
+export function buildToolsWithMemory(): ToolDefinition[] {
   const tools: ToolDefinition[] = TOOLS.map(t => ({ ...t }));
   const memoryIdx = tools.findIndex(t => t.name === "memory_read");
   if (memoryIdx === -1) return tools;
@@ -51,19 +59,16 @@ function buildToolsWithMemory(): ToolDefinition[] {
   const memory: any[] = core.loadMemory();
   const projectName = detectedProject;
 
-  const projectFragments = projectName
+  const allSorted = projectName
     ? (core.filterByProject(memory, projectName) as any[]).sort((a: any, b: any) => b.confidence - a.confidence)
-    : [];
-  const globalFragments = (core.filterByProject(memory, null) as any[]).sort((a: any, b: any) => b.confidence - a.confidence);
+    : (core.filterByProject(memory, null) as any[]).sort((a: any, b: any) => b.confidence - a.confidence);
 
   let contextBlock = "";
   let tokensUsed = 0;
   const budget = config.token_budget.full_content || 3000;
-  const maxFrags = config.injection.max_full_content_fragments || 10;
+  const maxFrags = config.injection.max_full_content_fragments || 15;
   let count = 0;
   const injectedIds = new Set<string>();
-
-  const allSorted = [...projectFragments, ...globalFragments];
 
   if (allSorted.length > 0) {
     contextBlock += `\n\nYOUR MEMORIES (you already know these — no need to call memory_read for them):\n`;
@@ -80,7 +85,7 @@ function buildToolsWithMemory(): ToolDefinition[] {
       injectedIds.add(frag.id);
     }
 
-    const remaining = allSorted.filter((f: any) => !injectedIds.has(f.id)).slice(0, 15);
+    const remaining = allSorted.filter((f: any) => !injectedIds.has(f.id)).slice(0, config.injection.max_summary_fragments || 30);
     if (remaining.length > 0) {
       contextBlock += `---\nADDITIONAL (call memory_read for details):\n`;
       for (const frag of remaining) {
@@ -91,7 +96,7 @@ function buildToolsWithMemory(): ToolDefinition[] {
   }
 
   const allGuides: any[] = guides.loadGuides();
-  const topGuides = guides.getTopGuides(allGuides, 5);
+  const topGuides = guides.getTopGuides(allGuides, config.injection.max_guides || 20);
   if (topGuides.length > 0) {
     contextBlock += `\nACTIVE GUIDES:\n`;
     for (const g of topGuides) {
@@ -110,17 +115,15 @@ function buildToolsWithMemory(): ToolDefinition[] {
   return tools;
 }
 
-function buildDynamicInstructions(projectName: string | null): string {
+export function buildDynamicInstructions(projectName: string | null): string {
   const config = core_config.loadConfig();
   const memory: any[] = core.loadMemory();
 
-  const projectFragments = projectName
+  const allSorted = projectName
     ? (core.filterByProject(memory, projectName) as any[])
         .sort((a: any, b: any) => b.confidence - a.confidence)
-    : [];
-
-  const globalFragments = (core.filterByProject(memory, null) as any[])
-    .sort((a: any, b: any) => b.confidence - a.confidence);
+    : (core.filterByProject(memory, null) as any[])
+        .sort((a: any, b: any) => b.confidence - a.confidence);
 
   const allGuides: any[] = guides.loadGuides();
   const topGuides = guides.getTopGuides(allGuides, config.injection.max_guides);
@@ -128,7 +131,6 @@ function buildDynamicInstructions(projectName: string | null): string {
   let instructions = "";
 
   const fullBudget = config.token_budget.full_content;
-  const allSorted = [...projectFragments, ...globalFragments];
   let tokensUsed = 0;
   const fullContentIds = new Set<string>();
 
@@ -223,8 +225,12 @@ server.setRequestHandler(InitializeRequestSchema, async (_request) => {
   return {
     protocolVersion: "2024-11-05",
     capabilities: {
-      tools: {},
-      resources: {},
+      tools: {
+        listChanged: true,
+      },
+      resources: {
+        listChanged: true,
+      },
     },
     serverInfo: {
       name: "lemma",
@@ -377,6 +383,11 @@ export async function startServer(): Promise<void> {
   await server.connect(transport);
 
   setNotifyChange(() => {
+    try {
+      server.notification({
+        method: "notifications/tools/list_changed",
+      });
+    } catch {}
     try {
       server.notification({
         method: "notifications/resources/updated",

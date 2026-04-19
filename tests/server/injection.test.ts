@@ -8,6 +8,7 @@ import * as core from "../../src/memory/index.js";
 import * as guides from "../../src/guides/index.js";
 import * as handlers from "../../src/server/handlers.js";
 import { getDynamicSystemPrompt, BASE_SYSTEM_PROMPT } from "../../src/server/system-prompt.js";
+import { buildToolsWithMemory, buildDynamicInstructions, setDetectedProject } from "../../src/server/index.js";
 import * as core_config from "../../src/memory/config.js";
 import type { LemmaConfig } from "../../src/types.js";
 
@@ -58,8 +59,7 @@ describe("Dynamic System Prompt Injection", () => {
     const prompt = await getDynamicSystemPrompt("BudgetProj");
     const projectCtx = prompt.match(/<project_context>([\s\S]*?)<\/project_context>/);
     assert.ok(projectCtx, "Should have project_context section");
-
-    const idMatches = projectCtx[1].match(/\[m[a-f0-9]{6}\]/g) || [];
+    const idMatches = projectCtx![1].match(/\[m[a-f0-9]{6}\]/g) || [];
     assert.ok(idMatches.length <= 20, `Expected max 20 fragments in context, got ${idMatches.length}`);
   });
 
@@ -133,5 +133,86 @@ describe("Handler Dispatch with Injection Context", () => {
     const result = await handlers.handleGuideGet({});
     assert.ok(!result.isError);
     assert.ok(result.content[0].text.includes("injection-guide"));
+  });
+});
+
+describe("Injection — no duplicate global fragments", () => {
+  test("buildToolsWithMemory does not duplicate global fragments", () => {
+    const globalFrag = core.createFragment("Global pref", "ai", "GlobalPref", null);
+    const projFrag = core.createFragment("Project detail", "ai", "ProjDetail", "DupTest");
+    core.saveMemory([globalFrag, projFrag]);
+
+    setDetectedProject("DupTest");
+    const tools = buildToolsWithMemory();
+    const memoryRead = tools.find(t => t.name === "memory_read");
+    assert.ok(memoryRead);
+
+    const desc = memoryRead!.description;
+    const globalCount = (desc.match(/\[m[a-f0-9]{12}\] GlobalPref/g) || []).length;
+    assert.equal(globalCount, 1, `Global fragment should appear exactly once, appeared ${globalCount} times`);
+
+    const projCount = (desc.match(/\[m[a-f0-9]{12}\] ProjDetail/g) || []).length;
+    assert.equal(projCount, 1, `Project fragment should appear exactly once, appeared ${projCount} times`);
+  });
+
+  test("buildDynamicInstructions does not duplicate global fragments", () => {
+    const globalFrag = core.createFragment("Global setting", "ai", "GlobalSetting", null);
+    const projFrag = core.createFragment("Project config", "ai", "ProjConfig", "DupInstr");
+    core.saveMemory([globalFrag, projFrag]);
+
+    const instructions = buildDynamicInstructions("DupInstr");
+
+    const globalCount = (instructions.match(/GlobalSetting/g) || []).length;
+    assert.equal(globalCount, 1, `Global fragment should appear exactly once in instructions, appeared ${globalCount} times`);
+
+    const projCount = (instructions.match(/ProjConfig/g) || []).length;
+    assert.equal(projCount, 1, `Project fragment should appear exactly once in instructions, appeared ${projCount} times`);
+  });
+
+  test("getDynamicSystemPrompt does not duplicate global fragments", async () => {
+    const globalFrag = core.createFragment("Global knowledge", "ai", "GlobalKnow", null);
+    const projFrag = core.createFragment("Project knowledge", "ai", "ProjKnow", "DupPrompt");
+    core.saveMemory([globalFrag, projFrag]);
+
+    const prompt = await getDynamicSystemPrompt("DupPrompt");
+
+    const globalCount = (prompt.match(/GlobalKnow/g) || []).length;
+    assert.equal(globalCount, 1, `Global fragment should appear exactly once in system prompt, appeared ${globalCount} times`);
+
+    const projCount = (prompt.match(/ProjKnow/g) || []).length;
+    assert.equal(projCount, 1, `Project fragment should appear exactly once in system prompt, appeared ${projCount} times`);
+  });
+
+  test("buildToolsWithMemory with no project shows only globals", () => {
+    const globalFrag = core.createFragment("Global only", "ai", "GlobalOnly", null);
+    const otherProj = core.createFragment("Other project", "ai", "OtherProj", "OtherProject");
+    core.saveMemory([globalFrag, otherProj]);
+
+    setDetectedProject(null);
+    const tools = buildToolsWithMemory();
+    const memoryRead = tools.find(t => t.name === "memory_read");
+    assert.ok(memoryRead);
+
+    const desc = memoryRead!.description;
+    assert.ok(desc.includes("GlobalOnly"), "Global fragment should be present");
+    assert.ok(!desc.includes("OtherProj"), "Other project fragment should NOT be present when no project detected");
+  });
+
+  test("buildToolsWithMemory respects config values for injection limits", () => {
+    const frags = [];
+    for (let i = 0; i < 30; i++) {
+      frags.push(core.createFragment(`Frag ${i} content`, "ai", `Frag${i}`, null));
+    }
+    core.saveMemory(frags);
+
+    setDetectedProject(null);
+    const tools = buildToolsWithMemory();
+    const memoryRead = tools.find(t => t.name === "memory_read");
+    assert.ok(memoryRead);
+
+    const desc = memoryRead!.description;
+    const idMatches = desc.match(/\[m[a-f0-9]{12}\]/g) || [];
+    const uniqueIds = new Set(idMatches);
+    assert.equal(idMatches.length, uniqueIds.size, "No duplicate fragment IDs should appear in injection");
   });
 });
