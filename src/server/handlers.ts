@@ -2,6 +2,9 @@ import * as core from "../memory/index.js";
 import * as guides from "../guides/index.js";
 import * as sessions from "../sessions/index.js";
 import * as virtualSession from "../sessions/virtual.js";
+import * as wiki from "../wiki/index.js";
+import path from "path";
+import fs from "fs";
 
 interface ToolResult {
   content: Array<{ type: string; text: string }>;
@@ -119,6 +122,31 @@ interface GuideMergeArgs {
 
 interface SessionStatsArgs {
   count?: number;
+}
+
+interface WikiSetupArgs {
+  vault_path?: string;
+  project_name?: string;
+  language?: string;
+}
+
+interface WikiIngestArgs {
+  vault_path?: string;
+  file_path?: string;
+  title?: string;
+  summary?: string;
+  entities?: string[];
+  concepts?: string[];
+  decisions?: string[];
+}
+
+interface WikiQueryArgs {
+  vault_path?: string;
+  query?: string;
+}
+
+interface WikiLintArgs {
+  vault_path?: string;
 }
 
 interface ToolCallRequest {
@@ -883,6 +911,201 @@ export async function handleSessionStats(args?: SessionStatsArgs): Promise<ToolR
   return { content: [{ type: "text", text: output }] };
 }
 
+export async function handleWikiSetup(args?: WikiSetupArgs): Promise<ToolResult> {
+  const vaultPath = args?.vault_path;
+  const projectName = args?.project_name || path.basename(vaultPath || "wiki");
+  const language = args?.language || "Türkçe";
+
+  if (!vaultPath) {
+    return { content: [{ type: "text", text: "Error: 'vault_path' is required" }], isError: true };
+  }
+
+  try {
+    if (wiki.detectVault(vaultPath)) {
+      const stats = wiki.getVaultStats(vaultPath);
+      return {
+        content: [{ type: "text", text: `Wiki vault already exists at ${vaultPath}\nStats: ${JSON.stringify(stats, null, 2)}` }],
+      };
+    }
+
+    const result = wiki.setupVault(vaultPath, projectName, language);
+    return {
+      content: [{ type: "text", text: `Wiki vault created at ${vaultPath}\nProject: ${projectName}\nLanguage: ${language}\nFolders created: ${result.folders}\nFiles created: ${result.files}` }],
+    };
+  } catch (error) {
+    return { content: [{ type: "text", text: `Error: ${(error as Error).message}` }], isError: true };
+  }
+}
+
+export async function handleWikiIngest(args?: WikiIngestArgs): Promise<ToolResult> {
+  const vaultPath = args?.vault_path;
+  const filePath = args?.file_path || null;
+  const title = args?.title || null;
+  const summary = args?.summary;
+  const entities = args?.entities || [];
+  const concepts = args?.concepts || [];
+  const decisions = args?.decisions || [];
+
+  if (!vaultPath) {
+    return { content: [{ type: "text", text: "Error: 'vault_path' is required" }], isError: true };
+  }
+
+  if (!summary) {
+    return { content: [{ type: "text", text: "Error: 'summary' is required — provide a summary of the source content" }], isError: true };
+  }
+
+  try {
+    if (!wiki.detectVault(vaultPath)) {
+      return { content: [{ type: "text", text: `Error: No wiki vault found at ${vaultPath}. Run wiki_setup first.` }], isError: true };
+    }
+
+    const date = new Date().toISOString().split("T")[0];
+    const slug = (title || "untitled").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+    const sourcePage = path.join(vaultPath, "sources", `${date}-${slug}.md`);
+
+    let pageContent = `---\ntitle: ${title || "Untitled"}\ntags: [source]\nsource: ${filePath || "manual"}\ndate: ${date}\nstatus: active\n---\n\n# ${title || "Untitled"}\n\n${summary}\n\n## Sources\n\n${filePath ? `- ${path.basename(filePath)}` : "- Manual entry"}\n\n## Related\n`;
+
+    wiki.writePage(sourcePage, pageContent);
+
+    let pagesCreated = 1;
+    const createdPages: string[] = [`sources/${date}-${slug}.md`];
+
+    for (const entity of entities) {
+      const entitySlug = entity.toLowerCase().replace(/[^a-z0-9]+/g, "-");
+      const entityPath = path.join(vaultPath, "entities", `${entitySlug}.md`);
+      if (!fs.existsSync(entityPath)) {
+        const entityContent = `---\ntitle: ${entity}\ntags: [entity]\ndate: ${date}\nstatus: active\n---\n\n# ${entity}\n\n## Sources\n\n- [[${date}-${slug}]]\n\n## Related\n`;
+        wiki.writePage(entityPath, entityContent);
+        pagesCreated++;
+        createdPages.push(`entities/${entitySlug}.md`);
+      } else {
+        const existing = wiki.readPage(entityPath) || "";
+        if (!existing.includes(`[[${date}-${slug}]]`)) {
+          const updated = existing.replace("## Related", `## Related\n\n- [[${date}-${slug}]]`);
+          wiki.writePage(entityPath, updated);
+        }
+      }
+    }
+
+    for (const concept of concepts) {
+      const conceptSlug = concept.toLowerCase().replace(/[^a-z0-9]+/g, "-");
+      const conceptPath = path.join(vaultPath, "concepts", `${conceptSlug}.md`);
+      if (!fs.existsSync(conceptPath)) {
+        const conceptContent = `---\ntitle: ${concept}\ntags: [concept]\ndate: ${date}\nstatus: active\n---\n\n# ${concept}\n\n## Sources\n\n- [[${date}-${slug}]]\n\n## Related\n`;
+        wiki.writePage(conceptPath, conceptContent);
+        pagesCreated++;
+        createdPages.push(`concepts/${conceptSlug}.md`);
+      }
+    }
+
+    for (const decision of decisions) {
+      const decisionSlug = decision.toLowerCase().substring(0, 60).replace(/[^a-z0-9]+/g, "-");
+      const decisionPath = path.join(vaultPath, "decisions", `${date}-${decisionSlug}.md`);
+      const decisionContent = `---\ntitle: ${decision}\ntags: [decision]\ndate: ${date}\nstatus: active\n---\n\n# ${decision}\n\n## Sources\n\n- [[${date}-${slug}]]\n\n## Related\n`;
+      wiki.writePage(decisionPath, decisionContent);
+      pagesCreated++;
+      createdPages.push(`decisions/${date}-${decisionSlug}.md`);
+    }
+
+    wiki.updateIndex(vaultPath, "Kaynaklar (Sources)", title || "Untitled", sourcePage);
+    wiki.appendToLog(vaultPath, `## [${date}] ingest | ${title || "Untitled"}\n  file: ${filePath || "manual"}\n  created: ${createdPages.join(", ")}`);
+
+    return {
+      content: [{ type: "text", text: `Ingested: ${title || "Untitled"}\nPages created: ${pagesCreated}\nFiles:\n${createdPages.map((p) => `  - ${p}`).join("\n")}\nEntities: ${entities.length} | Concepts: ${concepts.length} | Decisions: ${decisions.length}` }],
+    };
+  } catch (error) {
+    return { content: [{ type: "text", text: `Error: ${(error as Error).message}` }], isError: true };
+  }
+}
+
+export async function handleWikiQuery(args?: WikiQueryArgs): Promise<ToolResult> {
+  const vaultPath = args?.vault_path;
+  const query = args?.query;
+
+  if (!vaultPath) {
+    return { content: [{ type: "text", text: "Error: 'vault_path' is required" }], isError: true };
+  }
+  if (!query) {
+    return { content: [{ type: "text", text: "Error: 'query' is required" }], isError: true };
+  }
+
+  try {
+    if (!wiki.detectVault(vaultPath)) {
+      return { content: [{ type: "text", text: `Error: No wiki vault found at ${vaultPath}. Run wiki_setup first.` }], isError: true };
+    }
+
+    const results = wiki.searchWiki(vaultPath, query);
+
+    if (results.length === 0) {
+      const date = new Date().toISOString().split("T")[0];
+      wiki.appendToLog(vaultPath, `## [${date}] query | "${query}" → no results`);
+      return {
+        content: [{ type: "text", text: `No results found for: "${query}"\n\nConsider adding more sources to the wiki via wiki_ingest.` }],
+      };
+    }
+
+    let response = `Found ${results.length} matching page(s) for: "${query}"\n\n`;
+
+    for (const result of results) {
+      response += `### ${result.title}\nFile: ${result.file}\n`;
+      for (const match of result.matches) {
+        response += `  > ${match}\n`;
+      }
+      response += "\n";
+    }
+
+    const date = new Date().toISOString().split("T")[0];
+    wiki.appendToLog(vaultPath, `## [${date}] query | "${query}" → ${results.length} results`);
+
+    return { content: [{ type: "text", text: response }] };
+  } catch (error) {
+    return { content: [{ type: "text", text: `Error: ${(error as Error).message}` }], isError: true };
+  }
+}
+
+export async function handleWikiLint(args?: WikiLintArgs): Promise<ToolResult> {
+  const vaultPath = args?.vault_path;
+
+  if (!vaultPath) {
+    return { content: [{ type: "text", text: "Error: 'vault_path' is required" }], isError: true };
+  }
+
+  try {
+    if (!wiki.detectVault(vaultPath)) {
+      return { content: [{ type: "text", text: `Error: No wiki vault found at ${vaultPath}. Run wiki_setup first.` }], isError: true };
+    }
+
+    const findings = wiki.lintWiki(vaultPath);
+    const stats = wiki.getVaultStats(vaultPath);
+
+    const date = new Date().toISOString().split("T")[0];
+    const high = findings.filter((f) => f.priority === "high").length;
+    const medium = findings.filter((f) => f.priority === "medium").length;
+    const low = findings.filter((f) => f.priority === "low").length;
+
+    let report = `# Wiki Lint Report — ${date}\n\n`;
+    report += `Vault: ${vaultPath}\n`;
+    report += `Total pages: ${stats.total} | Raw sources: ${stats.raw}\n`;
+    report += `Findings: ${findings.length} (H:${high} M:${medium} L:${low})\n\n`;
+
+    if (findings.length === 0) {
+      report += "No issues found. Wiki is healthy.\n";
+    } else {
+      for (const finding of findings) {
+        report += `- [${finding.priority.toUpperCase()}] ${finding.category}: ${finding.file}\n  ${finding.description}\n  Fix: ${finding.suggestion}\n\n`;
+      }
+    }
+
+    const lintReportPath = path.join(vaultPath, "lint-report.md");
+    wiki.writePage(lintReportPath, report);
+    wiki.appendToLog(vaultPath, `## [${date}] lint | ${findings.length} findings (H:${high} M:${medium} L:${low})`);
+
+    return { content: [{ type: "text", text: report }] };
+  } catch (error) {
+    return { content: [{ type: "text", text: `Error: ${(error as Error).message}` }], isError: true };
+  }
+}
+
 export async function handleCallTool(request: ToolCallRequest): Promise<ToolResult> {
   const { name, arguments: args } = request.params;
 
@@ -924,6 +1147,14 @@ export async function handleCallTool(request: ToolCallRequest): Promise<ToolResu
         return await handleGuideMerge(args as GuideMergeArgs);
       case "session_stats":
         return await handleSessionStats(args as SessionStatsArgs);
+      case "wiki_setup":
+        return await handleWikiSetup(args as WikiSetupArgs);
+      case "wiki_ingest":
+        return await handleWikiIngest(args as WikiIngestArgs);
+      case "wiki_query":
+        return await handleWikiQuery(args as WikiQueryArgs);
+      case "wiki_lint":
+        return await handleWikiLint(args as WikiLintArgs);
       default:
         return {
           content: [{ type: "text", text: `Error: Unknown tool '${name}'` }],

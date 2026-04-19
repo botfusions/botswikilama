@@ -447,6 +447,102 @@ export const TOOLS: ToolDefinition[] = [
     },
   },
   {
+    name: "wiki_setup",
+    description: "Create a knowledge wiki vault at the specified path. Sets up folder structure (raw/, sources/, entities/, concepts/, decisions/, syntheses/, archive/), creates index.md, log.md, and CLAUDE.md. If vault already exists, reports status only.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        vault_path: {
+          type: "string",
+          description: "Absolute path where the wiki vault will be created",
+        },
+        project_name: {
+          type: "string",
+          description: "Name for this wiki/project (default: folder name)",
+        },
+        language: {
+          type: "string",
+          description: "Language for wiki content (default: 'Türkçe')",
+          default: "Türkçe",
+        },
+      },
+      required: ["vault_path"],
+    },
+  },
+  {
+    name: "wiki_ingest",
+    description: "Process raw source files in the wiki vault. Reads new files from raw/, creates summary pages in sources/, updates entity/concept/decision pages, and maintains cross-references. Returns summary of processed files.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        vault_path: {
+          type: "string",
+          description: "Absolute path to the wiki vault",
+        },
+        file_path: {
+          type: "string",
+          description: "Specific file to ingest (optional, if omitted processes all new files)",
+        },
+        title: {
+          type: "string",
+          description: "Title for the source summary page (optional, auto-generated)",
+        },
+        summary: {
+          type: "string",
+          description: "Summary of the source content written by the LLM",
+        },
+        entities: {
+          type: "array",
+          items: { type: "string" },
+          description: "Entities mentioned in the source (e.g., ['React', 'Node.js', 'John Smith'])",
+        },
+        concepts: {
+          type: "array",
+          items: { type: "string" },
+          description: "Concepts mentioned in the source (e.g., ['Server Components', 'Streaming SSR'])",
+        },
+        decisions: {
+          type: "array",
+          items: { type: "string" },
+          description: "Decisions documented in the source",
+        },
+      },
+      required: ["vault_path", "summary"],
+    },
+  },
+  {
+    name: "wiki_query",
+    description: "Search the wiki vault and return matching pages. Searches across sources, entities, concepts, decisions, and syntheses. Returns relevant excerpts with file paths.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        vault_path: {
+          type: "string",
+          description: "Absolute path to the wiki vault",
+        },
+        query: {
+          type: "string",
+          description: "Search query to find relevant wiki pages",
+        },
+      },
+      required: ["vault_path", "query"],
+    },
+  },
+  {
+    name: "wiki_lint",
+    description: "Run a health check on the wiki vault. Finds orphan pages, broken links, missing source references, and other issues. Returns a structured report without making changes.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        vault_path: {
+          type: "string",
+          description: "Absolute path to the wiki vault",
+        },
+      },
+      required: ["vault_path"],
+    },
+  },
+  {
     name: "session_stats",
     description: "Get virtual session statistics: recent tool usage patterns, technologies encountered, and memory activity.",
     inputSchema: {
