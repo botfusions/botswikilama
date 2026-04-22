@@ -14,6 +14,25 @@ const VAULT_FOLDERS = [
   "archive",
 ];
 
+export function validateVaultPath(vaultPath: string): void {
+  if (!vaultPath) {
+    throw new Error("vault_path is required");
+  }
+
+  if (vaultPath.includes("..")) {
+    throw new Error("Invalid vault_path: path traversal sequences are not allowed");
+  }
+
+  const resolvedPath = path.resolve(vaultPath);
+  const homeDir = os.homedir();
+
+  const isWithinHome = resolvedPath === homeDir || resolvedPath.startsWith(homeDir + path.sep);
+
+  if (!isWithinHome) {
+    throw new Error(`Invalid vault_path: must be within your home directory (${homeDir})`);
+  }
+}
+
 export function detectVault(vaultPath: string): boolean {
   return fs.existsSync(path.join(vaultPath, "index.md"));
 }
