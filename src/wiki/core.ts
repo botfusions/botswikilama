@@ -14,6 +14,24 @@ const VAULT_FOLDERS = [
   "archive",
 ];
 
+export function validateVaultPath(vaultPath: string): void {
+  const resolvedPath = path.resolve(vaultPath);
+  const homeDir = os.homedir();
+
+  // 1. Explicitly forbid '..' sequences in the input string
+  if (vaultPath.includes("..")) {
+    throw new Error(`Invalid vault path: '..' sequences are not allowed for security reasons.`);
+  }
+
+  // 2. Ensure the resolved path is within the home directory
+  // We check if resolvedPath starts with homeDir AND is followed by a path separator or is the homeDir itself
+  const isWithinHome = resolvedPath === homeDir || resolvedPath.startsWith(homeDir + path.sep);
+
+  if (!isWithinHome) {
+    throw new Error(`Invalid vault path: Vault must be located within the home directory (${homeDir}).`);
+  }
+}
+
 export function detectVault(vaultPath: string): boolean {
   return fs.existsSync(path.join(vaultPath, "index.md"));
 }
