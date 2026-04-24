@@ -14,6 +14,26 @@ const VAULT_FOLDERS = [
   "archive",
 ];
 
+export function validateVaultPath(vaultPath: string): void {
+  if (vaultPath.includes("..")) {
+    throw new Error("Invalid path: '..' sequence is not allowed for security reasons.");
+  }
+
+  const resolvedPath = path.resolve(vaultPath);
+  const homedir = os.homedir();
+
+  if (!resolvedPath.startsWith(homedir)) {
+    throw new Error(`Unauthorized path: Wiki vault must be located within your homedir (${homedir})`);
+  }
+
+  // Ensure it's not JUST the homedir or a path that starts with homedir but isn't a subpath
+  // e.g. /home/user-suffix should be blocked if homedir is /home/user
+  const relative = path.relative(homedir, resolvedPath);
+  if (relative === ".." || relative.startsWith(".." + path.sep)) {
+     throw new Error(`Unauthorized path: Wiki vault must be located within your homedir (${homedir})`);
+  }
+}
+
 export function detectVault(vaultPath: string): boolean {
   return fs.existsSync(path.join(vaultPath, "index.md"));
 }
