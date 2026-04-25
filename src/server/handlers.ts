@@ -913,11 +913,15 @@ export async function handleSessionStats(args?: SessionStatsArgs): Promise<ToolR
 
 export async function handleWikiSetup(args?: WikiSetupArgs): Promise<ToolResult> {
   const vaultPath = args?.vault_path;
-  const projectName = args?.project_name || path.basename(vaultPath || "wiki");
+  const projectName = args?.project_name || (vaultPath ? path.basename(vaultPath) : "wiki");
   const language = args?.language || "Türkçe";
 
   if (!vaultPath) {
     return { content: [{ type: "text", text: "Error: 'vault_path' is required" }], isError: true };
+  }
+
+  if (!wiki.validateVaultPath(vaultPath)) {
+    return { content: [{ type: "text", text: "Error: Invalid vault path. Paths must be within your home directory and not contain '..'." }], isError: true };
   }
 
   try {
@@ -939,6 +943,11 @@ export async function handleWikiSetup(args?: WikiSetupArgs): Promise<ToolResult>
 
 export async function handleWikiIngest(args?: WikiIngestArgs): Promise<ToolResult> {
   const vaultPath = args?.vault_path;
+
+  if (vaultPath && !wiki.validateVaultPath(vaultPath)) {
+    return { content: [{ type: "text", text: "Error: Invalid vault path. Paths must be within your home directory and not contain '..'." }], isError: true };
+  }
+
   const filePath = args?.file_path || null;
   const title = args?.title || null;
   const summary = args?.summary;
@@ -1025,6 +1034,11 @@ export async function handleWikiQuery(args?: WikiQueryArgs): Promise<ToolResult>
   if (!vaultPath) {
     return { content: [{ type: "text", text: "Error: 'vault_path' is required" }], isError: true };
   }
+
+  if (!wiki.validateVaultPath(vaultPath)) {
+    return { content: [{ type: "text", text: "Error: Invalid vault path. Paths must be within your home directory and not contain '..'." }], isError: true };
+  }
+
   if (!query) {
     return { content: [{ type: "text", text: "Error: 'query' is required" }], isError: true };
   }
@@ -1068,6 +1082,10 @@ export async function handleWikiLint(args?: WikiLintArgs): Promise<ToolResult> {
 
   if (!vaultPath) {
     return { content: [{ type: "text", text: "Error: 'vault_path' is required" }], isError: true };
+  }
+
+  if (!wiki.validateVaultPath(vaultPath)) {
+    return { content: [{ type: "text", text: "Error: Invalid vault path. Paths must be within your home directory and not contain '..'." }], isError: true };
   }
 
   try {
