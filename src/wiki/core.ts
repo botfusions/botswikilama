@@ -14,6 +14,19 @@ const VAULT_FOLDERS = [
   "archive",
 ];
 
+export function validateVaultPath(vaultPath: string): boolean {
+  if (!vaultPath) return false;
+
+  // Explicitly block path traversal sequences
+  if (vaultPath.includes("..")) return false;
+
+  const resolvedPath = path.resolve(vaultPath);
+  const homeDir = os.homedir();
+
+  // Ensure the path is within the home directory to prevent system-wide access
+  return resolvedPath === homeDir || resolvedPath.startsWith(homeDir + path.sep);
+}
+
 export function detectVault(vaultPath: string): boolean {
   return fs.existsSync(path.join(vaultPath, "index.md"));
 }
