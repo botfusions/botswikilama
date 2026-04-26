@@ -2,6 +2,21 @@ import os from "os";
 import path from "path";
 import fs from "fs";
 
+export function validateVaultPath(vaultPath: string): void {
+  if (vaultPath.includes("..")) {
+    throw new Error("Invalid vault path: '..' sequences are not allowed for security reasons.");
+  }
+
+  const resolvedPath = path.resolve(vaultPath);
+  const homeDir = os.homedir();
+
+  const isUnderHome = resolvedPath === homeDir || resolvedPath.startsWith(homeDir + path.sep);
+
+  if (!isUnderHome) {
+    throw new Error("Invalid vault path: Wiki vaults are restricted to the user's home directory.");
+  }
+}
+
 const VAULT_FOLDERS = [
   "raw/articles",
   "raw/papers",
