@@ -921,6 +921,7 @@ export async function handleWikiSetup(args?: WikiSetupArgs): Promise<ToolResult>
   }
 
   try {
+    wiki.validateVaultPath(vaultPath);
     if (wiki.detectVault(vaultPath)) {
       const stats = wiki.getVaultStats(vaultPath);
       return {
@@ -955,6 +956,7 @@ export async function handleWikiIngest(args?: WikiIngestArgs): Promise<ToolResul
   }
 
   try {
+    wiki.validateVaultPath(vaultPath);
     if (!wiki.detectVault(vaultPath)) {
       return { content: [{ type: "text", text: `Error: No wiki vault found at ${vaultPath}. Run wiki_setup first.` }], isError: true };
     }
@@ -1030,6 +1032,7 @@ export async function handleWikiQuery(args?: WikiQueryArgs): Promise<ToolResult>
   }
 
   try {
+    wiki.validateVaultPath(vaultPath);
     if (!wiki.detectVault(vaultPath)) {
       return { content: [{ type: "text", text: `Error: No wiki vault found at ${vaultPath}. Run wiki_setup first.` }], isError: true };
     }
@@ -1071,6 +1074,7 @@ export async function handleWikiLint(args?: WikiLintArgs): Promise<ToolResult> {
   }
 
   try {
+    wiki.validateVaultPath(vaultPath);
     if (!wiki.detectVault(vaultPath)) {
       return { content: [{ type: "text", text: `Error: No wiki vault found at ${vaultPath}. Run wiki_setup first.` }], isError: true };
     }
