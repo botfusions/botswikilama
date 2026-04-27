@@ -2,6 +2,26 @@ import os from "os";
 import path from "path";
 import fs from "fs";
 
+/**
+ * Validates that a vault path is secure and within the user's home directory.
+ * Prevents path traversal and access to sensitive system directories.
+ */
+export function validateVaultPath(vaultPath: string): void {
+  if (vaultPath.includes("..")) {
+    throw new Error(`Invalid vault path: ".." sequences are forbidden for security reasons.`);
+  }
+
+  const resolvedPath = path.resolve(vaultPath);
+  const homeDir = os.homedir();
+
+  // Ensure path is within home directory and not the home directory itself
+  // Using homeDir + path.sep ensures we are in a subdirectory and prevents
+  // matching "/home/user_alternate" when homeDir is "/home/user"
+  if (!resolvedPath.startsWith(homeDir + path.sep)) {
+    throw new Error(`Invalid vault path: Must be a subdirectory of the home directory (${homeDir}).`);
+  }
+}
+
 const VAULT_FOLDERS = [
   "raw/articles",
   "raw/papers",
