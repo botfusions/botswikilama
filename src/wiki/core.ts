@@ -14,6 +14,21 @@ const VAULT_FOLDERS = [
   "archive",
 ];
 
+export function validateVaultPath(vaultPath: string): string {
+  const homeDir = os.homedir();
+  const absolutePath = path.resolve(vaultPath);
+
+  if (vaultPath.includes("..")) {
+    throw new Error("Security: Path traversal sequences ('..') are not allowed");
+  }
+
+  if (!absolutePath.startsWith(homeDir + path.sep)) {
+    throw new Error(`Security: Vault must be located within user home directory: ${homeDir}`);
+  }
+
+  return absolutePath;
+}
+
 export function detectVault(vaultPath: string): boolean {
   return fs.existsSync(path.join(vaultPath, "index.md"));
 }
