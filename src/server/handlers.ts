@@ -912,15 +912,17 @@ export async function handleSessionStats(args?: SessionStatsArgs): Promise<ToolR
 }
 
 export async function handleWikiSetup(args?: WikiSetupArgs): Promise<ToolResult> {
-  const vaultPath = args?.vault_path;
-  const projectName = args?.project_name || path.basename(vaultPath || "wiki");
-  const language = args?.language || "Türkçe";
+  const rawVaultPath = args?.vault_path;
 
-  if (!vaultPath) {
+  if (!rawVaultPath) {
     return { content: [{ type: "text", text: "Error: 'vault_path' is required" }], isError: true };
   }
 
   try {
+    const vaultPath = wiki.validateVaultPath(rawVaultPath);
+    const projectName = args?.project_name || path.basename(vaultPath || "wiki");
+    const language = args?.language || "Türkçe";
+
     if (wiki.detectVault(vaultPath)) {
       const stats = wiki.getVaultStats(vaultPath);
       return {
@@ -938,7 +940,7 @@ export async function handleWikiSetup(args?: WikiSetupArgs): Promise<ToolResult>
 }
 
 export async function handleWikiIngest(args?: WikiIngestArgs): Promise<ToolResult> {
-  const vaultPath = args?.vault_path;
+  const rawVaultPath = args?.vault_path;
   const filePath = args?.file_path || null;
   const title = args?.title || null;
   const summary = args?.summary;
@@ -946,7 +948,7 @@ export async function handleWikiIngest(args?: WikiIngestArgs): Promise<ToolResul
   const concepts = args?.concepts || [];
   const decisions = args?.decisions || [];
 
-  if (!vaultPath) {
+  if (!rawVaultPath) {
     return { content: [{ type: "text", text: "Error: 'vault_path' is required" }], isError: true };
   }
 
@@ -955,6 +957,15 @@ export async function handleWikiIngest(args?: WikiIngestArgs): Promise<ToolResul
   }
 
   try {
+    const vaultPath = wiki.validateVaultPath(rawVaultPath);
+
+    if (filePath) {
+      const absFilePath = path.resolve(filePath);
+      if (!absFilePath.startsWith(vaultPath + path.sep)) {
+        return { content: [{ type: "text", text: `Error: 'file_path' must be within the wiki vault at ${vaultPath}` }], isError: true };
+      }
+    }
+
     if (!wiki.detectVault(vaultPath)) {
       return { content: [{ type: "text", text: `Error: No wiki vault found at ${vaultPath}. Run wiki_setup first.` }], isError: true };
     }
@@ -1019,10 +1030,10 @@ export async function handleWikiIngest(args?: WikiIngestArgs): Promise<ToolResul
 }
 
 export async function handleWikiQuery(args?: WikiQueryArgs): Promise<ToolResult> {
-  const vaultPath = args?.vault_path;
+  const rawVaultPath = args?.vault_path;
   const query = args?.query;
 
-  if (!vaultPath) {
+  if (!rawVaultPath) {
     return { content: [{ type: "text", text: "Error: 'vault_path' is required" }], isError: true };
   }
   if (!query) {
@@ -1030,6 +1041,7 @@ export async function handleWikiQuery(args?: WikiQueryArgs): Promise<ToolResult>
   }
 
   try {
+    const vaultPath = wiki.validateVaultPath(rawVaultPath);
     if (!wiki.detectVault(vaultPath)) {
       return { content: [{ type: "text", text: `Error: No wiki vault found at ${vaultPath}. Run wiki_setup first.` }], isError: true };
     }
@@ -1064,13 +1076,14 @@ export async function handleWikiQuery(args?: WikiQueryArgs): Promise<ToolResult>
 }
 
 export async function handleWikiLint(args?: WikiLintArgs): Promise<ToolResult> {
-  const vaultPath = args?.vault_path;
+  const rawVaultPath = args?.vault_path;
 
-  if (!vaultPath) {
+  if (!rawVaultPath) {
     return { content: [{ type: "text", text: "Error: 'vault_path' is required" }], isError: true };
   }
 
   try {
+    const vaultPath = wiki.validateVaultPath(rawVaultPath);
     if (!wiki.detectVault(vaultPath)) {
       return { content: [{ type: "text", text: `Error: No wiki vault found at ${vaultPath}. Run wiki_setup first.` }], isError: true };
     }
