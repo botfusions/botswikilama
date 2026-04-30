@@ -2,6 +2,22 @@ import os from "os";
 import path from "path";
 import fs from "fs";
 
+export function validateVaultPath(vaultPath: string): string {
+  if (vaultPath.includes("..")) {
+    throw new Error("Security Error: Path traversal detected (..) in vault path");
+  }
+
+  const homeDir = os.homedir();
+  const resolvedPath = path.resolve(vaultPath);
+
+  // Ensure it's under homeDir and NOT exactly homeDir (must be a subdirectory)
+  if (!resolvedPath.startsWith(homeDir + path.sep)) {
+    throw new Error(`Security Error: Vault path must be a subdirectory within the home directory (${homeDir})`);
+  }
+
+  return resolvedPath;
+}
+
 const VAULT_FOLDERS = [
   "raw/articles",
   "raw/papers",
