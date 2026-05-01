@@ -921,14 +921,15 @@ export async function handleWikiSetup(args?: WikiSetupArgs): Promise<ToolResult>
   }
 
   try {
-    if (wiki.detectVault(vaultPath)) {
-      const stats = wiki.getVaultStats(vaultPath);
+    const validatedPath = wiki.validateVaultPath(vaultPath);
+    if (wiki.detectVault(validatedPath)) {
+      const stats = wiki.getVaultStats(validatedPath);
       return {
         content: [{ type: "text", text: `Wiki vault already exists at ${vaultPath}\nStats: ${JSON.stringify(stats, null, 2)}` }],
       };
     }
 
-    const result = wiki.setupVault(vaultPath, projectName, language);
+    const result = wiki.setupVault(validatedPath, projectName, language);
     return {
       content: [{ type: "text", text: `Wiki vault created at ${vaultPath}\nProject: ${projectName}\nLanguage: ${language}\nFolders created: ${result.folders}\nFiles created: ${result.files}` }],
     };
@@ -955,13 +956,15 @@ export async function handleWikiIngest(args?: WikiIngestArgs): Promise<ToolResul
   }
 
   try {
-    if (!wiki.detectVault(vaultPath)) {
-      return { content: [{ type: "text", text: `Error: No wiki vault found at ${vaultPath}. Run wiki_setup first.` }], isError: true };
+    const validatedVault = wiki.validateVaultPath(vaultPath);
+
+    if (!wiki.detectVault(validatedVault)) {
+      return { content: [{ type: "text", text: `Error: No wiki vault found at ${validatedVault}. Run wiki_setup first.` }], isError: true };
     }
 
     const date = new Date().toISOString().split("T")[0];
     const slug = (title || "untitled").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
-    const sourcePage = path.join(vaultPath, "sources", `${date}-${slug}.md`);
+    const sourcePage = path.join(validatedVault, "sources", `${date}-${slug}.md`);
 
     let pageContent = `---\ntitle: ${title || "Untitled"}\ntags: [source]\nsource: ${filePath || "manual"}\ndate: ${date}\nstatus: active\n---\n\n# ${title || "Untitled"}\n\n${summary}\n\n## Sources\n\n${filePath ? `- ${path.basename(filePath)}` : "- Manual entry"}\n\n## Related\n`;
 
@@ -972,7 +975,7 @@ export async function handleWikiIngest(args?: WikiIngestArgs): Promise<ToolResul
 
     for (const entity of entities) {
       const entitySlug = entity.toLowerCase().replace(/[^a-z0-9]+/g, "-");
-      const entityPath = path.join(vaultPath, "entities", `${entitySlug}.md`);
+      const entityPath = path.join(validatedVault, "entities", `${entitySlug}.md`);
       if (!fs.existsSync(entityPath)) {
         const entityContent = `---\ntitle: ${entity}\ntags: [entity]\ndate: ${date}\nstatus: active\n---\n\n# ${entity}\n\n## Sources\n\n- [[${date}-${slug}]]\n\n## Related\n`;
         wiki.writePage(entityPath, entityContent);
@@ -989,7 +992,7 @@ export async function handleWikiIngest(args?: WikiIngestArgs): Promise<ToolResul
 
     for (const concept of concepts) {
       const conceptSlug = concept.toLowerCase().replace(/[^a-z0-9]+/g, "-");
-      const conceptPath = path.join(vaultPath, "concepts", `${conceptSlug}.md`);
+      const conceptPath = path.join(validatedVault, "concepts", `${conceptSlug}.md`);
       if (!fs.existsSync(conceptPath)) {
         const conceptContent = `---\ntitle: ${concept}\ntags: [concept]\ndate: ${date}\nstatus: active\n---\n\n# ${concept}\n\n## Sources\n\n- [[${date}-${slug}]]\n\n## Related\n`;
         wiki.writePage(conceptPath, conceptContent);
@@ -1000,15 +1003,15 @@ export async function handleWikiIngest(args?: WikiIngestArgs): Promise<ToolResul
 
     for (const decision of decisions) {
       const decisionSlug = decision.toLowerCase().substring(0, 60).replace(/[^a-z0-9]+/g, "-");
-      const decisionPath = path.join(vaultPath, "decisions", `${date}-${decisionSlug}.md`);
+      const decisionPath = path.join(validatedVault, "decisions", `${date}-${decisionSlug}.md`);
       const decisionContent = `---\ntitle: ${decision}\ntags: [decision]\ndate: ${date}\nstatus: active\n---\n\n# ${decision}\n\n## Sources\n\n- [[${date}-${slug}]]\n\n## Related\n`;
       wiki.writePage(decisionPath, decisionContent);
       pagesCreated++;
       createdPages.push(`decisions/${date}-${decisionSlug}.md`);
     }
 
-    wiki.updateIndex(vaultPath, "Kaynaklar (Sources)", title || "Untitled", sourcePage);
-    wiki.appendToLog(vaultPath, `## [${date}] ingest | ${title || "Untitled"}\n  file: ${filePath || "manual"}\n  created: ${createdPages.join(", ")}`);
+    wiki.updateIndex(validatedVault, "Kaynaklar (Sources)", title || "Untitled", sourcePage);
+    wiki.appendToLog(validatedVault, `## [${date}] ingest | ${title || "Untitled"}\n  file: ${filePath || "manual"}\n  created: ${createdPages.join(", ")}`);
 
     return {
       content: [{ type: "text", text: `Ingested: ${title || "Untitled"}\nPages created: ${pagesCreated}\nFiles:\n${createdPages.map((p) => `  - ${p}`).join("\n")}\nEntities: ${entities.length} | Concepts: ${concepts.length} | Decisions: ${decisions.length}` }],
@@ -1030,15 +1033,16 @@ export async function handleWikiQuery(args?: WikiQueryArgs): Promise<ToolResult>
   }
 
   try {
-    if (!wiki.detectVault(vaultPath)) {
-      return { content: [{ type: "text", text: `Error: No wiki vault found at ${vaultPath}. Run wiki_setup first.` }], isError: true };
+    const validatedPath = wiki.validateVaultPath(vaultPath);
+    if (!wiki.detectVault(validatedPath)) {
+      return { content: [{ type: "text", text: `Error: No wiki vault found at ${validatedPath}. Run wiki_setup first.` }], isError: true };
     }
 
-    const results = wiki.searchWiki(vaultPath, query);
+    const results = wiki.searchWiki(validatedPath, query);
 
     if (results.length === 0) {
       const date = new Date().toISOString().split("T")[0];
-      wiki.appendToLog(vaultPath, `## [${date}] query | "${query}" → no results`);
+      wiki.appendToLog(validatedPath, `## [${date}] query | "${query}" → no results`);
       return {
         content: [{ type: "text", text: `No results found for: "${query}"\n\nConsider adding more sources to the wiki via wiki_ingest.` }],
       };
@@ -1055,7 +1059,7 @@ export async function handleWikiQuery(args?: WikiQueryArgs): Promise<ToolResult>
     }
 
     const date = new Date().toISOString().split("T")[0];
-    wiki.appendToLog(vaultPath, `## [${date}] query | "${query}" → ${results.length} results`);
+    wiki.appendToLog(validatedPath, `## [${date}] query | "${query}" → ${results.length} results`);
 
     return { content: [{ type: "text", text: response }] };
   } catch (error) {
@@ -1071,12 +1075,13 @@ export async function handleWikiLint(args?: WikiLintArgs): Promise<ToolResult> {
   }
 
   try {
-    if (!wiki.detectVault(vaultPath)) {
-      return { content: [{ type: "text", text: `Error: No wiki vault found at ${vaultPath}. Run wiki_setup first.` }], isError: true };
+    const validatedPath = wiki.validateVaultPath(vaultPath);
+    if (!wiki.detectVault(validatedPath)) {
+      return { content: [{ type: "text", text: `Error: No wiki vault found at ${validatedPath}. Run wiki_setup first.` }], isError: true };
     }
 
-    const findings = wiki.lintWiki(vaultPath);
-    const stats = wiki.getVaultStats(vaultPath);
+    const findings = wiki.lintWiki(validatedPath);
+    const stats = wiki.getVaultStats(validatedPath);
 
     const date = new Date().toISOString().split("T")[0];
     const high = findings.filter((f) => f.priority === "high").length;
@@ -1084,7 +1089,7 @@ export async function handleWikiLint(args?: WikiLintArgs): Promise<ToolResult> {
     const low = findings.filter((f) => f.priority === "low").length;
 
     let report = `# Wiki Lint Report — ${date}\n\n`;
-    report += `Vault: ${vaultPath}\n`;
+    report += `Vault: ${validatedPath}\n`;
     report += `Total pages: ${stats.total} | Raw sources: ${stats.raw}\n`;
     report += `Findings: ${findings.length} (H:${high} M:${medium} L:${low})\n\n`;
 
@@ -1096,9 +1101,9 @@ export async function handleWikiLint(args?: WikiLintArgs): Promise<ToolResult> {
       }
     }
 
-    const lintReportPath = path.join(vaultPath, "lint-report.md");
+    const lintReportPath = path.join(validatedPath, "lint-report.md");
     wiki.writePage(lintReportPath, report);
-    wiki.appendToLog(vaultPath, `## [${date}] lint | ${findings.length} findings (H:${high} M:${medium} L:${low})`);
+    wiki.appendToLog(validatedPath, `## [${date}] lint | ${findings.length} findings (H:${high} M:${medium} L:${low})`);
 
     return { content: [{ type: "text", text: report }] };
   } catch (error) {

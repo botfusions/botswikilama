@@ -1,5 +1,6 @@
 export {
   detectVault,
+  validateVaultPath,
   setupVault,
   readPage,
   writePage,
