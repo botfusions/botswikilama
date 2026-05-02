@@ -14,6 +14,31 @@ const VAULT_FOLDERS = [
   "archive",
 ];
 
+export function validateVaultPath(vaultPath: string): string {
+  const homeDir = os.homedir();
+
+  // Expand ~ to home directory if present
+  let expandedPath = vaultPath;
+  if (vaultPath === "~") {
+    expandedPath = homeDir;
+  } else if (vaultPath.startsWith("~" + path.sep)) {
+    expandedPath = path.join(homeDir, vaultPath.substring(2));
+  }
+
+  const resolvedPath = path.resolve(expandedPath);
+
+  // Platform-agnostic case-insensitive comparison for path prefix
+  const isWindows = process.platform === "win32";
+  const normalizedResolved = isWindows ? resolvedPath.toLowerCase() : resolvedPath;
+  const normalizedHome = isWindows ? (homeDir + path.sep).toLowerCase() : (homeDir + path.sep);
+
+  if (!normalizedResolved.startsWith(normalizedHome) && normalizedResolved !== (isWindows ? homeDir.toLowerCase() : homeDir)) {
+    throw new Error(`Security Error: Vault path must be under user home directory (${homeDir})`);
+  }
+
+  return resolvedPath;
+}
+
 export function detectVault(vaultPath: string): boolean {
   return fs.existsSync(path.join(vaultPath, "index.md"));
 }
