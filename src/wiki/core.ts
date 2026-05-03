@@ -14,6 +14,47 @@ const VAULT_FOLDERS = [
   "archive",
 ];
 
+/**
+ * Validates that a vault path is secure and located within the user's home directory.
+ * Prevents path traversal and unauthorized filesystem access.
+ */
+export function validateVaultPath(vaultPath: string): string {
+  if (!vaultPath) {
+    throw new Error("Vault path is required");
+  }
+
+  const homeDir = os.homedir();
+  let expandedPath = vaultPath;
+
+  // Handle tilde expansion
+  if (vaultPath.startsWith("~")) {
+    expandedPath = path.join(homeDir, vaultPath.slice(1));
+  }
+
+  // Resolve to absolute path
+  const resolvedPath = path.resolve(expandedPath);
+
+  // Extra safety: Explicitly block '..' sequences
+  if (vaultPath.includes("..") || expandedPath.includes("..") || resolvedPath.includes("..")) {
+    throw new Error("Security violation: Path traversal sequences ('..') are strictly prohibited");
+  }
+
+  // Security: Ensure the path is strictly inside the home directory
+  // We use path.sep to prevent "prefix bypass" (e.g., /home/user vs /home/user_extended)
+  const secureHomePrefix = homeDir.endsWith(path.sep) ? homeDir : homeDir + path.sep;
+
+  const isWindows = process.platform === "win32";
+  const checkPath = isWindows ? resolvedPath.toLowerCase() : resolvedPath;
+  const checkPrefix = isWindows ? secureHomePrefix.toLowerCase() : secureHomePrefix;
+  const checkHome = isWindows ? homeDir.toLowerCase() : homeDir;
+
+  if (checkPath !== checkHome && !checkPath.startsWith(checkPrefix)) {
+    throw new Error(`Security violation: Wiki vault must be located within your home directory (${homeDir})`);
+  }
+
+  return resolvedPath;
+}
+
 export function detectVault(vaultPath: string): boolean {
   return fs.existsSync(path.join(vaultPath, "index.md"));
 }
