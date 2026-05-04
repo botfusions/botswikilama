@@ -2,6 +2,33 @@ import os from "os";
 import path from "path";
 import fs from "fs";
 
+export function validateVaultPath(vaultPath: string): string {
+  if (vaultPath.includes("..")) {
+    throw new Error("Path traversal attempt detected: '..' sequences are not allowed");
+  }
+
+  let resolvedPath = vaultPath;
+  if (vaultPath.startsWith("~")) {
+    resolvedPath = path.join(os.homedir(), vaultPath.slice(1));
+  }
+
+  const absolutePath = path.resolve(resolvedPath);
+  const homeDir = os.homedir();
+
+  const isWindows = process.platform === "win32";
+  const normalizedPath = isWindows ? absolutePath.toLowerCase() : absolutePath;
+  const normalizedHome = isWindows ? homeDir.toLowerCase() : homeDir;
+
+  if (
+    !normalizedPath.startsWith(normalizedHome + path.sep) &&
+    normalizedPath !== normalizedHome
+  ) {
+    throw new Error("Access denied: Vault must be located within the user's home directory");
+  }
+
+  return absolutePath;
+}
+
 const VAULT_FOLDERS = [
   "raw/articles",
   "raw/papers",
