@@ -2,6 +2,23 @@ import os from "os";
 import path from "path";
 import fs from "fs";
 
+export function validateVaultPath(vaultPath: string): string {
+  const homeDir = os.homedir();
+  let resolvedPath = vaultPath;
+
+  if (vaultPath.startsWith("~")) {
+    resolvedPath = path.join(homeDir, vaultPath.slice(1));
+  }
+
+  const absolutePath = path.resolve(resolvedPath);
+
+  if (!absolutePath.startsWith(homeDir + path.sep)) {
+    throw new Error(`Invalid vault path: ${vaultPath}. Vaults must be located within the home directory.`);
+  }
+
+  return absolutePath;
+}
+
 const VAULT_FOLDERS = [
   "raw/articles",
   "raw/papers",
