@@ -2,6 +2,23 @@ import os from "os";
 import path from "path";
 import fs from "fs";
 
+export function validateVaultPath(vaultPath: string): string {
+  const homeDir = os.homedir();
+  let resolvedPath = vaultPath;
+
+  if (vaultPath.startsWith("~")) {
+    resolvedPath = path.join(homeDir, vaultPath.slice(1));
+  }
+
+  const absolutePath = path.resolve(resolvedPath);
+
+  if (!absolutePath.startsWith(homeDir + path.sep) && absolutePath !== homeDir) {
+    throw new Error(`Access denied: Path must be within home directory (${homeDir})`);
+  }
+
+  return absolutePath;
+}
+
 const VAULT_FOLDERS = [
   "raw/articles",
   "raw/papers",
