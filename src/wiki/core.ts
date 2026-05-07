@@ -14,6 +14,17 @@ const VAULT_FOLDERS = [
   "archive",
 ];
 
+export function validateVaultPath(vaultPath: string): string {
+  const homeDir = os.homedir();
+  const resolvedPath = path.resolve(vaultPath.replace(/^~(?=$|\/|\\)/, homeDir));
+
+  if (!resolvedPath.startsWith(homeDir + path.sep) && resolvedPath !== homeDir) {
+    throw new Error("Vault path must be within the home directory");
+  }
+
+  return resolvedPath;
+}
+
 export function detectVault(vaultPath: string): boolean {
   return fs.existsSync(path.join(vaultPath, "index.md"));
 }
