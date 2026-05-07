@@ -11,5 +11,6 @@ export {
   searchWiki,
   lintWiki,
   getVaultStats,
+  validateVaultPath,
 } from "./core.js";
 export type { LintFinding } from "./core.js";
