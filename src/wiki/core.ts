@@ -163,6 +163,10 @@ export function listRawFiles(rawDir: string): string[] {
   function walk(dir: string) {
     for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
       const fullPath = path.join(dir, entry.name);
+      if (entry.isSymbolicLink()) {
+        // Skip symbolic links to prevent path traversal
+        continue;
+      }
       if (entry.isDirectory()) {
         walk(fullPath);
       } else if (!entry.name.startsWith(".")) {
