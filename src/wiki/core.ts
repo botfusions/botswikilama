@@ -74,7 +74,7 @@ export function setupVault(vaultPath: string, projectName: string, language: str
 function generateIndexTemplate(projectName: string, language: string): string {
   const date = new Date().toISOString().split("T")[0];
   return `---
-title: ${projectName} — İçerik Kataloğu
+title: ${sanitizeYamlValue(projectName + " — İçerik Kataloğu")}
 date: ${date}
 ---
 
@@ -142,6 +142,10 @@ export function writePage(filePath: string, content: string): void {
   const dir = path.dirname(filePath);
   fs.mkdirSync(dir, { recursive: true });
   fs.writeFileSync(filePath, content, "utf-8");
+}
+
+export function sanitizeYamlValue(value: string): string {
+  return `"${value.replace(/\\/g, "\\\\").replace(/"/g, '\\"').replace(/\n/g, "\\n")}"`;
 }
 
 export function listFiles(dir: string, extension: string = ".md"): string[] {
