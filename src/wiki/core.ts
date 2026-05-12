@@ -2,6 +2,15 @@ import os from "os";
 import path from "path";
 import fs from "fs";
 
+export function sanitizeYamlValue(value: string | null | undefined): string {
+  if (value === null || value === undefined) return '""';
+  const escaped = value
+    .replace(/\\/g, "\\\\")
+    .replace(/"/g, '\\"')
+    .replace(/\n/g, "\\n");
+  return `"${escaped}"`;
+}
+
 export function validateVaultPath(vaultPath: string): string {
   const homeDir = os.homedir();
   let resolvedPath = vaultPath;
@@ -73,8 +82,9 @@ export function setupVault(vaultPath: string, projectName: string, language: str
 
 function generateIndexTemplate(projectName: string, language: string): string {
   const date = new Date().toISOString().split("T")[0];
+  const sanitizedProjectName = sanitizeYamlValue(`${projectName} — İçerik Kataloğu`);
   return `---
-title: ${projectName} — İçerik Kataloğu
+title: ${sanitizedProjectName}
 date: ${date}
 ---
 
