@@ -19,6 +19,16 @@ export function validateVaultPath(vaultPath: string): string {
   return absolutePath;
 }
 
+export function sanitizeYamlValue(value: string): string {
+  if (!value) return '""';
+  // Escape backslashes first, then double quotes, then newlines
+  const escaped = String(value)
+    .replace(/\\/g, "\\\\")
+    .replace(/"/g, '\\"')
+    .replace(/\n/g, "\\n");
+  return `"${escaped}"`;
+}
+
 const VAULT_FOLDERS = [
   "raw/articles",
   "raw/papers",
@@ -73,8 +83,10 @@ export function setupVault(vaultPath: string, projectName: string, language: str
 
 function generateIndexTemplate(projectName: string, language: string): string {
   const date = new Date().toISOString().split("T")[0];
+  const fullTitle = `${projectName} — İçerik Kataloğu`;
+  const safeTitle = sanitizeYamlValue(fullTitle);
   return `---
-title: ${projectName} — İçerik Kataloğu
+title: ${safeTitle}
 date: ${date}
 ---
 

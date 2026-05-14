@@ -7,3 +7,8 @@
 **Vulnerability:** The `listRawFiles` function in wiki core used a recursive walk that followed symbolic links. This allowed an attacker to place a symlink inside the `raw/` directory pointing to sensitive files outside the vault, which would then be read and potentially ingested into the wiki.
 **Learning:** When recursively traversing user-influenced directories, always check for symbolic links and skip them unless explicitly required and validated. Using `fs.readdirSync(..., { withFileTypes: true })` and checking `entry.isSymbolicLink()` is an efficient way to prevent this.
 **Prevention:** Explicitly skip symbolic links during recursive file discovery in untrusted or user-provided directory structures.
+
+## 2026-05-14 - YAML Injection in Wiki Frontmatter
+**Vulnerability:** User-provided values (titles, project names, etc.) were directly inserted into Markdown frontmatter without sanitization. This allowed injecting additional YAML keys or altering the structure of the frontmatter.
+**Learning:** Any user-controlled input used in generating structured data formats like YAML must be properly escaped and quoted. In Markdown frontmatter, wrapping values in double quotes and escaping inner double quotes, backslashes, and newlines prevents most injection attacks.
+**Prevention:** Implement a `sanitizeYamlValue` helper that handles escaping and quoting, and apply it to all user-influenced variables in frontmatter templates.
