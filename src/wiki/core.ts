@@ -19,6 +19,21 @@ export function validateVaultPath(vaultPath: string): string {
   return absolutePath;
 }
 
+/**
+ * Sanitizes a value for use in YAML frontmatter by wrapping it in double quotes
+ * and escaping necessary characters.
+ */
+export function sanitizeYamlValue(value: string | null | undefined): string {
+  if (value === null || value === undefined) return '""';
+  const str = String(value);
+  // Escape backslashes, then double quotes, then newlines
+  const escaped = str
+    .replace(/\\/g, "\\\\")
+    .replace(/"/g, '\\"')
+    .replace(/\n/g, "\\n");
+  return `"${escaped}"`;
+}
+
 const VAULT_FOLDERS = [
   "raw/articles",
   "raw/papers",
@@ -73,8 +88,9 @@ export function setupVault(vaultPath: string, projectName: string, language: str
 
 function generateIndexTemplate(projectName: string, language: string): string {
   const date = new Date().toISOString().split("T")[0];
+  const safeTitle = sanitizeYamlValue(`${projectName} — İçerik Kataloğu`);
   return `---
-title: ${projectName} — İçerik Kataloğu
+title: ${safeTitle}
 date: ${date}
 ---
 
