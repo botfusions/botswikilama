@@ -12,5 +12,6 @@ export {
   lintWiki,
   getVaultStats,
   validateVaultPath,
+  sanitizeYamlValue,
 } from "./core.js";
 export type { LintFinding } from "./core.js";
