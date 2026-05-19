@@ -13,5 +13,6 @@ export {
   getVaultStats,
   validateVaultPath,
   sanitizeYamlValue,
+  sanitizeMarkdownHeading,
 } from "./core.js";
 export type { LintFinding } from "./core.js";

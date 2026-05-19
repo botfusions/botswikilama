@@ -19,13 +19,18 @@ export function validateVaultPath(vaultPath: string): string {
   return absolutePath;
 }
 
-export function sanitizeYamlValue(value: any): string {
+export function sanitizeMarkdownHeading(value: unknown): string {
+  return String(value).replace(/[\r\n]/g, " ");
+}
+
+export function sanitizeYamlValue(value: unknown): string {
   const str = String(value);
   const escaped = str
     .replace(/\\/g, "\\\\")
-    .replace(/"/g, '\\"')
+    .replace(/"/g, "\\\"")
+    .replace(/\r/g, "\\r")
     .replace(/\n/g, "\\n");
-  return `"${escaped}"`;
+  return "\"" + escaped + "\"";
 }
 
 const VAULT_FOLDERS = [
@@ -83,12 +88,13 @@ export function setupVault(vaultPath: string, projectName: string, language: str
 function generateIndexTemplate(projectName: string, language: string): string {
   const date = new Date().toISOString().split("T")[0];
   const safeTitle = sanitizeYamlValue(`${projectName} — İçerik Kataloğu`);
+  const safeMdHeading = sanitizeMarkdownHeading(`${projectName} — İçerik Kataloğu`);
   return `---
 title: ${safeTitle}
 date: ${date}
 ---
 
-# ${projectName} — İçerik Kataloğu
+# ${safeMdHeading}
 
 ## Kaynaklar (Sources)
 
@@ -110,7 +116,8 @@ function generateLogTemplate(): string {
 }
 
 function generateClaudeMd(projectName: string, language: string): string {
-  return `# ${projectName} — Wiki Şeması
+  const safeMdHeading = sanitizeMarkdownHeading(`${projectName} — Wiki Şeması`);
+  return `# ${safeMdHeading}
 
 ## Amaç
 ${projectName} için kalıcı bilgi arşivi. LLM ile artımlı olarak inşa edilir.
