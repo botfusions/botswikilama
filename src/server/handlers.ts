@@ -971,7 +971,10 @@ export async function handleWikiIngest(args?: WikiIngestArgs): Promise<ToolResul
     const slug = (title || "untitled").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
     const sourcePage = path.join(vaultPath, "sources", `${date}-${slug}.md`);
 
-    let pageContent = `---\ntitle: ${title || "Untitled"}\ntags: [source]\nsource: ${filePath || "manual"}\ndate: ${date}\nstatus: active\n---\n\n# ${title || "Untitled"}\n\n${summary}\n\n## Sources\n\n${filePath ? `- ${path.basename(filePath)}` : "- Manual entry"}\n\n## Related\n`;
+    const safeTitle = wiki.sanitizeYamlValue(title || "Untitled");
+    const safeFilePath = wiki.sanitizeYamlValue(filePath || "manual");
+
+    let pageContent = `---\ntitle: ${safeTitle}\ntags: [source]\nsource: ${safeFilePath}\ndate: ${date}\nstatus: active\n---\n\n# ${title || "Untitled"}\n\n${summary}\n\n## Sources\n\n${filePath ? `- ${path.basename(filePath)}` : "- Manual entry"}\n\n## Related\n`;
 
     wiki.writePage(sourcePage, pageContent);
 
@@ -982,7 +985,8 @@ export async function handleWikiIngest(args?: WikiIngestArgs): Promise<ToolResul
       const entitySlug = entity.toLowerCase().replace(/[^a-z0-9]+/g, "-");
       const entityPath = path.join(vaultPath, "entities", `${entitySlug}.md`);
       if (!fs.existsSync(entityPath)) {
-        const entityContent = `---\ntitle: ${entity}\ntags: [entity]\ndate: ${date}\nstatus: active\n---\n\n# ${entity}\n\n## Sources\n\n- [[${date}-${slug}]]\n\n## Related\n`;
+        const safeEntityTitle = wiki.sanitizeYamlValue(entity);
+        const entityContent = `---\ntitle: ${safeEntityTitle}\ntags: [entity]\ndate: ${date}\nstatus: active\n---\n\n# ${entity}\n\n## Sources\n\n- [[${date}-${slug}]]\n\n## Related\n`;
         wiki.writePage(entityPath, entityContent);
         pagesCreated++;
         createdPages.push(`entities/${entitySlug}.md`);
@@ -999,7 +1003,8 @@ export async function handleWikiIngest(args?: WikiIngestArgs): Promise<ToolResul
       const conceptSlug = concept.toLowerCase().replace(/[^a-z0-9]+/g, "-");
       const conceptPath = path.join(vaultPath, "concepts", `${conceptSlug}.md`);
       if (!fs.existsSync(conceptPath)) {
-        const conceptContent = `---\ntitle: ${concept}\ntags: [concept]\ndate: ${date}\nstatus: active\n---\n\n# ${concept}\n\n## Sources\n\n- [[${date}-${slug}]]\n\n## Related\n`;
+        const safeConceptTitle = wiki.sanitizeYamlValue(concept);
+        const conceptContent = `---\ntitle: ${safeConceptTitle}\ntags: [concept]\ndate: ${date}\nstatus: active\n---\n\n# ${concept}\n\n## Sources\n\n- [[${date}-${slug}]]\n\n## Related\n`;
         wiki.writePage(conceptPath, conceptContent);
         pagesCreated++;
         createdPages.push(`concepts/${conceptSlug}.md`);
@@ -1009,7 +1014,8 @@ export async function handleWikiIngest(args?: WikiIngestArgs): Promise<ToolResul
     for (const decision of decisions) {
       const decisionSlug = decision.toLowerCase().substring(0, 60).replace(/[^a-z0-9]+/g, "-");
       const decisionPath = path.join(vaultPath, "decisions", `${date}-${decisionSlug}.md`);
-      const decisionContent = `---\ntitle: ${decision}\ntags: [decision]\ndate: ${date}\nstatus: active\n---\n\n# ${decision}\n\n## Sources\n\n- [[${date}-${slug}]]\n\n## Related\n`;
+      const safeDecisionTitle = wiki.sanitizeYamlValue(decision);
+      const decisionContent = `---\ntitle: ${safeDecisionTitle}\ntags: [decision]\ndate: ${date}\nstatus: active\n---\n\n# ${decision}\n\n## Sources\n\n- [[${date}-${slug}]]\n\n## Related\n`;
       wiki.writePage(decisionPath, decisionContent);
       pagesCreated++;
       createdPages.push(`decisions/${date}-${decisionSlug}.md`);
