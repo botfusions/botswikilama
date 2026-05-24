@@ -164,9 +164,9 @@ export function listFiles(dir: string, extension: string = ".md"): string[] {
   if (!fs.existsSync(dir)) return [];
   try {
     return fs
-      .readdirSync(dir)
-      .filter((f) => f.endsWith(extension))
-      .map((f) => path.join(dir, f));
+      .readdirSync(dir, { withFileTypes: true })
+      .filter((entry) => entry.isFile() && entry.name.endsWith(extension))
+      .map((entry) => path.join(dir, entry.name));
   } catch {
     return [];
   }
