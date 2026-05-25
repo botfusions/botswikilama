@@ -17,3 +17,8 @@
 **Vulnerability:** The `listFiles` function in wiki core used a flat directory listing that followed symbolic links. This allowed an attacker to place a symlink inside the wiki's managed directories (like `sources/`) pointing to sensitive files outside the vault, which would then be searchable via `wiki_query` or reported in `wiki_lint`.
 **Learning:** Even when not performing a recursive walk, symbolic links can still lead to path traversal if they point outside the intended root. File discovery utilities should explicitly filter for regular files or validate symlink targets.
 **Prevention:** Use `fs.readdirSync(..., { withFileTypes: true })` and filter for `entry.isFile()` to ignore symbolic links during file discovery in wiki directories.
+
+## 2025-05-23 - Prototype Pollution in Recursive Config Merging
+**Vulnerability:** The `deepMerge` function used for loading user configuration was vulnerable to Prototype Pollution. While it used object spreads for the target, it recursively merged source keys without validating them, allowing special keys like `__proto__` or `constructor` to modify the prototype of the resulting configuration object.
+**Learning:** Recursive merge functions must always explicitly block sensitive keys like `__proto__`, `constructor`, and `prototype`. Even when using patterns like `{...target}` which protect the global `Object.prototype` from direct pollution, the resulting merged object can still have its own prototype chain corrupted if these keys are processed.
+**Prevention:** Implement an explicit blocklist for sensitive keys (`__proto__`, `constructor`, `prototype`) in all recursive object merging or property assignment logic.
