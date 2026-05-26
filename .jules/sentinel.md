@@ -22,3 +22,8 @@
 **Vulnerability:** The `deepMerge` function used for loading user configuration was vulnerable to Prototype Pollution. While it used object spreads for the target, it recursively merged source keys without validating them, allowing special keys like `__proto__` or `constructor` to modify the prototype of the resulting configuration object.
 **Learning:** Recursive merge functions must always explicitly block sensitive keys like `__proto__`, `constructor`, and `prototype`. Even when using patterns like `{...target}` which protect the global `Object.prototype` from direct pollution, the resulting merged object can still have its own prototype chain corrupted if these keys are processed.
 **Prevention:** Implement an explicit blocklist for sensitive keys (`__proto__`, `constructor`, `prototype`) in all recursive object merging or property assignment logic.
+
+## 2025-05-24 - DoS Protection via Input Length Validation
+**Vulnerability:** Lack of length validation on user-provided strings in tool arguments (fragments, titles, descriptions, queries) could lead to memory exhaustion or DoS.
+**Learning:** MCP tools that accept free-form text must enforce reasonable upper bounds on input sizes to protect the server process and downstream processing (like fuzzy search or file I/O) from resource exhaustion.
+**Prevention:** Implement a centralized validation helper and apply it to all tool handlers that accept user-influenced strings, returning clear error messages when limits are exceeded.

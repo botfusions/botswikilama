@@ -158,6 +158,29 @@ interface ToolCallRequest {
 
 let activeSessionId: string | null = null;
 
+const MAX_LENGTHS = {
+  title: 200,
+  project: 100,
+  category: 100,
+  description: 2000,
+  summary: 2000,
+  fragment: 10000,
+  query: 500,
+  name: 100,
+};
+
+function validateLengths(args: any, limits: Record<string, number>): ToolResult | null {
+  for (const [key, limit] of Object.entries(limits)) {
+    if (typeof args?.[key] === "string" && args[key].length > limit) {
+      return {
+        content: [{ type: "text", text: `Error: '${key}' exceeds maximum length of ${limit} characters` }],
+        isError: true,
+      };
+    }
+  }
+  return null;
+}
+
 let _notifyChange: (() => void) | null = null;
 
 export function setNotifyChange(fn: () => void): void {
@@ -277,6 +300,9 @@ export async function handleSessionEnd(args?: SessionEndArgs): Promise<ToolResul
 }
 
 export async function handleMemoryRead(args?: MemoryReadArgs): Promise<ToolResult> {
+  const v = validateLengths(args, { query: MAX_LENGTHS.query, project: MAX_LENGTHS.project });
+  if (v) return v;
+
   const currentProject = args?.project || core.detectProject();
   const query = args?.query || null;
   const detailId = args?.id || null;
@@ -347,6 +373,14 @@ export async function handleMemoryRead(args?: MemoryReadArgs): Promise<ToolResul
 }
 
 export async function handleMemoryAdd(args?: MemoryAddArgs): Promise<ToolResult> {
+  const v = validateLengths(args, {
+    fragment: MAX_LENGTHS.fragment,
+    title: MAX_LENGTHS.title,
+    description: MAX_LENGTHS.description,
+    project: MAX_LENGTHS.project
+  });
+  if (v) return v;
+
   const fragment = args?.fragment;
   const title = args?.title || null;
   const description = args?.description || null;
@@ -396,6 +430,9 @@ export async function handleMemoryAdd(args?: MemoryAddArgs): Promise<ToolResult>
 }
 
 export async function handleMemoryUpdate(args?: MemoryUpdateArgs): Promise<ToolResult> {
+  const v = validateLengths(args, { title: MAX_LENGTHS.title, fragment: MAX_LENGTHS.fragment });
+  if (v) return v;
+
   const id = args?.id;
   const title = args?.title;
   const fragment = args?.fragment;
@@ -616,6 +653,9 @@ export async function handleGuideGet(args?: GuideGetArgs): Promise<ToolResult> {
 }
 
 export async function handleGuidePractice(args?: GuidePracticeArgs): Promise<ToolResult> {
+  const v = validateLengths(args, { guide: MAX_LENGTHS.name, category: MAX_LENGTHS.category, description: MAX_LENGTHS.description });
+  if (v) return v;
+
   const guideName = args?.guide;
   const category = args?.category;
   const description = args?.description || "";
@@ -656,6 +696,9 @@ export async function handleGuidePractice(args?: GuidePracticeArgs): Promise<Too
 }
 
 export async function handleGuideCreate(args?: GuideCreateArgs): Promise<ToolResult> {
+  const v = validateLengths(args, { guide: MAX_LENGTHS.name, category: MAX_LENGTHS.category, description: MAX_LENGTHS.description });
+  if (v) return v;
+
   const guideName = args?.guide;
   const category = args?.category;
   const description = args?.description;
@@ -731,6 +774,14 @@ export async function handleGuideDistill(args?: GuideDistillArgs): Promise<ToolR
 }
 
 export async function handleGuideUpdate(args?: GuideUpdateArgs): Promise<ToolResult> {
+  const v = validateLengths(args, {
+    guide: MAX_LENGTHS.name,
+    new_name: MAX_LENGTHS.name,
+    category: MAX_LENGTHS.category,
+    description: MAX_LENGTHS.description
+  });
+  if (v) return v;
+
   const guideName = args?.guide;
   const updates: Record<string, unknown> = {
     guide: args?.new_name,
@@ -912,6 +963,9 @@ export async function handleSessionStats(args?: SessionStatsArgs): Promise<ToolR
 }
 
 export async function handleWikiSetup(args?: WikiSetupArgs): Promise<ToolResult> {
+  const v = validateLengths(args, { project_name: MAX_LENGTHS.name });
+  if (v) return v;
+
   let vaultPath = args?.vault_path;
   const projectName = args?.project_name || (vaultPath ? path.basename(vaultPath) : "wiki");
   const language = args?.language || "Türkçe";
@@ -944,6 +998,9 @@ export async function handleWikiSetup(args?: WikiSetupArgs): Promise<ToolResult>
 }
 
 export async function handleWikiIngest(args?: WikiIngestArgs): Promise<ToolResult> {
+  const v = validateLengths(args, { title: MAX_LENGTHS.title, summary: MAX_LENGTHS.summary });
+  if (v) return v;
+
   let vaultPath = args?.vault_path;
   const filePath = args?.file_path || null;
   const title = args?.title || null;
@@ -1033,6 +1090,9 @@ export async function handleWikiIngest(args?: WikiIngestArgs): Promise<ToolResul
 }
 
 export async function handleWikiQuery(args?: WikiQueryArgs): Promise<ToolResult> {
+  const v = validateLengths(args, { query: MAX_LENGTHS.query });
+  if (v) return v;
+
   let vaultPath = args?.vault_path;
   const query = args?.query;
 
