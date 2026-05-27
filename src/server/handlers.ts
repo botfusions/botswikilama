@@ -5,6 +5,7 @@ import * as virtualSession from "../sessions/virtual.js";
 import * as wiki from "../wiki/index.js";
 import path from "path";
 import fs from "fs";
+import os from "os";
 
 interface ToolResult {
   content: Array<{ type: string; text: string }>;
@@ -179,6 +180,18 @@ function validateLengths(args: any, limits: Record<string, number>): ToolResult 
     }
   }
   return null;
+}
+
+const HOME_DIR = os.homedir();
+
+/**
+ * Redacts absolute paths to the user's home directory by replacing them with '~'.
+ * This prevents leaking the server's internal directory structure.
+ */
+function redactPath(text: string): string {
+  if (!HOME_DIR || !text) return text;
+  // Replace all occurrences of home directory with ~
+  return text.split(HOME_DIR).join("~");
 }
 
 let _notifyChange: (() => void) | null = null;
@@ -1188,60 +1201,73 @@ export async function handleCallTool(request: ToolCallRequest): Promise<ToolResu
   const { name, arguments: args } = request.params;
 
   try {
-    switch (name) {
-      case "session_start":
-        return await handleSessionStart(args as SessionStartArgs);
-      case "session_end":
-        return await handleSessionEnd(args as SessionEndArgs);
-      case "memory_read":
-        return await handleMemoryRead(args as MemoryReadArgs);
-      case "memory_add":
-        return await handleMemoryAdd(args as MemoryAddArgs);
-      case "memory_update":
-        return await handleMemoryUpdate(args as MemoryUpdateArgs);
-      case "memory_forget":
-        return await handleMemoryForget(args as MemoryForgetArgs);
-      case "memory_feedback":
-        return await handleMemoryFeedback(args as MemoryFeedbackArgs);
-      case "memory_merge":
-        return await handleMemoryMerge(args as MemoryMergeArgs);
-      case "memory_stats":
-        return await handleMemoryStats(args as MemoryStatsArgs);
-      case "memory_audit":
-        return await handleMemoryAudit(args);
-      case "guide_get":
-        return await handleGuideGet(args as GuideGetArgs);
-      case "guide_practice":
-        return await handleGuidePractice(args as GuidePracticeArgs);
-      case "guide_create":
-        return await handleGuideCreate(args as GuideCreateArgs);
-      case "guide_distill":
-        return await handleGuideDistill(args as GuideDistillArgs);
-      case "guide_update":
-        return await handleGuideUpdate(args as GuideUpdateArgs);
-      case "guide_forget":
-        return await handleGuideForget(args as GuideForgetArgs);
-      case "guide_merge":
-        return await handleGuideMerge(args as GuideMergeArgs);
-      case "session_stats":
-        return await handleSessionStats(args as SessionStatsArgs);
-      case "wiki_setup":
-        return await handleWikiSetup(args as WikiSetupArgs);
-      case "wiki_ingest":
-        return await handleWikiIngest(args as WikiIngestArgs);
-      case "wiki_query":
-        return await handleWikiQuery(args as WikiQueryArgs);
-      case "wiki_lint":
-        return await handleWikiLint(args as WikiLintArgs);
-      default:
-        return {
-          content: [{ type: "text", text: `Error: Unknown tool '${name}'` }],
-          isError: true,
-        };
+    const result: ToolResult = await (async () => {
+      switch (name) {
+        case "session_start":
+          return await handleSessionStart(args as SessionStartArgs);
+        case "session_end":
+          return await handleSessionEnd(args as SessionEndArgs);
+        case "memory_read":
+          return await handleMemoryRead(args as MemoryReadArgs);
+        case "memory_add":
+          return await handleMemoryAdd(args as MemoryAddArgs);
+        case "memory_update":
+          return await handleMemoryUpdate(args as MemoryUpdateArgs);
+        case "memory_forget":
+          return await handleMemoryForget(args as MemoryForgetArgs);
+        case "memory_feedback":
+          return await handleMemoryFeedback(args as MemoryFeedbackArgs);
+        case "memory_merge":
+          return await handleMemoryMerge(args as MemoryMergeArgs);
+        case "memory_stats":
+          return await handleMemoryStats(args as MemoryStatsArgs);
+        case "memory_audit":
+          return await handleMemoryAudit(args);
+        case "guide_get":
+          return await handleGuideGet(args as GuideGetArgs);
+        case "guide_practice":
+          return await handleGuidePractice(args as GuidePracticeArgs);
+        case "guide_create":
+          return await handleGuideCreate(args as GuideCreateArgs);
+        case "guide_distill":
+          return await handleGuideDistill(args as GuideDistillArgs);
+        case "guide_update":
+          return await handleGuideUpdate(args as GuideUpdateArgs);
+        case "guide_forget":
+          return await handleGuideForget(args as GuideForgetArgs);
+        case "guide_merge":
+          return await handleGuideMerge(args as GuideMergeArgs);
+        case "session_stats":
+          return await handleSessionStats(args as SessionStatsArgs);
+        case "wiki_setup":
+          return await handleWikiSetup(args as WikiSetupArgs);
+        case "wiki_ingest":
+          return await handleWikiIngest(args as WikiIngestArgs);
+        case "wiki_query":
+          return await handleWikiQuery(args as WikiQueryArgs);
+        case "wiki_lint":
+          return await handleWikiLint(args as WikiLintArgs);
+        default:
+          return {
+            content: [{ type: "text", text: `Error: Unknown tool '${name}'` }],
+            isError: true,
+          };
+      }
+    })();
+
+    if (result.content) {
+      result.content = result.content.map((item) => {
+        if (item.type === "text" && item.text) {
+          return { ...item, text: redactPath(item.text) };
+        }
+        return item;
+      });
     }
+
+    return result;
   } catch (error) {
     return {
-      content: [{ type: "text", text: `Error: ${(error as Error).message}` }],
+      content: [{ type: "text", text: redactPath(`Error: ${(error as Error).message}`) }],
       isError: true,
     };
   }
