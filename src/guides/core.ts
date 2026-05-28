@@ -101,7 +101,11 @@ export function saveGuides(guides: Guide[], options: { force?: boolean } = {}): 
         const backupIds = new Set(backupEntries.map((e: { id: string }) => e.id));
         const newEntries = guides.filter(g => !backupIds.has(g.id));
         if (newEntries.length > 0) {
-          const merged = [...backupEntries, ...newEntries];
+          let merged = [...backupEntries, ...newEntries];
+          // Limit backup to 1000 entries to prevent DoS via disk exhaustion
+          if (merged.length > 1000) {
+            merged = merged.slice(-1000);
+          }
           fs.writeFileSync(backupFile, merged.map((g: { id: string }) => JSON.stringify(g)).join("\n"), "utf-8");
         }
       } catch {

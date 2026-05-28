@@ -27,3 +27,8 @@
 **Vulnerability:** Lack of length validation on user-provided strings in tool arguments (fragments, titles, descriptions, queries) could lead to memory exhaustion or DoS.
 **Learning:** MCP tools that accept free-form text must enforce reasonable upper bounds on input sizes to protect the server process and downstream processing (like fuzzy search or file I/O) from resource exhaustion.
 **Prevention:** Implement a centralized validation helper and apply it to all tool handlers that accept user-influenced strings, returning clear error messages when limits are exceeded.
+
+## 2025-05-25 - Unbounded Backup Growth DoS risk
+**Vulnerability:** The backup mechanism for memory, guides, and sessions merged all historical entries into a .bak file indefinitely. This could lead to disk space exhaustion (DoS) over time as deleted entries were never removed from the backup.
+**Learning:** Automated backup systems that merge historical data must have explicit limits to prevent unbounded resource consumption, especially when the main storage is pruned but the backup is not.
+**Prevention:** Implement a cap on the number of entries in backup files, keeping only the most recent N records (e.g., 1000) to balance safety and storage.
