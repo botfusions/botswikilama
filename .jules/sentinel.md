@@ -27,3 +27,8 @@
 **Vulnerability:** Lack of length validation on user-provided strings in tool arguments (fragments, titles, descriptions, queries) could lead to memory exhaustion or DoS.
 **Learning:** MCP tools that accept free-form text must enforce reasonable upper bounds on input sizes to protect the server process and downstream processing (like fuzzy search or file I/O) from resource exhaustion.
 **Prevention:** Implement a centralized validation helper and apply it to all tool handlers that accept user-influenced strings, returning clear error messages when limits are exceeded.
+
+## 2025-05-25 - DoS Protection in Backups and Array Arguments
+**Vulnerability:** Unbounded growth of `.bak` files and lack of item count limits in array arguments allowed for potential disk and memory exhaustion.
+**Learning:** Persistence layers with automated backup mechanisms must enforce caps on backup size to prevent DoS. Similarly, tool handlers accepting arrays must validate both the number of items and their individual lengths to ensure predictable resource usage.
+**Prevention:** Implement a hard limit (e.g., 1000 entries) for rolling backups using `.slice()`. Use centralized validation helpers for both string lengths and array item counts across all API entry points.
