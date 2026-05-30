@@ -170,11 +170,37 @@ const MAX_LENGTHS = {
   name: 100,
 };
 
+const MAX_COUNTS = {
+  ids: 100,
+  guides: 50,
+  technologies: 20,
+  lessons: 50,
+  contexts: 50,
+  learnings: 50,
+  entities: 50,
+  concepts: 50,
+  decisions: 50,
+  add_anti_patterns: 20,
+  add_pitfalls: 20,
+};
+
 function validateLengths(args: any, limits: Record<string, number>): ToolResult | null {
   for (const [key, limit] of Object.entries(limits)) {
     if (typeof args?.[key] === "string" && args[key].length > limit) {
       return {
         content: [{ type: "text", text: `Error: '${key}' exceeds maximum length of ${limit} characters` }],
+        isError: true,
+      };
+    }
+  }
+  return null;
+}
+
+function validateCounts(args: any, limits: Record<string, number>): ToolResult | null {
+  for (const [key, limit] of Object.entries(limits)) {
+    if (Array.isArray(args?.[key]) && args[key].length > limit) {
+      return {
+        content: [{ type: "text", text: `Error: '${key}' exceeds maximum count of ${limit} items` }],
         isError: true,
       };
     }
@@ -205,6 +231,9 @@ function notifyMemoryChange(): void {
 }
 
 export async function handleSessionStart(args?: SessionStartArgs): Promise<ToolResult> {
+  const c = validateCounts(args, { technologies: MAX_COUNTS.technologies });
+  if (c) return c;
+
   const taskType = args?.task_type;
   const technologies = args?.technologies || [];
   const initialApproach = args?.initial_approach || null;
@@ -246,6 +275,9 @@ export async function handleSessionStart(args?: SessionStartArgs): Promise<ToolR
 }
 
 export async function handleSessionEnd(args?: SessionEndArgs): Promise<ToolResult> {
+  const c = validateCounts(args, { lessons: MAX_COUNTS.lessons });
+  if (c) return c;
+
   const outcome = args?.outcome;
   const finalApproach = args?.final_approach || null;
   const lessons = args?.lessons || [];
@@ -315,6 +347,8 @@ export async function handleSessionEnd(args?: SessionEndArgs): Promise<ToolResul
 export async function handleMemoryRead(args?: MemoryReadArgs): Promise<ToolResult> {
   const v = validateLengths(args, { query: MAX_LENGTHS.query, project: MAX_LENGTHS.project });
   if (v) return v;
+  const c = validateCounts(args, { ids: MAX_COUNTS.ids });
+  if (c) return c;
 
   const currentProject = args?.project || core.detectProject();
   const query = args?.query || null;
@@ -585,6 +619,9 @@ export async function handleMemoryFeedback(args?: MemoryFeedbackArgs): Promise<T
 }
 
 export async function handleMemoryMerge(args?: MemoryMergeArgs): Promise<ToolResult> {
+  const c = validateCounts(args, { ids: MAX_COUNTS.ids });
+  if (c) return c;
+
   const ids = args?.ids;
   const title = args?.title;
   const fragment = args?.fragment;
@@ -668,6 +705,8 @@ export async function handleGuideGet(args?: GuideGetArgs): Promise<ToolResult> {
 export async function handleGuidePractice(args?: GuidePracticeArgs): Promise<ToolResult> {
   const v = validateLengths(args, { guide: MAX_LENGTHS.name, category: MAX_LENGTHS.category, description: MAX_LENGTHS.description });
   if (v) return v;
+  const c = validateCounts(args, { contexts: MAX_COUNTS.contexts, learnings: MAX_COUNTS.learnings });
+  if (c) return c;
 
   const guideName = args?.guide;
   const category = args?.category;
@@ -711,6 +750,8 @@ export async function handleGuidePractice(args?: GuidePracticeArgs): Promise<Too
 export async function handleGuideCreate(args?: GuideCreateArgs): Promise<ToolResult> {
   const v = validateLengths(args, { guide: MAX_LENGTHS.name, category: MAX_LENGTHS.category, description: MAX_LENGTHS.description });
   if (v) return v;
+  const c = validateCounts(args, { contexts: MAX_COUNTS.contexts, learnings: MAX_COUNTS.learnings });
+  if (c) return c;
 
   const guideName = args?.guide;
   const category = args?.category;
@@ -794,6 +835,11 @@ export async function handleGuideUpdate(args?: GuideUpdateArgs): Promise<ToolRes
     description: MAX_LENGTHS.description
   });
   if (v) return v;
+  const c = validateCounts(args, {
+    add_anti_patterns: MAX_COUNTS.add_anti_patterns,
+    add_pitfalls: MAX_COUNTS.add_pitfalls
+  });
+  if (c) return c;
 
   const guideName = args?.guide;
   const updates: Record<string, unknown> = {
@@ -856,6 +902,13 @@ export async function handleGuideForget(args?: GuideForgetArgs): Promise<ToolRes
 }
 
 export async function handleGuideMerge(args?: GuideMergeArgs): Promise<ToolResult> {
+  const c = validateCounts(args, {
+    guides: MAX_COUNTS.guides,
+    contexts: MAX_COUNTS.contexts,
+    learnings: MAX_COUNTS.learnings
+  });
+  if (c) return c;
+
   const guideNames = args?.guides;
   const newGuideName = args?.guide;
   const category = args?.category;
@@ -1013,6 +1066,12 @@ export async function handleWikiSetup(args?: WikiSetupArgs): Promise<ToolResult>
 export async function handleWikiIngest(args?: WikiIngestArgs): Promise<ToolResult> {
   const v = validateLengths(args, { title: MAX_LENGTHS.title, summary: MAX_LENGTHS.summary });
   if (v) return v;
+  const c = validateCounts(args, {
+    entities: MAX_COUNTS.entities,
+    concepts: MAX_COUNTS.concepts,
+    decisions: MAX_COUNTS.decisions
+  });
+  if (c) return c;
 
   let vaultPath = args?.vault_path;
   const filePath = args?.file_path || null;
