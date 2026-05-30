@@ -9,7 +9,8 @@ import {
   handleWikiQuery,
   handleGuideCreate,
   handleGuidePractice,
-  handleGuideUpdate
+  handleGuideUpdate,
+  handleGuideMerge
 } from "../../src/server/handlers.js";
 
 test("handleMemoryAdd rejects oversized fragment", async () => {
@@ -73,4 +74,33 @@ test("handleGuideUpdate rejects oversized new_name", async () => {
   });
   assert.strictEqual(result.isError, true);
   assert.match(result.content[0].text, /Error: 'new_name' exceeds maximum length/);
+});
+
+test("handleMemoryRead rejects oversized ids array", async () => {
+  const result = await handleMemoryRead({
+    ids: Array(101).fill("id")
+  });
+  assert.strictEqual(result.isError, true);
+  assert.match(result.content[0].text, /Error: 'ids' exceeds maximum count of 100 items/);
+});
+
+test("handleWikiIngest rejects oversized entities array", async () => {
+  const result = await handleWikiIngest({
+    vault_path: "/tmp/vault",
+    summary: "valid summary",
+    entities: Array(51).fill("entity")
+  });
+  assert.strictEqual(result.isError, true);
+  assert.match(result.content[0].text, /Error: 'entities' exceeds maximum count of 50 items/);
+});
+
+test("handleGuideMerge rejects oversized guides array", async () => {
+  // @ts-ignore - guides is required but we want to test count validation first
+  const result = await handleGuideMerge({
+    guides: Array(51).fill("guide"),
+    guide: "new-guide",
+    category: "dev"
+  });
+  assert.strictEqual(result.isError, true);
+  assert.match(result.content[0].text, /Error: 'guides' exceeds maximum count of 50 items/);
 });

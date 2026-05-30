@@ -27,3 +27,8 @@
 **Vulnerability:** Lack of length validation on user-provided strings in tool arguments (fragments, titles, descriptions, queries) could lead to memory exhaustion or DoS.
 **Learning:** MCP tools that accept free-form text must enforce reasonable upper bounds on input sizes to protect the server process and downstream processing (like fuzzy search or file I/O) from resource exhaustion.
 **Prevention:** Implement a centralized validation helper and apply it to all tool handlers that accept user-influenced strings, returning clear error messages when limits are exceeded.
+
+## 2025-05-25 - DoS Protection via Array Count Validation
+**Vulnerability:** Tool handlers accepting array arguments (e.g., ids, entities, technologies) lacked validation on the number of items provided. An attacker could provide an extremely large array, leading to high memory consumption or CPU exhaustion during processing.
+**Learning:** For MCP tools, validating the count of items in array parameters is as critical as validating the length of string parameters for DoS prevention.
+**Prevention:** Implement a centralized validateCounts helper and apply it to all tool handlers that accept array inputs, enforcing reasonable upper bounds based on the tool's purpose.
