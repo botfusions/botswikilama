@@ -61,7 +61,7 @@ export function saveSessions(sessions: Session[], options: { force?: boolean } =
         const backupIds = new Set(backupEntries.map((e: any) => e.id));
         const newEntries = sessions.filter(s => !backupIds.has(s.id));
         if (newEntries.length > 0) {
-          const merged = [...backupEntries, ...newEntries];
+          const merged = [...backupEntries, ...newEntries].slice(-1000);
           fs.writeFileSync(backupFile, merged.map(s => JSON.stringify(s)).join("\n"), "utf-8");
         }
       } catch {

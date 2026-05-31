@@ -23,6 +23,11 @@
 **Learning:** Recursive merge functions must always explicitly block sensitive keys like `__proto__`, `constructor`, and `prototype`. Even when using patterns like `{...target}` which protect the global `Object.prototype` from direct pollution, the resulting merged object can still have its own prototype chain corrupted if these keys are processed.
 **Prevention:** Implement an explicit blocklist for sensitive keys (`__proto__`, `constructor`, `prototype`) in all recursive object merging or property assignment logic.
 
+## 2025-05-26 - DoS Protection via Backup File Capping
+**Vulnerability:** Cumulative backup files (.bak) for memory, guides, and sessions grew unbounded with every unique entry added. This could lead to disk exhaustion and high memory usage during the backup merge process.
+**Learning:** Persistence layers that implement append-only or cumulative backups must have hard limits on history retention. Even small entries can eventually cause a Denial-of-Service if the total count is allowed to grow indefinitely.
+**Prevention:** Implement a hard cap on the number of entries kept in cumulative backups (e.g., 1000) by slicing the merged array before writing to disk.
+
 ## 2025-05-24 - DoS Protection via Input Length Validation
 **Vulnerability:** Lack of length validation on user-provided strings in tool arguments (fragments, titles, descriptions, queries) could lead to memory exhaustion or DoS.
 **Learning:** MCP tools that accept free-form text must enforce reasonable upper bounds on input sizes to protect the server process and downstream processing (like fuzzy search or file I/O) from resource exhaustion.
