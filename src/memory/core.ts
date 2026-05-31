@@ -185,7 +185,7 @@ export function saveMemory(fragments: MemoryFragment[], options: { force?: boole
         const backupIds = new Set(backupEntries.map((e: MemoryFragment) => e.id));
         const newEntries = fragments.filter(f => !backupIds.has(f.id));
         if (newEntries.length > 0) {
-          const merged = [...backupEntries, ...newEntries];
+          const merged = [...backupEntries, ...newEntries].slice(-1000);
           fs.writeFileSync(backupFile, merged.map(f => JSON.stringify(f)).join("\n"), "utf-8");
         }
       } catch {
