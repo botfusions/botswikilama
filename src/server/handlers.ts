@@ -168,6 +168,9 @@ const MAX_LENGTHS = {
   fragment: 10000,
   query: 500,
   name: 100,
+  id: 100,
+  vault_path: 1024,
+  file_path: 1024,
 };
 
 const MAX_COUNTS = {
@@ -231,6 +234,8 @@ function notifyMemoryChange(): void {
 }
 
 export async function handleSessionStart(args?: SessionStartArgs): Promise<ToolResult> {
+  const v = validateLengths(args, { task_type: MAX_LENGTHS.name, initial_approach: MAX_LENGTHS.description });
+  if (v) return v;
   const c = validateCounts(args, { technologies: MAX_COUNTS.technologies });
   if (c) return c;
 
@@ -275,6 +280,8 @@ export async function handleSessionStart(args?: SessionStartArgs): Promise<ToolR
 }
 
 export async function handleSessionEnd(args?: SessionEndArgs): Promise<ToolResult> {
+  const v = validateLengths(args, { outcome: MAX_LENGTHS.name, final_approach: MAX_LENGTHS.description });
+  if (v) return v;
   const c = validateCounts(args, { lessons: MAX_COUNTS.lessons });
   if (c) return c;
 
@@ -345,7 +352,12 @@ export async function handleSessionEnd(args?: SessionEndArgs): Promise<ToolResul
 }
 
 export async function handleMemoryRead(args?: MemoryReadArgs): Promise<ToolResult> {
-  const v = validateLengths(args, { query: MAX_LENGTHS.query, project: MAX_LENGTHS.project });
+  const v = validateLengths(args, {
+    query: MAX_LENGTHS.query,
+    project: MAX_LENGTHS.project,
+    id: MAX_LENGTHS.id,
+    context: MAX_LENGTHS.name
+  });
   if (v) return v;
   const c = validateCounts(args, { ids: MAX_COUNTS.ids });
   if (c) return c;
@@ -477,7 +489,7 @@ export async function handleMemoryAdd(args?: MemoryAddArgs): Promise<ToolResult>
 }
 
 export async function handleMemoryUpdate(args?: MemoryUpdateArgs): Promise<ToolResult> {
-  const v = validateLengths(args, { title: MAX_LENGTHS.title, fragment: MAX_LENGTHS.fragment });
+  const v = validateLengths(args, { id: MAX_LENGTHS.id, title: MAX_LENGTHS.title, fragment: MAX_LENGTHS.fragment });
   if (v) return v;
 
   const id = args?.id;
@@ -542,6 +554,8 @@ export async function handleMemoryUpdate(args?: MemoryUpdateArgs): Promise<ToolR
 }
 
 export async function handleMemoryForget(args?: MemoryForgetArgs): Promise<ToolResult> {
+  const v = validateLengths(args, { id: MAX_LENGTHS.id });
+  if (v) return v;
   const id = args?.id;
 
   if (!id || typeof id !== "string") {
@@ -571,6 +585,8 @@ export async function handleMemoryForget(args?: MemoryForgetArgs): Promise<ToolR
 }
 
 export async function handleMemoryFeedback(args?: MemoryFeedbackArgs): Promise<ToolResult> {
+  const v = validateLengths(args, { id: MAX_LENGTHS.id });
+  if (v) return v;
   const id = args?.id;
   const useful = args?.useful;
 
@@ -619,6 +635,8 @@ export async function handleMemoryFeedback(args?: MemoryFeedbackArgs): Promise<T
 }
 
 export async function handleMemoryMerge(args?: MemoryMergeArgs): Promise<ToolResult> {
+  const v = validateLengths(args, { title: MAX_LENGTHS.title, fragment: MAX_LENGTHS.fragment, project: MAX_LENGTHS.project });
+  if (v) return v;
   const c = validateCounts(args, { ids: MAX_COUNTS.ids });
   if (c) return c;
 
@@ -672,6 +690,8 @@ export async function handleMemoryMerge(args?: MemoryMergeArgs): Promise<ToolRes
 }
 
 export async function handleGuideGet(args?: GuideGetArgs): Promise<ToolResult> {
+  const v = validateLengths(args, { category: MAX_LENGTHS.category, guide: MAX_LENGTHS.name, task: MAX_LENGTHS.description });
+  if (v) return v;
   const category = args?.category || null;
   const guideName = args?.guide || null;
   const task = args?.task || null;
@@ -787,6 +807,8 @@ export async function handleGuideCreate(args?: GuideCreateArgs): Promise<ToolRes
 }
 
 export async function handleGuideDistill(args?: GuideDistillArgs): Promise<ToolResult> {
+  const v = validateLengths(args, { memory_id: MAX_LENGTHS.id, guide: MAX_LENGTHS.name, category: MAX_LENGTHS.category });
+  if (v) return v;
   const memoryId = args?.memory_id;
   const guideName = args?.guide;
   const category = args?.category || "dev-tool";
@@ -832,7 +854,8 @@ export async function handleGuideUpdate(args?: GuideUpdateArgs): Promise<ToolRes
     guide: MAX_LENGTHS.name,
     new_name: MAX_LENGTHS.name,
     category: MAX_LENGTHS.category,
-    description: MAX_LENGTHS.description
+    description: MAX_LENGTHS.description,
+    superseded_by: MAX_LENGTHS.name
   });
   if (v) return v;
   const c = validateCounts(args, {
@@ -876,6 +899,8 @@ export async function handleGuideUpdate(args?: GuideUpdateArgs): Promise<ToolRes
 }
 
 export async function handleGuideForget(args?: GuideForgetArgs): Promise<ToolResult> {
+  const v = validateLengths(args, { guide: MAX_LENGTHS.name });
+  if (v) return v;
   const guideName = args?.guide;
 
   if (!guideName) {
@@ -902,6 +927,8 @@ export async function handleGuideForget(args?: GuideForgetArgs): Promise<ToolRes
 }
 
 export async function handleGuideMerge(args?: GuideMergeArgs): Promise<ToolResult> {
+  const v = validateLengths(args, { guide: MAX_LENGTHS.name, category: MAX_LENGTHS.category, description: MAX_LENGTHS.description });
+  if (v) return v;
   const c = validateCounts(args, {
     guides: MAX_COUNTS.guides,
     contexts: MAX_COUNTS.contexts,
@@ -981,6 +1008,8 @@ export async function handleGuideMerge(args?: GuideMergeArgs): Promise<ToolResul
 }
 
 export async function handleMemoryStats(args?: MemoryStatsArgs): Promise<ToolResult> {
+  const v = validateLengths(args, { project: MAX_LENGTHS.project });
+  if (v) return v;
   const project = args?.project || null;
   const memory = core.loadMemory();
   const stats = core.calculateStats(memory, project);
@@ -1029,7 +1058,7 @@ export async function handleSessionStats(args?: SessionStatsArgs): Promise<ToolR
 }
 
 export async function handleWikiSetup(args?: WikiSetupArgs): Promise<ToolResult> {
-  const v = validateLengths(args, { project_name: MAX_LENGTHS.name });
+  const v = validateLengths(args, { vault_path: MAX_LENGTHS.vault_path, project_name: MAX_LENGTHS.name });
   if (v) return v;
 
   let vaultPath = args?.vault_path;
@@ -1064,7 +1093,12 @@ export async function handleWikiSetup(args?: WikiSetupArgs): Promise<ToolResult>
 }
 
 export async function handleWikiIngest(args?: WikiIngestArgs): Promise<ToolResult> {
-  const v = validateLengths(args, { title: MAX_LENGTHS.title, summary: MAX_LENGTHS.summary });
+  const v = validateLengths(args, {
+    vault_path: MAX_LENGTHS.vault_path,
+    file_path: MAX_LENGTHS.file_path,
+    title: MAX_LENGTHS.title,
+    summary: MAX_LENGTHS.summary
+  });
   if (v) return v;
   const c = validateCounts(args, {
     entities: MAX_COUNTS.entities,
@@ -1162,7 +1196,7 @@ export async function handleWikiIngest(args?: WikiIngestArgs): Promise<ToolResul
 }
 
 export async function handleWikiQuery(args?: WikiQueryArgs): Promise<ToolResult> {
-  const v = validateLengths(args, { query: MAX_LENGTHS.query });
+  const v = validateLengths(args, { vault_path: MAX_LENGTHS.vault_path, query: MAX_LENGTHS.query });
   if (v) return v;
 
   let vaultPath = args?.vault_path;
@@ -1212,6 +1246,9 @@ export async function handleWikiQuery(args?: WikiQueryArgs): Promise<ToolResult>
 }
 
 export async function handleWikiLint(args?: WikiLintArgs): Promise<ToolResult> {
+  const v = validateLengths(args, { vault_path: MAX_LENGTHS.vault_path });
+  if (v) return v;
+
   let vaultPath = args?.vault_path;
 
   if (!vaultPath) {
