@@ -171,6 +171,7 @@ const MAX_LENGTHS = {
   id: 100,
   vault_path: 1024,
   file_path: 1024,
+  language: 50,
 };
 
 const MAX_COUNTS = {
@@ -219,8 +220,17 @@ const HOME_DIR = os.homedir();
  */
 function redactPath(text: string): string {
   if (!HOME_DIR || !text) return text;
-  // Replace all occurrences of home directory with ~
-  return text.split(HOME_DIR).join("~");
+
+  // Escape special characters in HOME_DIR for regex
+  const escapedHome = HOME_DIR.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+  /**
+   * Use a regex to ensure we only redact when HOME_DIR is a full path component.
+   * This prevents redacting /home/user_extra when HOME_DIR is /home/user.
+   * We look for HOME_DIR followed by a path separator, space, quote, close parenthesis, or end of string.
+   */
+  const regex = new RegExp(escapedHome + "(?=[\\\\/\\s\"'\\)]|$)", "g");
+  return text.replace(regex, "~");
 }
 
 let _notifyChange: (() => void) | null = null;
@@ -1058,12 +1068,16 @@ export async function handleSessionStats(args?: SessionStatsArgs): Promise<ToolR
 }
 
 export async function handleWikiSetup(args?: WikiSetupArgs): Promise<ToolResult> {
-  const v = validateLengths(args, { vault_path: MAX_LENGTHS.vault_path, project_name: MAX_LENGTHS.name });
+  const v = validateLengths(args, {
+    vault_path: MAX_LENGTHS.vault_path,
+    project_name: MAX_LENGTHS.name,
+    language: MAX_LENGTHS.language
+  });
   if (v) return v;
 
   let vaultPath = args?.vault_path;
-  const projectName = args?.project_name || (vaultPath ? path.basename(vaultPath) : "wiki");
-  const language = args?.language || "Türkçe";
+  const projectName = wiki.sanitizeMarkdownValue(args?.project_name || (vaultPath ? path.basename(vaultPath) : "wiki"));
+  const language = wiki.sanitizeMarkdownValue(args?.language || "Türkçe");
 
   if (!vaultPath) {
     return { content: [{ type: "text", text: "Error: 'vault_path' is required" }], isError: true };
@@ -1109,11 +1123,11 @@ export async function handleWikiIngest(args?: WikiIngestArgs): Promise<ToolResul
 
   let vaultPath = args?.vault_path;
   const filePath = args?.file_path || null;
-  const title = args?.title || null;
+  const title = wiki.sanitizeMarkdownValue(args?.title || null);
   const summary = args?.summary;
-  const entities = args?.entities || [];
-  const concepts = args?.concepts || [];
-  const decisions = args?.decisions || [];
+  const entities = (args?.entities || []).map(e => wiki.sanitizeMarkdownValue(e)).filter(Boolean);
+  const concepts = (args?.concepts || []).map(c => wiki.sanitizeMarkdownValue(c)).filter(Boolean);
+  const decisions = (args?.decisions || []).map(d => wiki.sanitizeMarkdownValue(d)).filter(Boolean);
 
   if (!vaultPath) {
     return { content: [{ type: "text", text: "Error: 'vault_path' is required" }], isError: true };
@@ -1132,6 +1146,19 @@ export async function handleWikiIngest(args?: WikiIngestArgs): Promise<ToolResul
 
     const date = new Date().toISOString().split("T")[0];
     const slug = (title || "untitled").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+
+    // Validate each element in the arrays to prevent oversized items
+    for (const [key, list] of Object.entries({ entities, concepts, decisions })) {
+      for (const item of list) {
+        if (item.length > MAX_LENGTHS.name) {
+          return {
+            content: [{ type: "text", text: `Error: Individual '${key}' item exceeds maximum length of ${MAX_LENGTHS.name} characters` }],
+            isError: true,
+          };
+        }
+      }
+    }
+
     const sourcePage = path.join(vaultPath, "sources", `${date}-${slug}.md`);
 
     const safeTitle = wiki.sanitizeYamlValue(title || "Untitled");

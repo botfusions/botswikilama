@@ -37,3 +37,8 @@
 **Vulnerability:** Tool handlers accepting array arguments (e.g., ids, entities, technologies) lacked validation on the number of items provided. An attacker could provide an extremely large array, leading to high memory consumption or CPU exhaustion during processing.
 **Learning:** For MCP tools, validating the count of items in array parameters is as critical as validating the length of string parameters for DoS prevention.
 **Prevention:** Implement a centralized validateCounts helper and apply it to all tool handlers that accept array inputs, enforcing reasonable upper bounds based on the tool's purpose.
+
+## 2025-06-01 - Markdown Header and Rule Injection
+**Vulnerability:** User-provided inputs were interpolated into Markdown headers and rule definitions in generated files like `CLAUDE.md`. By including newlines and Markdown syntax, an attacker could inject unauthorized instructions or overwrite existing rules that guide the LLM's behavior.
+**Learning:** Even when output is "just" Markdown, newlines in user-supplied strings can break the structural integrity of the document, especially when those strings are used in sensitive areas like headers or rule lists that define operational boundaries for the AI.
+**Prevention:** Use a dedicated sanitization function that strips all newline characters from user input before embedding it into Markdown structures where line breaks have semantic meaning.
