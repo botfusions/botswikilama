@@ -33,7 +33,7 @@ describe("Wiki YAML Injection Protection", () => {
     // Check that frontmatter is protected
     const frontmatter = content.split("---")[1];
     assert.ok(!frontmatter.includes("\ninjected_key: injected_value"), "Unescaped YAML injection should NOT be present in frontmatter");
-    assert.ok(frontmatter.includes('title: "Normal Project\\ninjected_key: injected_value'), "Project name should be escaped in frontmatter");
+    assert.ok(frontmatter.includes('title: "Normal Project injected_key: injected_value'), "Project name should be sanitized in frontmatter");
   });
 
   test("wiki_ingest should escape title in YAML frontmatter", async () => {
@@ -54,7 +54,7 @@ describe("Wiki YAML Injection Protection", () => {
     const content = fs.readFileSync(path.join(sourcesDir, sourceFile), "utf-8");
     const frontmatter = content.split("---")[1];
     assert.ok(!frontmatter.includes("\ninjected_key: injected_value"), "Unescaped YAML injection should NOT be present in frontmatter");
-    assert.ok(frontmatter.includes('title: "Malicious Title\\ninjected_key: injected_value"'), "Title should be escaped in frontmatter");
+    assert.ok(frontmatter.includes('title: "Malicious Title injected_key: injected_value"'), "Title should be sanitized in frontmatter");
   });
 
   test("wiki_ingest should escape entities in YAML frontmatter", async () => {
@@ -76,6 +76,6 @@ describe("Wiki YAML Injection Protection", () => {
     const content = fs.readFileSync(path.join(entitiesDir, entityFile), "utf-8");
     const frontmatter = content.split("---")[1];
     assert.ok(!frontmatter.includes("\ninjected_key: injected_value"), "Unescaped YAML injection should NOT be present in frontmatter");
-    assert.ok(frontmatter.includes('title: "Malicious Entity\\ninjected_key: injected_value"'), "Entity title should be escaped in frontmatter");
+    assert.ok(frontmatter.includes('title: "Malicious Entity injected_key: injected_value"'), "Entity title should be sanitized in frontmatter");
   });
 });

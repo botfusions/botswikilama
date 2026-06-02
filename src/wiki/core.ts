@@ -34,6 +34,15 @@ export function sanitizeYamlValue(value: any): string {
   return `"${escaped}"`;
 }
 
+/**
+ * Sanitizes a string for use in Markdown headers or rules by stripping newlines.
+ * This prevents header injection and ensures rules are not broken by unexpected line breaks.
+ */
+export function sanitizeMarkdownValue(value: any): string {
+  if (value === null || value === undefined) return "";
+  return String(value).replace(/\r?\n|\r/g, " ").trim();
+}
+
 const VAULT_FOLDERS = [
   "raw/articles",
   "raw/papers",
