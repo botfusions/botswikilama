@@ -43,6 +43,27 @@ export function sanitizeMarkdownValue(value: any): string {
   return String(value).replace(/\r?\n|\r/g, " ").trim();
 }
 
+const HOME_DIR = os.homedir();
+
+/**
+ * Redacts absolute paths to the user's home directory by replacing them with '~'.
+ * This prevents leaking the server's internal directory structure.
+ */
+export function redactPath(text: string): string {
+  if (!HOME_DIR || !text) return text;
+
+  // Escape special characters in HOME_DIR for regex
+  const escapedHome = HOME_DIR.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+  /**
+   * Use a regex to ensure we only redact when HOME_DIR is a full path component.
+   * This prevents redacting /home/user_extra when HOME_DIR is /home/user.
+   * We look for HOME_DIR followed by a path separator, space, quote, close parenthesis, or end of string.
+   */
+  const regex = new RegExp(escapedHome + "(?=[\\\\/\\s\"'\\)]|$)", "g");
+  return text.replace(regex, "~");
+}
+
 const VAULT_FOLDERS = [
   "raw/articles",
   "raw/papers",

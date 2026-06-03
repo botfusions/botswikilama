@@ -42,3 +42,8 @@
 **Vulnerability:** User-provided inputs were interpolated into Markdown headers and rule definitions in generated files like `CLAUDE.md`. By including newlines and Markdown syntax, an attacker could inject unauthorized instructions or overwrite existing rules that guide the LLM's behavior.
 **Learning:** Even when output is "just" Markdown, newlines in user-supplied strings can break the structural integrity of the document, especially when those strings are used in sensitive areas like headers or rule lists that define operational boundaries for the AI.
 **Prevention:** Use a dedicated sanitization function that strips all newline characters from user input before embedding it into Markdown structures where line breaks have semantic meaning.
+
+## 2025-06-03 - Persistent Path Disclosure in Wiki Files
+**Vulnerability:** Absolute home directory paths were being written to persistent Wiki files (logs, lint reports, and source metadata), leaking the server's internal directory structure and username.
+**Learning:** Redacting paths in tool responses is insufficient if the same absolute paths are still stored in files generated or managed by those tools. Persistent storage must be sanitized with the same rigour as transient output to prevent Information Exposure.
+**Prevention:** Apply a shared `redactPath` utility to all user-controllable absolute paths before they are written to disk in persistent files or returned in responses.
