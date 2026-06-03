@@ -212,26 +212,6 @@ function validateCounts(args: any, limits: Record<string, number>): ToolResult |
   return null;
 }
 
-const HOME_DIR = os.homedir();
-
-/**
- * Redacts absolute paths to the user's home directory by replacing them with '~'.
- * This prevents leaking the server's internal directory structure.
- */
-function redactPath(text: string): string {
-  if (!HOME_DIR || !text) return text;
-
-  // Escape special characters in HOME_DIR for regex
-  const escapedHome = HOME_DIR.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-
-  /**
-   * Use a regex to ensure we only redact when HOME_DIR is a full path component.
-   * This prevents redacting /home/user_extra when HOME_DIR is /home/user.
-   * We look for HOME_DIR followed by a path separator, space, quote, close parenthesis, or end of string.
-   */
-  const regex = new RegExp(escapedHome + "(?=[\\\\/\\s\"'\\)]|$)", "g");
-  return text.replace(regex, "~");
-}
 
 let _notifyChange: (() => void) | null = null;
 
@@ -1162,7 +1142,7 @@ export async function handleWikiIngest(args?: WikiIngestArgs): Promise<ToolResul
     const sourcePage = path.join(vaultPath, "sources", `${date}-${slug}.md`);
 
     const safeTitle = wiki.sanitizeYamlValue(title || "Untitled");
-    const safeFilePath = wiki.sanitizeYamlValue(filePath || "manual");
+    const safeFilePath = wiki.sanitizeYamlValue(wiki.redactPath(filePath || "manual"));
 
     let pageContent = `---\ntitle: ${safeTitle}\ntags: [source]\nsource: ${safeFilePath}\ndate: ${date}\nstatus: active\n---\n\n# ${title || "Untitled"}\n\n${summary}\n\n## Sources\n\n${filePath ? `- ${path.basename(filePath)}` : "- Manual entry"}\n\n## Related\n`;
 
@@ -1212,7 +1192,7 @@ export async function handleWikiIngest(args?: WikiIngestArgs): Promise<ToolResul
     }
 
     wiki.updateIndex(vaultPath, "Kaynaklar (Sources)", title || "Untitled", sourcePage);
-    wiki.appendToLog(vaultPath, `## [${date}] ingest | ${title || "Untitled"}\n  file: ${filePath || "manual"}\n  created: ${createdPages.join(", ")}`);
+    wiki.appendToLog(vaultPath, `## [${date}] ingest | ${title || "Untitled"}\n  file: ${wiki.redactPath(filePath || "manual")}\n  created: ${createdPages.join(", ")}`);
 
     return {
       content: [{ type: "text", text: `Ingested: ${title || "Untitled"}\nPages created: ${pagesCreated}\nFiles:\n${createdPages.map((p) => `  - ${p}`).join("\n")}\nEntities: ${entities.length} | Concepts: ${concepts.length} | Decisions: ${decisions.length}` }],
@@ -1298,7 +1278,7 @@ export async function handleWikiLint(args?: WikiLintArgs): Promise<ToolResult> {
     const low = findings.filter((f) => f.priority === "low").length;
 
     let report = `# Wiki Lint Report — ${date}\n\n`;
-    report += `Vault: ${vaultPath}\n`;
+    report += `Vault: ${wiki.redactPath(vaultPath)}\n`;
     report += `Total pages: ${stats.total} | Raw sources: ${stats.raw}\n`;
     report += `Findings: ${findings.length} (H:${high} M:${medium} L:${low})\n\n`;
 
@@ -1381,7 +1361,7 @@ export async function handleCallTool(request: ToolCallRequest): Promise<ToolResu
     if (result.content) {
       result.content = result.content.map((item) => {
         if (item.type === "text" && item.text) {
-          return { ...item, text: redactPath(item.text) };
+          return { ...item, text: wiki.redactPath(item.text) };
         }
         return item;
       });
@@ -1390,7 +1370,7 @@ export async function handleCallTool(request: ToolCallRequest): Promise<ToolResu
     return result;
   } catch (error) {
     return {
-      content: [{ type: "text", text: redactPath(`Error: ${(error as Error).message}`) }],
+      content: [{ type: "text", text: wiki.redactPath(`Error: ${(error as Error).message}`) }],
       isError: true,
     };
   }
