@@ -47,3 +47,8 @@
 **Vulnerability:** Absolute home directory paths were being written to persistent Wiki files (logs, lint reports, and source metadata), leaking the server's internal directory structure and username.
 **Learning:** Redacting paths in tool responses is insufficient if the same absolute paths are still stored in files generated or managed by those tools. Persistent storage must be sanitized with the same rigour as transient output to prevent Information Exposure.
 **Prevention:** Apply a shared `redactPath` utility to all user-controllable absolute paths before they are written to disk in persistent files or returned in responses.
+
+## 2025-06-05 - DoS and Injection via Unvalidated Array Items
+**Vulnerability:** While top-level string lengths and array counts were validated, individual string items within arrays (e.g., `learnings`, `technologies`) were not. This allowed providing extremely large strings within arrays to cause DoS. Additionally, missing sanitization on fields like memory titles allowed newline injection that could break the Markdown structure of tool descriptions used for universal memory injection.
+**Learning:** Input validation must be recursive or comprehensive for all nested data structures. Any string field that is eventually used in a structural context (Markdown, logs, YAML) must be sanitized for newlines to prevent injection attacks that break the format's integrity.
+**Prevention:** Implement a `validateArrayItems` helper to check the length of every string within an array. Systematically apply `sanitizeMarkdownValue` to all user-provided strings used in LLM prompts or log files.

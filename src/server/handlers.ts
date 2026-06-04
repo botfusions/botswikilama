@@ -200,6 +200,22 @@ function validateLengths(args: any, limits: Record<string, number>): ToolResult 
   return null;
 }
 
+function validateArrayItems(args: any, arrayKeys: string[], limit: number): ToolResult | null {
+  for (const key of arrayKeys) {
+    if (Array.isArray(args?.[key])) {
+      for (const item of args[key]) {
+        if (typeof item === "string" && item.length > limit) {
+          return {
+            content: [{ type: "text", text: `Error: Individual '${key}' item exceeds maximum length of ${limit} characters` }],
+            isError: true,
+          };
+        }
+      }
+    }
+  }
+  return null;
+}
+
 function validateCounts(args: any, limits: Record<string, number>): ToolResult | null {
   for (const [key, limit] of Object.entries(limits)) {
     if (Array.isArray(args?.[key]) && args[key].length > limit) {
@@ -228,9 +244,11 @@ export async function handleSessionStart(args?: SessionStartArgs): Promise<ToolR
   if (v) return v;
   const c = validateCounts(args, { technologies: MAX_COUNTS.technologies });
   if (c) return c;
+  const ai = validateArrayItems(args, ["technologies"], MAX_LENGTHS.name);
+  if (ai) return ai;
 
-  const taskType = args?.task_type;
-  const technologies = args?.technologies || [];
+  const taskType = wiki.sanitizeMarkdownValue(args?.task_type);
+  const technologies = (args?.technologies || []).map(t => wiki.sanitizeMarkdownValue(t)).filter(Boolean);
   const initialApproach = args?.initial_approach || null;
 
   if (!taskType) {
@@ -274,10 +292,12 @@ export async function handleSessionEnd(args?: SessionEndArgs): Promise<ToolResul
   if (v) return v;
   const c = validateCounts(args, { lessons: MAX_COUNTS.lessons });
   if (c) return c;
+  const ai = validateArrayItems(args, ["lessons"], MAX_LENGTHS.name);
+  if (ai) return ai;
 
-  const outcome = args?.outcome;
+  const outcome = wiki.sanitizeMarkdownValue(args?.outcome);
   const finalApproach = args?.final_approach || null;
-  const lessons = args?.lessons || [];
+  const lessons = (args?.lessons || []).map(l => wiki.sanitizeMarkdownValue(l)).filter(Boolean);
 
   if (!outcome) {
     return {
@@ -431,9 +451,9 @@ export async function handleMemoryAdd(args?: MemoryAddArgs): Promise<ToolResult>
   if (v) return v;
 
   const fragment = args?.fragment;
-  const title = args?.title || null;
-  const description = args?.description || null;
-  const project = args?.project === undefined ? null : args.project;
+  const title = wiki.sanitizeMarkdownValue(args?.title || null);
+  const description = wiki.sanitizeMarkdownValue(args?.description || null);
+  const project = args?.project === undefined ? null : wiki.sanitizeMarkdownValue(args.project);
   const source = (args?.source || "ai") as "user" | "ai";
 
   if (!fragment || typeof fragment !== "string") {
@@ -483,7 +503,7 @@ export async function handleMemoryUpdate(args?: MemoryUpdateArgs): Promise<ToolR
   if (v) return v;
 
   const id = args?.id;
-  const title = args?.title;
+  const title = wiki.sanitizeMarkdownValue(args?.title);
   const fragment = args?.fragment;
   const confidence = args?.confidence;
 
@@ -504,8 +524,8 @@ export async function handleMemoryUpdate(args?: MemoryUpdateArgs): Promise<ToolR
     };
   }
 
-  if (title !== undefined) {
-    if (typeof title !== "string") {
+  if (args?.title !== undefined) {
+    if (typeof args.title !== "string") {
       return {
         content: [{ type: "text", text: "Error: 'title' must be a string" }],
         isError: true,
@@ -631,9 +651,9 @@ export async function handleMemoryMerge(args?: MemoryMergeArgs): Promise<ToolRes
   if (c) return c;
 
   const ids = args?.ids;
-  const title = args?.title;
+  const title = wiki.sanitizeMarkdownValue(args?.title);
   const fragment = args?.fragment;
-  const project = args?.project === undefined ? null : args.project;
+  const project = args?.project === undefined ? null : wiki.sanitizeMarkdownValue(args.project);
 
   if (!ids || !Array.isArray(ids) || ids.length < 2) {
     return {
@@ -717,12 +737,14 @@ export async function handleGuidePractice(args?: GuidePracticeArgs): Promise<Too
   if (v) return v;
   const c = validateCounts(args, { contexts: MAX_COUNTS.contexts, learnings: MAX_COUNTS.learnings });
   if (c) return c;
+  const ai = validateArrayItems(args, ["contexts", "learnings"], MAX_LENGTHS.name);
+  if (ai) return ai;
 
-  const guideName = args?.guide;
-  const category = args?.category;
+  const guideName = wiki.sanitizeMarkdownValue(args?.guide);
+  const category = wiki.sanitizeMarkdownValue(args?.category);
   const description = args?.description || "";
-  const contexts = args?.contexts || [];
-  const learnings = args?.learnings || [];
+  const contexts = (args?.contexts || []).map(c => wiki.sanitizeMarkdownValue(c)).filter(Boolean);
+  const learnings = (args?.learnings || []).map(l => wiki.sanitizeMarkdownValue(l)).filter(Boolean);
 
   if (!guideName || !category) {
     return {
@@ -762,12 +784,14 @@ export async function handleGuideCreate(args?: GuideCreateArgs): Promise<ToolRes
   if (v) return v;
   const c = validateCounts(args, { contexts: MAX_COUNTS.contexts, learnings: MAX_COUNTS.learnings });
   if (c) return c;
+  const ai = validateArrayItems(args, ["contexts", "learnings"], MAX_LENGTHS.name);
+  if (ai) return ai;
 
-  const guideName = args?.guide;
-  const category = args?.category;
+  const guideName = wiki.sanitizeMarkdownValue(args?.guide);
+  const category = wiki.sanitizeMarkdownValue(args?.category);
   const description = args?.description;
-  const contexts = args?.contexts || [];
-  const learnings = args?.learnings || [];
+  const contexts = (args?.contexts || []).map(c => wiki.sanitizeMarkdownValue(c)).filter(Boolean);
+  const learnings = (args?.learnings || []).map(l => wiki.sanitizeMarkdownValue(l)).filter(Boolean);
 
   if (!guideName || !category || !description) {
     return {
@@ -800,8 +824,8 @@ export async function handleGuideDistill(args?: GuideDistillArgs): Promise<ToolR
   const v = validateLengths(args, { memory_id: MAX_LENGTHS.id, guide: MAX_LENGTHS.name, category: MAX_LENGTHS.category });
   if (v) return v;
   const memoryId = args?.memory_id;
-  const guideName = args?.guide;
-  const category = args?.category || "dev-tool";
+  const guideName = wiki.sanitizeMarkdownValue(args?.guide);
+  const category = wiki.sanitizeMarkdownValue(args?.category || "dev-tool");
 
   if (!memoryId || !guideName) {
     return {
@@ -853,15 +877,17 @@ export async function handleGuideUpdate(args?: GuideUpdateArgs): Promise<ToolRes
     add_pitfalls: MAX_COUNTS.add_pitfalls
   });
   if (c) return c;
+  const ai = validateArrayItems(args, ["add_anti_patterns", "add_pitfalls"], MAX_LENGTHS.name);
+  if (ai) return ai;
 
-  const guideName = args?.guide;
+  const guideName = wiki.sanitizeMarkdownValue(args?.guide);
   const updates: Record<string, unknown> = {
-    guide: args?.new_name,
-    category: args?.category,
+    guide: wiki.sanitizeMarkdownValue(args?.new_name),
+    category: wiki.sanitizeMarkdownValue(args?.category),
     description: args?.description,
-    add_anti_patterns: args?.add_anti_patterns,
-    add_pitfalls: args?.add_pitfalls,
-    superseded_by: args?.superseded_by,
+    add_anti_patterns: (args?.add_anti_patterns || []).map(a => wiki.sanitizeMarkdownValue(a)).filter(Boolean),
+    add_pitfalls: (args?.add_pitfalls || []).map(p => wiki.sanitizeMarkdownValue(p)).filter(Boolean),
+    superseded_by: wiki.sanitizeMarkdownValue(args?.superseded_by),
     deprecated: args?.deprecated,
   };
 
@@ -925,13 +951,18 @@ export async function handleGuideMerge(args?: GuideMergeArgs): Promise<ToolResul
     learnings: MAX_COUNTS.learnings
   });
   if (c) return c;
+  const ai = validateArrayItems(args, ["contexts", "learnings"], MAX_LENGTHS.name);
+  if (ai) return ai;
 
   const guideNames = args?.guides;
-  const newGuideName = args?.guide;
-  const category = args?.category;
+  const newGuideName = wiki.sanitizeMarkdownValue(args?.guide);
+  const category = wiki.sanitizeMarkdownValue(args?.category);
   const description = args?.description || "";
-  let contexts: string[] | undefined = args?.contexts;
-  let learnings: string[] | undefined = args?.learnings;
+  let contexts: string[] | undefined = (args?.contexts || []).map(c => wiki.sanitizeMarkdownValue(c)).filter(Boolean);
+  let learnings: string[] | undefined = (args?.learnings || []).map(l => wiki.sanitizeMarkdownValue(l)).filter(Boolean);
+
+  if (contexts.length === 0) contexts = undefined;
+  if (learnings.length === 0) learnings = undefined;
 
   if (!guideNames || !Array.isArray(guideNames) || guideNames.length < 2) {
     return {
@@ -1102,7 +1133,7 @@ export async function handleWikiIngest(args?: WikiIngestArgs): Promise<ToolResul
   if (c) return c;
 
   let vaultPath = args?.vault_path;
-  const filePath = args?.file_path || null;
+  const filePath = wiki.sanitizeMarkdownValue(args?.file_path || null);
   const title = wiki.sanitizeMarkdownValue(args?.title || null);
   const summary = args?.summary;
   const entities = (args?.entities || []).map(e => wiki.sanitizeMarkdownValue(e)).filter(Boolean);
@@ -1124,20 +1155,11 @@ export async function handleWikiIngest(args?: WikiIngestArgs): Promise<ToolResul
       return { content: [{ type: "text", text: `Error: No wiki vault found at ${vaultPath}. Run wiki_setup first.` }], isError: true };
     }
 
+    const ai = validateArrayItems(args, ["entities", "concepts", "decisions"], MAX_LENGTHS.name);
+    if (ai) return ai;
+
     const date = new Date().toISOString().split("T")[0];
     const slug = (title || "untitled").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
-
-    // Validate each element in the arrays to prevent oversized items
-    for (const [key, list] of Object.entries({ entities, concepts, decisions })) {
-      for (const item of list) {
-        if (item.length > MAX_LENGTHS.name) {
-          return {
-            content: [{ type: "text", text: `Error: Individual '${key}' item exceeds maximum length of ${MAX_LENGTHS.name} characters` }],
-            isError: true,
-          };
-        }
-      }
-    }
 
     const sourcePage = path.join(vaultPath, "sources", `${date}-${slug}.md`);
 
