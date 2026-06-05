@@ -47,3 +47,8 @@
 **Vulnerability:** Absolute home directory paths were being written to persistent Wiki files (logs, lint reports, and source metadata), leaking the server's internal directory structure and username.
 **Learning:** Redacting paths in tool responses is insufficient if the same absolute paths are still stored in files generated or managed by those tools. Persistent storage must be sanitized with the same rigour as transient output to prevent Information Exposure.
 **Prevention:** Apply a shared `redactPath` utility to all user-controllable absolute paths before they are written to disk in persistent files or returned in responses.
+
+## 2025-06-05 - DoS via Unvalidated Array Item Lengths
+**Vulnerability:** Tool handlers accepting array arguments (e.g., technologies, lessons, entities) only validated the total count of items and not the length of individual string items. An attacker could provide a small array containing extremely large strings, leading to memory exhaustion or log corruption.
+**Learning:** Validating array counts is insufficient for DoS protection when the items themselves are variable-length strings. Each item must be individually checked against reasonable limits.
+**Prevention:** Use a centralized `validateArrayItems` helper to enforce maximum string lengths for all items within array parameters across all tool handlers.
