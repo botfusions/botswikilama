@@ -47,3 +47,8 @@
 **Vulnerability:** Absolute home directory paths were being written to persistent Wiki files (logs, lint reports, and source metadata), leaking the server's internal directory structure and username.
 **Learning:** Redacting paths in tool responses is insufficient if the same absolute paths are still stored in files generated or managed by those tools. Persistent storage must be sanitized with the same rigour as transient output to prevent Information Exposure.
 **Prevention:** Apply a shared `redactPath` utility to all user-controllable absolute paths before they are written to disk in persistent files or returned in responses.
+
+## 2025-06-10 - DoS Protection via Array Item Length Validation
+**Vulnerability:** While tools validated overall array counts and top-level string lengths, they lacked validation for the length of individual string items within array parameters. This allowed an attacker to provide a small array containing extremely large strings, leading to memory exhaustion or DoS.
+**Learning:** For MCP tools, input validation must be deep. Validating only the presence and overall count of array elements is insufficient if the elements themselves can be of unbounded size.
+**Prevention:** Use a centralized `validateArrayItems` helper to enforce maximum length limits for every string element within array-based tool arguments.
