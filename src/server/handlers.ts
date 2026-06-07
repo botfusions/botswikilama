@@ -200,6 +200,22 @@ function validateLengths(args: any, limits: Record<string, number>): ToolResult 
   return null;
 }
 
+function validateArrayItems(args: any, limits: Record<string, number>): ToolResult | null {
+  for (const [key, limit] of Object.entries(limits)) {
+    if (Array.isArray(args?.[key])) {
+      for (const item of args[key]) {
+        if (typeof item === "string" && item.length > limit) {
+          return {
+            content: [{ type: "text", text: `Error: Individual '${key}' item exceeds maximum length of ${limit} characters` }],
+            isError: true,
+          };
+        }
+      }
+    }
+  }
+  return null;
+}
+
 function validateCounts(args: any, limits: Record<string, number>): ToolResult | null {
   for (const [key, limit] of Object.entries(limits)) {
     if (Array.isArray(args?.[key]) && args[key].length > limit) {
@@ -228,9 +244,11 @@ export async function handleSessionStart(args?: SessionStartArgs): Promise<ToolR
   if (v) return v;
   const c = validateCounts(args, { technologies: MAX_COUNTS.technologies });
   if (c) return c;
+  const ai = validateArrayItems(args, { technologies: MAX_LENGTHS.name });
+  if (ai) return ai;
 
-  const taskType = args?.task_type;
-  const technologies = args?.technologies || [];
+  const taskType = wiki.sanitizeMarkdownValue(args?.task_type);
+  const technologies = (args?.technologies || []).map(t => wiki.sanitizeMarkdownValue(t)).filter(Boolean);
   const initialApproach = args?.initial_approach || null;
 
   if (!taskType) {
@@ -274,10 +292,12 @@ export async function handleSessionEnd(args?: SessionEndArgs): Promise<ToolResul
   if (v) return v;
   const c = validateCounts(args, { lessons: MAX_COUNTS.lessons });
   if (c) return c;
+  const ai = validateArrayItems(args, { lessons: MAX_LENGTHS.description });
+  if (ai) return ai;
 
-  const outcome = args?.outcome;
+  const outcome = wiki.sanitizeMarkdownValue(args?.outcome);
   const finalApproach = args?.final_approach || null;
-  const lessons = args?.lessons || [];
+  const lessons = (args?.lessons || []).filter(Boolean);
 
   if (!outcome) {
     return {
@@ -352,10 +372,10 @@ export async function handleMemoryRead(args?: MemoryReadArgs): Promise<ToolResul
   const c = validateCounts(args, { ids: MAX_COUNTS.ids });
   if (c) return c;
 
-  const currentProject = args?.project || core.detectProject();
+  const currentProject = wiki.sanitizeMarkdownValue(args?.project || core.detectProject());
   const query = args?.query || null;
   const detailId = args?.id || null;
-  const context = args?.context || null;
+  const context = wiki.sanitizeMarkdownValue(args?.context || null);
   const showAll = args?.all === true;
 
   let memory: any[] = core.loadMemory();
@@ -431,9 +451,9 @@ export async function handleMemoryAdd(args?: MemoryAddArgs): Promise<ToolResult>
   if (v) return v;
 
   const fragment = args?.fragment;
-  const title = args?.title || null;
+  const title = wiki.sanitizeMarkdownValue(args?.title || null);
   const description = args?.description || null;
-  const project = args?.project === undefined ? null : args.project;
+  const project = args?.project === undefined ? null : wiki.sanitizeMarkdownValue(args.project);
   const source = (args?.source || "ai") as "user" | "ai";
 
   if (!fragment || typeof fragment !== "string") {
@@ -511,7 +531,7 @@ export async function handleMemoryUpdate(args?: MemoryUpdateArgs): Promise<ToolR
         isError: true,
       };
     }
-    memory[targetIndex].title = title;
+    memory[targetIndex].title = wiki.sanitizeMarkdownValue(title);
   }
 
   if (fragment !== undefined) {
@@ -633,7 +653,7 @@ export async function handleMemoryMerge(args?: MemoryMergeArgs): Promise<ToolRes
   const ids = args?.ids;
   const title = args?.title;
   const fragment = args?.fragment;
-  const project = args?.project === undefined ? null : args.project;
+  const project = args?.project === undefined ? null : wiki.sanitizeMarkdownValue(args.project);
 
   if (!ids || !Array.isArray(ids) || ids.length < 2) {
     return {
@@ -666,7 +686,7 @@ export async function handleMemoryMerge(args?: MemoryMergeArgs): Promise<ToolRes
     };
   }
 
-  const newFragment = core.createFragment(fragment, "ai" as const, title, project);
+  const newFragment = core.createFragment(fragment, "ai" as const, wiki.sanitizeMarkdownValue(title), project);
   memory.push(newFragment);
 
   const mergedMemory = memory.filter((f: any) => !ids.includes(f.id));
@@ -682,8 +702,8 @@ export async function handleMemoryMerge(args?: MemoryMergeArgs): Promise<ToolRes
 export async function handleGuideGet(args?: GuideGetArgs): Promise<ToolResult> {
   const v = validateLengths(args, { category: MAX_LENGTHS.category, guide: MAX_LENGTHS.name, task: MAX_LENGTHS.description });
   if (v) return v;
-  const category = args?.category || null;
-  const guideName = args?.guide || null;
+  const category = wiki.sanitizeMarkdownValue(args?.category || null);
+  const guideName = wiki.sanitizeMarkdownValue(args?.guide || null);
   const task = args?.task || null;
   const allGuides = guides.loadGuides();
 
@@ -717,12 +737,14 @@ export async function handleGuidePractice(args?: GuidePracticeArgs): Promise<Too
   if (v) return v;
   const c = validateCounts(args, { contexts: MAX_COUNTS.contexts, learnings: MAX_COUNTS.learnings });
   if (c) return c;
+  const ai = validateArrayItems(args, { contexts: MAX_LENGTHS.name, learnings: MAX_LENGTHS.description });
+  if (ai) return ai;
 
-  const guideName = args?.guide;
-  const category = args?.category;
+  const guideName = wiki.sanitizeMarkdownValue(args?.guide);
+  const category = wiki.sanitizeMarkdownValue(args?.category);
   const description = args?.description || "";
-  const contexts = args?.contexts || [];
-  const learnings = args?.learnings || [];
+  const contexts = (args?.contexts || []).map(c => wiki.sanitizeMarkdownValue(c)).filter(Boolean);
+  const learnings = (args?.learnings || []).filter(Boolean);
 
   if (!guideName || !category) {
     return {
@@ -762,12 +784,14 @@ export async function handleGuideCreate(args?: GuideCreateArgs): Promise<ToolRes
   if (v) return v;
   const c = validateCounts(args, { contexts: MAX_COUNTS.contexts, learnings: MAX_COUNTS.learnings });
   if (c) return c;
+  const ai = validateArrayItems(args, { contexts: MAX_LENGTHS.name, learnings: MAX_LENGTHS.description });
+  if (ai) return ai;
 
-  const guideName = args?.guide;
-  const category = args?.category;
+  const guideName = wiki.sanitizeMarkdownValue(args?.guide);
+  const category = wiki.sanitizeMarkdownValue(args?.category);
   const description = args?.description;
-  const contexts = args?.contexts || [];
-  const learnings = args?.learnings || [];
+  const contexts = (args?.contexts || []).map(c => wiki.sanitizeMarkdownValue(c)).filter(Boolean);
+  const learnings = (args?.learnings || []).filter(Boolean);
 
   if (!guideName || !category || !description) {
     return {
@@ -800,8 +824,8 @@ export async function handleGuideDistill(args?: GuideDistillArgs): Promise<ToolR
   const v = validateLengths(args, { memory_id: MAX_LENGTHS.id, guide: MAX_LENGTHS.name, category: MAX_LENGTHS.category });
   if (v) return v;
   const memoryId = args?.memory_id;
-  const guideName = args?.guide;
-  const category = args?.category || "dev-tool";
+  const guideName = wiki.sanitizeMarkdownValue(args?.guide);
+  const category = wiki.sanitizeMarkdownValue(args?.category || "dev-tool");
 
   if (!memoryId || !guideName) {
     return {
@@ -853,15 +877,20 @@ export async function handleGuideUpdate(args?: GuideUpdateArgs): Promise<ToolRes
     add_pitfalls: MAX_COUNTS.add_pitfalls
   });
   if (c) return c;
+  const ai = validateArrayItems(args, {
+    add_anti_patterns: MAX_LENGTHS.description,
+    add_pitfalls: MAX_LENGTHS.description
+  });
+  if (ai) return ai;
 
-  const guideName = args?.guide;
+  const guideName = wiki.sanitizeMarkdownValue(args?.guide);
   const updates: Record<string, unknown> = {
-    guide: args?.new_name,
-    category: args?.category,
+    guide: args?.new_name ? wiki.sanitizeMarkdownValue(args.new_name) : undefined,
+    category: args?.category ? wiki.sanitizeMarkdownValue(args.category) : undefined,
     description: args?.description,
-    add_anti_patterns: args?.add_anti_patterns,
-    add_pitfalls: args?.add_pitfalls,
-    superseded_by: args?.superseded_by,
+    add_anti_patterns: args?.add_anti_patterns ? args.add_anti_patterns.filter(Boolean) : undefined,
+    add_pitfalls: args?.add_pitfalls ? args.add_pitfalls.filter(Boolean) : undefined,
+    superseded_by: args?.superseded_by ? wiki.sanitizeMarkdownValue(args.superseded_by) : undefined,
     deprecated: args?.deprecated,
   };
 
@@ -891,7 +920,7 @@ export async function handleGuideUpdate(args?: GuideUpdateArgs): Promise<ToolRes
 export async function handleGuideForget(args?: GuideForgetArgs): Promise<ToolResult> {
   const v = validateLengths(args, { guide: MAX_LENGTHS.name });
   if (v) return v;
-  const guideName = args?.guide;
+  const guideName = wiki.sanitizeMarkdownValue(args?.guide);
 
   if (!guideName) {
     return {
@@ -925,13 +954,21 @@ export async function handleGuideMerge(args?: GuideMergeArgs): Promise<ToolResul
     learnings: MAX_COUNTS.learnings
   });
   if (c) return c;
+  const ai = validateArrayItems(args, {
+    guides: MAX_LENGTHS.name,
+    contexts: MAX_LENGTHS.name,
+    learnings: MAX_LENGTHS.description
+  });
+  if (ai) return ai;
 
-  const guideNames = args?.guides;
-  const newGuideName = args?.guide;
-  const category = args?.category;
+  const guideNames = (args?.guides || []).map(n => wiki.sanitizeMarkdownValue(n)).filter(Boolean);
+  const newGuideName = wiki.sanitizeMarkdownValue(args?.guide);
+  const category = wiki.sanitizeMarkdownValue(args?.category);
   const description = args?.description || "";
-  let contexts: string[] | undefined = args?.contexts;
-  let learnings: string[] | undefined = args?.learnings;
+  let contexts: string[] | undefined = (args?.contexts || []).map(c => wiki.sanitizeMarkdownValue(c)).filter(Boolean);
+  if (contexts.length === 0) contexts = undefined;
+  let learnings: string[] | undefined = (args?.learnings || []).filter(Boolean);
+  if (learnings.length === 0) learnings = undefined;
 
   if (!guideNames || !Array.isArray(guideNames) || guideNames.length < 2) {
     return {
@@ -1127,17 +1164,12 @@ export async function handleWikiIngest(args?: WikiIngestArgs): Promise<ToolResul
     const date = new Date().toISOString().split("T")[0];
     const slug = (title || "untitled").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
 
-    // Validate each element in the arrays to prevent oversized items
-    for (const [key, list] of Object.entries({ entities, concepts, decisions })) {
-      for (const item of list) {
-        if (item.length > MAX_LENGTHS.name) {
-          return {
-            content: [{ type: "text", text: `Error: Individual '${key}' item exceeds maximum length of ${MAX_LENGTHS.name} characters` }],
-            isError: true,
-          };
-        }
-      }
-    }
+    const ai = validateArrayItems(args, {
+      entities: MAX_LENGTHS.name,
+      concepts: MAX_LENGTHS.name,
+      decisions: MAX_LENGTHS.name
+    });
+    if (ai) return ai;
 
     const sourcePage = path.join(vaultPath, "sources", `${date}-${slug}.md`);
 
