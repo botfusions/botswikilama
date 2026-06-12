@@ -200,6 +200,23 @@ function validateLengths(args: any, limits: Record<string, number>): ToolResult 
   return null;
 }
 
+function validateArrayItems(args: any, limits: Record<string, number>): ToolResult | null {
+  for (const [key, limit] of Object.entries(limits)) {
+    const list = args?.[key];
+    if (Array.isArray(list)) {
+      for (const item of list) {
+        if (typeof item === "string" && item.length > limit) {
+          return {
+            content: [{ type: "text", text: `Error: Individual '${key}' item exceeds maximum length of ${limit} characters` }],
+            isError: true,
+          };
+        }
+      }
+    }
+  }
+  return null;
+}
+
 function validateCounts(args: any, limits: Record<string, number>): ToolResult | null {
   for (const [key, limit] of Object.entries(limits)) {
     if (Array.isArray(args?.[key]) && args[key].length > limit) {
@@ -228,6 +245,8 @@ export async function handleSessionStart(args?: SessionStartArgs): Promise<ToolR
   if (v) return v;
   const c = validateCounts(args, { technologies: MAX_COUNTS.technologies });
   if (c) return c;
+  const i = validateArrayItems(args, { technologies: MAX_LENGTHS.name });
+  if (i) return i;
 
   const taskType = args?.task_type;
   const technologies = args?.technologies || [];
@@ -274,6 +293,8 @@ export async function handleSessionEnd(args?: SessionEndArgs): Promise<ToolResul
   if (v) return v;
   const c = validateCounts(args, { lessons: MAX_COUNTS.lessons });
   if (c) return c;
+  const i = validateArrayItems(args, { lessons: MAX_LENGTHS.description });
+  if (i) return i;
 
   const outcome = args?.outcome;
   const finalApproach = args?.final_approach || null;
@@ -351,6 +372,8 @@ export async function handleMemoryRead(args?: MemoryReadArgs): Promise<ToolResul
   if (v) return v;
   const c = validateCounts(args, { ids: MAX_COUNTS.ids });
   if (c) return c;
+  const i = validateArrayItems(args, { ids: MAX_LENGTHS.id });
+  if (i) return i;
 
   const currentProject = args?.project || core.detectProject();
   const query = args?.query || null;
@@ -629,6 +652,8 @@ export async function handleMemoryMerge(args?: MemoryMergeArgs): Promise<ToolRes
   if (v) return v;
   const c = validateCounts(args, { ids: MAX_COUNTS.ids });
   if (c) return c;
+  const i = validateArrayItems(args, { ids: MAX_LENGTHS.id });
+  if (i) return i;
 
   const ids = args?.ids;
   const title = args?.title;
@@ -717,6 +742,8 @@ export async function handleGuidePractice(args?: GuidePracticeArgs): Promise<Too
   if (v) return v;
   const c = validateCounts(args, { contexts: MAX_COUNTS.contexts, learnings: MAX_COUNTS.learnings });
   if (c) return c;
+  const i = validateArrayItems(args, { contexts: MAX_LENGTHS.name, learnings: MAX_LENGTHS.description });
+  if (i) return i;
 
   const guideName = args?.guide;
   const category = args?.category;
@@ -762,6 +789,8 @@ export async function handleGuideCreate(args?: GuideCreateArgs): Promise<ToolRes
   if (v) return v;
   const c = validateCounts(args, { contexts: MAX_COUNTS.contexts, learnings: MAX_COUNTS.learnings });
   if (c) return c;
+  const i = validateArrayItems(args, { contexts: MAX_LENGTHS.name, learnings: MAX_LENGTHS.description });
+  if (i) return i;
 
   const guideName = args?.guide;
   const category = args?.category;
@@ -853,6 +882,11 @@ export async function handleGuideUpdate(args?: GuideUpdateArgs): Promise<ToolRes
     add_pitfalls: MAX_COUNTS.add_pitfalls
   });
   if (c) return c;
+  const i = validateArrayItems(args, {
+    add_anti_patterns: MAX_LENGTHS.description,
+    add_pitfalls: MAX_LENGTHS.description
+  });
+  if (i) return i;
 
   const guideName = args?.guide;
   const updates: Record<string, unknown> = {
@@ -925,6 +959,12 @@ export async function handleGuideMerge(args?: GuideMergeArgs): Promise<ToolResul
     learnings: MAX_COUNTS.learnings
   });
   if (c) return c;
+  const i = validateArrayItems(args, {
+    guides: MAX_LENGTHS.name,
+    contexts: MAX_LENGTHS.name,
+    learnings: MAX_LENGTHS.description
+  });
+  if (i) return i;
 
   const guideNames = args?.guides;
   const newGuideName = args?.guide;
@@ -1100,6 +1140,12 @@ export async function handleWikiIngest(args?: WikiIngestArgs): Promise<ToolResul
     decisions: MAX_COUNTS.decisions
   });
   if (c) return c;
+  const i = validateArrayItems(args, {
+    entities: MAX_LENGTHS.name,
+    concepts: MAX_LENGTHS.name,
+    decisions: MAX_LENGTHS.name
+  });
+  if (i) return i;
 
   let vaultPath = args?.vault_path;
   const filePath = args?.file_path || null;
@@ -1126,18 +1172,6 @@ export async function handleWikiIngest(args?: WikiIngestArgs): Promise<ToolResul
 
     const date = new Date().toISOString().split("T")[0];
     const slug = (title || "untitled").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
-
-    // Validate each element in the arrays to prevent oversized items
-    for (const [key, list] of Object.entries({ entities, concepts, decisions })) {
-      for (const item of list) {
-        if (item.length > MAX_LENGTHS.name) {
-          return {
-            content: [{ type: "text", text: `Error: Individual '${key}' item exceeds maximum length of ${MAX_LENGTHS.name} characters` }],
-            isError: true,
-          };
-        }
-      }
-    }
 
     const sourcePage = path.join(vaultPath, "sources", `${date}-${slug}.md`);
 
