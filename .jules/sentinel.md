@@ -52,3 +52,8 @@
 **Vulnerability:** While array count and overall string length were validated, individual string items within arrays (e.g., technologies, lessons, entities) were not checked. An attacker could provide a valid number of items where each item was extremely large, leading to high memory usage or downstream processing issues.
 **Learning:** For MCP tools accepting arrays of strings, validating the total count of items is insufficient if the individual item size is not also capped.
 **Prevention:** Implement a `validateArrayItems` helper and apply it to all handlers that process array arguments, enforcing length limits on every element.
+
+## 2025-06-07 - Information Exposure in LLM-facing Contexts
+**Vulnerability:** Absolute home directory paths were leaked to the LLM via system prompts, tool descriptions, instructions, and MCP resources when memory fragments or guides contained such paths.
+**Learning:** Redacting paths in tool *responses* and *persistent files* is not enough. Dynamically generated context (prompts, tool metadata) that aggregates this data must also be sanitized before being sent to the LLM or exposed via MCP endpoints.
+**Prevention:** Apply a centralized `redactPath` utility to all generated strings that incorporate user-provided content before they are exposed to the LLM or external interfaces.
