@@ -10,6 +10,7 @@ import {
 } from "@modelcontextprotocol/sdk/types.js";
 import * as core from "../memory/index.js";
 import * as guides from "../guides/index.js";
+import * as wiki from "../wiki/index.js";
 import * as virtualSession from "../sessions/virtual.js";
 import { BASE_SYSTEM_PROMPT } from "./system-prompt.js";
 import { TOOLS } from "./tools.js";
@@ -75,7 +76,7 @@ export function buildToolsWithMemory(): ToolDefinition[] {
 
     for (const frag of allSorted) {
       if (count >= maxFrags) break;
-      const entry = `---\n[${frag.id}] ${frag.title} (${(frag.confidence * 100).toFixed(0)}%)\n${frag.fragment}\n`;
+      const entry = wiki.redactPath(`---\n[${frag.id}] ${frag.title} (${(frag.confidence * 100).toFixed(0)}%)\n${frag.fragment}\n`);
       const cost = core_config.estimateTokens(entry);
       if (tokensUsed + cost > budget) break;
 
@@ -89,8 +90,9 @@ export function buildToolsWithMemory(): ToolDefinition[] {
     if (remaining.length > 0) {
       contextBlock += `---\nADDITIONAL (call memory_read for details):\n`;
       for (const frag of remaining) {
-        const scope = frag.project ? `[${frag.project}]` : "[global]";
-        contextBlock += `[${frag.id}] ${scope} ${frag.title}\n`;
+        const scope = wiki.redactPath(frag.project ? `[${frag.project}]` : "[global]");
+        const title = wiki.redactPath(frag.title);
+        contextBlock += `[${frag.id}] ${scope} ${title}\n`;
       }
     }
   }
@@ -101,7 +103,7 @@ export function buildToolsWithMemory(): ToolDefinition[] {
     contextBlock += `\nACTIVE GUIDES:\n`;
     for (const g of topGuides) {
       const learnings = (g.learnings || []).slice(0, 3).join("; ");
-      contextBlock += `- ${g.guide} (${g.category}, ${g.usage_count}x)${learnings ? ": " + learnings : ""}\n`;
+      contextBlock += wiki.redactPath(`- ${g.guide} (${g.category}, ${g.usage_count}x)${learnings ? ": " + learnings : ""}\n`);
     }
   }
 
@@ -136,7 +138,7 @@ export function buildDynamicInstructions(projectName: string | null): string {
 
   const fullContentParts: string[] = [];
   for (const frag of allSorted) {
-    const entryText = `### [${frag.id}] ${frag.title} (${(frag.confidence * 100).toFixed(0)}%)\n${frag.fragment}\n`;
+    const entryText = wiki.redactPath(`### [${frag.id}] ${frag.title} (${(frag.confidence * 100).toFixed(0)}%)\n${frag.fragment}\n`);
     const cost = core_config.estimateTokens(entryText);
     if (tokensUsed + cost > fullBudget) break;
     if (fullContentParts.length >= config.injection.max_full_content_fragments) break;
@@ -160,9 +162,10 @@ export function buildDynamicInstructions(projectName: string | null): string {
     instructions += `## Additional Memory Index (call \`memory_read id="<id>"\` for details)\n\n`;
     const toShow = remaining.slice(0, maxSummary);
     for (const frag of toShow) {
-      const scope = frag.project ? `[${frag.project}]` : "[global]";
-      const desc = (frag.description || "").replace(/\n/g, " ").slice(0, 80);
-      instructions += `- [${frag.id}] ${scope} ${frag.title}${desc ? " — " + desc : ""}\n`;
+      const scope = wiki.redactPath(frag.project ? `[${frag.project}]` : "[global]");
+      const title = wiki.redactPath(frag.title);
+      const desc = wiki.redactPath((frag.description || "").replace(/\n/g, " ").slice(0, 80));
+      instructions += `- [${frag.id}] ${scope} ${title}${desc ? " — " + desc : ""}\n`;
     }
     if (remaining.length > maxSummary) {
       instructions += `- ... and ${remaining.length - maxSummary} more (use \`memory_read\` to browse)\n`;
@@ -180,8 +183,8 @@ export function buildDynamicInstructions(projectName: string | null): string {
     let detailCount = 0;
     for (const guide of topGuides) {
       if (detailCount < maxDetail && guide.description && guide.description.length > 20) {
-        const entry = `### ${guide.guide} (${guide.category}) — ${guide.usage_count}x used\n`;
-        const desc = guide.description.length > 300 ? guide.description.slice(0, 300) + "..." : guide.description;
+        const entry = wiki.redactPath(`### ${guide.guide} (${guide.category}) — ${guide.usage_count}x used\n`);
+        const desc = wiki.redactPath(guide.description.length > 300 ? guide.description.slice(0, 300) + "..." : guide.description);
         const fullEntry = entry + desc + "\n\n";
         const cost = core_config.estimateTokens(fullEntry);
 
@@ -193,13 +196,13 @@ export function buildDynamicInstructions(projectName: string | null): string {
         }
       }
 
-      instructions += `- ${guide.guide} (${guide.category}) — ${guide.usage_count}x used\n`;
+      instructions += wiki.redactPath(`- ${guide.guide} (${guide.category}) — ${guide.usage_count}x used\n`);
     }
     instructions += `\nUse \`guide_get guide="<name>"\` for full guide details.\n\n`;
   }
 
   if (projectName) {
-    instructions = `# Lemma — Your Memory (project: ${projectName})\n\n` + instructions;
+    instructions = `# Lemma — Your Memory (project: ${wiki.redactPath(projectName)})\n\n` + instructions;
   } else {
     instructions = `# Lemma — Your Memory\n\n` + instructions;
   }

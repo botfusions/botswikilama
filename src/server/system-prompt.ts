@@ -1,5 +1,6 @@
 import type { MemoryFragment, PromptContext } from "../types.js";
 import * as core from "../memory/index.js";
+import * as wiki from "../wiki/index.js";
 import { applyPromptModifiers } from "./hooks.js";
 
 const BASE_SYSTEM_PROMPT = `<system_prompt>
@@ -69,13 +70,14 @@ function formatProjectContext(fragments: MemoryFragment[], projectName: string):
     const confidenceBar = "█".repeat(barCount) + "░".repeat(5 - barCount);
     const sourceIcon = frag.source === "ai" ? "🤖" : "👤";
 
-    const summary = frag.description || frag.title;
+    const title = wiki.redactPath(frag.title);
+    const summary = wiki.redactPath(frag.description || frag.title);
 
-    return `[${frag.id}] ${confidenceBar} (${sourceIcon}) ${frag.title}\n    ${summary}`;
+    return `[${frag.id}] ${confidenceBar} (${sourceIcon}) ${title}\n    ${summary}`;
   });
 
   return `<project_context>
-## Project Context: ${projectName}
+## Project Context: ${wiki.redactPath(projectName)}
 
 You have ${fragments.length} saved memory fragment(s) for this project.
 Use \`memory_read\` to load full details or \`memory_read id="<id>"\` for specific fragment.
@@ -90,7 +92,9 @@ function formatGlobalContext(fragments: MemoryFragment[]): string {
   }
 
   const lines = fragments.map(frag => {
-    return `- **${frag.title}**: ${frag.description || frag.fragment.slice(0, 100)}`;
+    const title = wiki.redactPath(frag.title);
+    const description = wiki.redactPath(frag.description || frag.fragment.slice(0, 100));
+    return `- **${title}**: ${description}`;
   });
 
   return `<global_knowledge>
