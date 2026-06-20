@@ -93,7 +93,7 @@ function formatGlobalContext(fragments: MemoryFragment[]): string {
 
   const lines = fragments.map(frag => {
     const title = wiki.redactPath(frag.title);
-    const description = wiki.redactPath(frag.description || frag.fragment.slice(0, 100));
+    const description = wiki.redactPath(frag.description || frag.fragment).slice(0, 100);
     return `- **${title}**: ${description}`;
   });
 

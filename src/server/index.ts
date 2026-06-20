@@ -164,7 +164,7 @@ export function buildDynamicInstructions(projectName: string | null): string {
     for (const frag of toShow) {
       const scope = wiki.redactPath(frag.project ? `[${frag.project}]` : "[global]");
       const title = wiki.redactPath(frag.title);
-      const desc = wiki.redactPath((frag.description || "").replace(/\n/g, " ").slice(0, 80));
+      const desc = wiki.redactPath((frag.description || "").replace(/\n/g, " ")).slice(0, 80);
       instructions += `- [${frag.id}] ${scope} ${title}${desc ? " — " + desc : ""}\n`;
     }
     if (remaining.length > maxSummary) {
@@ -184,7 +184,8 @@ export function buildDynamicInstructions(projectName: string | null): string {
     for (const guide of topGuides) {
       if (detailCount < maxDetail && guide.description && guide.description.length > 20) {
         const entry = wiki.redactPath(`### ${guide.guide} (${guide.category}) — ${guide.usage_count}x used\n`);
-        const desc = wiki.redactPath(guide.description.length > 300 ? guide.description.slice(0, 300) + "..." : guide.description);
+        const rawGuideDesc = wiki.redactPath(guide.description);
+        const desc = rawGuideDesc.length > 300 ? rawGuideDesc.slice(0, 300) + "..." : rawGuideDesc;
         const fullEntry = entry + desc + "\n\n";
         const cost = core_config.estimateTokens(fullEntry);
 
