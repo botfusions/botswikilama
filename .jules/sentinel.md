@@ -52,3 +52,8 @@
 **Vulnerability:** While array count and overall string length were validated, individual string items within arrays (e.g., technologies, lessons, entities) were not checked. An attacker could provide a valid number of items where each item was extremely large, leading to high memory usage or downstream processing issues.
 **Learning:** For MCP tools accepting arrays of strings, validating the total count of items is insufficient if the individual item size is not also capped.
 **Prevention:** Implement a `validateArrayItems` helper and apply it to all handlers that process array arguments, enforcing length limits on every element.
+
+## 2026-06-22 - Absolute Path Disclosure in LLM-facing Components
+**Vulnerability:** Absolute home directory paths were disclosed to LLMs through dynamic system prompts, tool descriptions, instructions, and JSON resource content.
+**Learning:** Redacting paths in tool *responses* is insufficient if the same data is injected into the model's context via system prompts or metadata. LLM-facing components must have a central redaction layer.
+**Prevention:** Apply a global `redactPath` utility to all dynamic strings before they are returned to the LLM as part of the system prompt, tool definitions, or resources.
