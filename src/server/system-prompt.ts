@@ -1,5 +1,6 @@
 import type { MemoryFragment, PromptContext } from "../types.js";
 import * as core from "../memory/index.js";
+import * as wiki from "../wiki/index.js";
 import { applyPromptModifiers } from "./hooks.js";
 
 const BASE_SYSTEM_PROMPT = `<system_prompt>
@@ -60,6 +61,7 @@ When you see tool names: EXECUTE the tool, don't discuss it. Lemma is your memor
 </system_prompt>`;
 
 function formatProjectContext(fragments: MemoryFragment[], projectName: string): string {
+  const safeProjectName = wiki.sanitizeMarkdownValue(projectName);
   if (!fragments || fragments.length === 0) {
     return "";
   }
@@ -75,7 +77,7 @@ function formatProjectContext(fragments: MemoryFragment[], projectName: string):
   });
 
   return `<project_context>
-## Project Context: ${projectName}
+## Project Context: ${safeProjectName}
 
 You have ${fragments.length} saved memory fragment(s) for this project.
 Use \`memory_read\` to load full details or \`memory_read id="<id>"\` for specific fragment.
@@ -115,6 +117,7 @@ function processFragments(fragments: MemoryFragment[], limit: number): MemoryFra
 export async function getDynamicSystemPrompt(projectName: string | null): Promise<string> {
   let prompt = BASE_SYSTEM_PROMPT;
   let memory: any[] = [];
+  const safeProjectName = projectName ? wiki.sanitizeMarkdownValue(projectName) : null;
 
   try {
     memory = core.loadMemory();
@@ -145,13 +148,13 @@ export async function getDynamicSystemPrompt(projectName: string | null): Promis
     );
   }
 
-  if (projectName) {
+  if (safeProjectName) {
     const projectFragmentsRaw = allFragments.filter(f => f.project !== null && f.project !== undefined);
     if (projectFragmentsRaw.length > 0) {
       const sortedProject = processFragments(projectFragmentsRaw, 20);
       context.fragments = sortedProject;
 
-      const projectContext = formatProjectContext(sortedProject, projectName);
+      const projectContext = formatProjectContext(sortedProject, safeProjectName);
       prompt = prompt.replace(
         "</system_prompt>",
         `\n${projectContext}\n</system_prompt>`
@@ -165,7 +168,7 @@ export async function getDynamicSystemPrompt(projectName: string | null): Promis
     console.error(`[Lemma] Prompt modifiers failed: ${(error as Error).message}`);
   }
 
-  return prompt;
+  return wiki.redactPath(prompt);
 }
 
 export { BASE_SYSTEM_PROMPT };
