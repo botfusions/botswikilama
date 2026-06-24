@@ -52,3 +52,8 @@
 **Vulnerability:** While array count and overall string length were validated, individual string items within arrays (e.g., technologies, lessons, entities) were not checked. An attacker could provide a valid number of items where each item was extremely large, leading to high memory usage or downstream processing issues.
 **Learning:** For MCP tools accepting arrays of strings, validating the total count of items is insufficient if the individual item size is not also capped.
 **Prevention:** Implement a `validateArrayItems` helper and apply it to all handlers that process array arguments, enforcing length limits on every element.
+
+## 2026-06-24 - Prompt-based Information Exposure and Injection
+**Vulnerability:** Absolute home directory paths were leaked in system prompts and tool descriptions. Also, project names were vulnerable to Markdown injection in generated instructions.
+**Learning:** Data intended for LLM prompts must be treated as a serialization target. Absolute paths must be redacted, and any user-influenced metadata (like project names) must be sanitized to prevent document structure breakage or instruction injection. Importantly, security sanitization for display must be decoupled from internal logic (like database lookups) to avoid functional regressions.
+**Prevention:** Apply a shared `redactPath` utility and `sanitizeMarkdownValue` to all data before it enters a prompt template. Always use the raw, unsanitized value for internal lookups and only the sanitized version for display.

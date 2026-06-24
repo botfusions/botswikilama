@@ -27,7 +27,7 @@ test("wiki_ingest should skip symbolic links to files outside vault", async () =
 
     try {
       fs.symlinkSync(secretFile, symlinkPath);
-    } catch (e) {
+    } catch (e: any) {
       console.error("Symlink creation failed, skipping test part:", e.message);
       throw e;
     }

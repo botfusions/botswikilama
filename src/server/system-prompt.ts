@@ -1,6 +1,7 @@
 import type { MemoryFragment, PromptContext } from "../types.js";
 import * as core from "../memory/index.js";
 import { applyPromptModifiers } from "./hooks.js";
+import * as wiki from "../wiki/index.js";
 
 const BASE_SYSTEM_PROMPT = `<system_prompt>
 <identity>
@@ -113,6 +114,7 @@ function processFragments(fragments: MemoryFragment[], limit: number): MemoryFra
 }
 
 export async function getDynamicSystemPrompt(projectName: string | null): Promise<string> {
+  const sanitizedProject = projectName ? wiki.sanitizeMarkdownValue(projectName) : null;
   let prompt = BASE_SYSTEM_PROMPT;
   let memory: any[] = [];
 
@@ -124,7 +126,7 @@ export async function getDynamicSystemPrompt(projectName: string | null): Promis
   }
 
   const context: PromptContext = {
-    project: projectName,
+    project: sanitizedProject,
     fragments: [],
     globalFragments: [],
   };
@@ -145,13 +147,13 @@ export async function getDynamicSystemPrompt(projectName: string | null): Promis
     );
   }
 
-  if (projectName) {
+  if (sanitizedProject) {
     const projectFragmentsRaw = allFragments.filter(f => f.project !== null && f.project !== undefined);
     if (projectFragmentsRaw.length > 0) {
       const sortedProject = processFragments(projectFragmentsRaw, 20);
       context.fragments = sortedProject;
 
-      const projectContext = formatProjectContext(sortedProject, projectName);
+      const projectContext = formatProjectContext(sortedProject, sanitizedProject);
       prompt = prompt.replace(
         "</system_prompt>",
         `\n${projectContext}\n</system_prompt>`
@@ -165,7 +167,7 @@ export async function getDynamicSystemPrompt(projectName: string | null): Promis
     console.error(`[Lemma] Prompt modifiers failed: ${(error as Error).message}`);
   }
 
-  return prompt;
+  return wiki.redactPath(prompt);
 }
 
 export { BASE_SYSTEM_PROMPT };

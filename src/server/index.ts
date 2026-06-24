@@ -11,6 +11,7 @@ import {
 import * as core from "../memory/index.js";
 import * as guides from "../guides/index.js";
 import * as virtualSession from "../sessions/virtual.js";
+import * as wiki from "../wiki/index.js";
 import { BASE_SYSTEM_PROMPT } from "./system-prompt.js";
 import { TOOLS } from "./tools.js";
 import type { ToolDefinition } from "./tools.js";
@@ -108,7 +109,7 @@ export function buildToolsWithMemory(): ToolDefinition[] {
   if (contextBlock) {
     tools[memoryIdx] = {
       ...tools[memoryIdx]!,
-      description: tools[memoryIdx]!.description + contextBlock,
+      description: wiki.redactPath(tools[memoryIdx]!.description + contextBlock),
     };
   }
 
@@ -116,6 +117,7 @@ export function buildToolsWithMemory(): ToolDefinition[] {
 }
 
 export function buildDynamicInstructions(projectName: string | null): string {
+  const sanitizedProject = projectName ? wiki.sanitizeMarkdownValue(projectName) : null;
   const config = core_config.loadConfig();
   const memory: any[] = core.loadMemory();
 
@@ -198,8 +200,8 @@ export function buildDynamicInstructions(projectName: string | null): string {
     instructions += `\nUse \`guide_get guide="<name>"\` for full guide details.\n\n`;
   }
 
-  if (projectName) {
-    instructions = `# Lemma — Your Memory (project: ${projectName})\n\n` + instructions;
+  if (sanitizedProject) {
+    instructions = `# Lemma — Your Memory (project: ${sanitizedProject})\n\n` + instructions;
   } else {
     instructions = `# Lemma — Your Memory\n\n` + instructions;
   }
@@ -210,7 +212,7 @@ export function buildDynamicInstructions(projectName: string | null): string {
 
   instructions += `\n**RULE:** Call \`memory_add\` AFTER learning something new. If you skip this, the knowledge is lost forever — you will NOT remember it next session.`;
 
-  return instructions;
+  return wiki.redactPath(instructions);
 }
 
 server.setRequestHandler(InitializeRequestSchema, async (_request) => {
