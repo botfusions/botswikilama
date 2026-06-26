@@ -11,6 +11,7 @@ import {
 import * as core from "../memory/index.js";
 import * as guides from "../guides/index.js";
 import * as virtualSession from "../sessions/virtual.js";
+import * as wiki from "../wiki/index.js";
 import { BASE_SYSTEM_PROMPT } from "./system-prompt.js";
 import { TOOLS } from "./tools.js";
 import type { ToolDefinition } from "./tools.js";
@@ -108,7 +109,7 @@ export function buildToolsWithMemory(): ToolDefinition[] {
   if (contextBlock) {
     tools[memoryIdx] = {
       ...tools[memoryIdx]!,
-      description: tools[memoryIdx]!.description + contextBlock,
+      description: wiki.redactPath(tools[memoryIdx]!.description + contextBlock),
     };
   }
 
@@ -116,6 +117,10 @@ export function buildToolsWithMemory(): ToolDefinition[] {
 }
 
 export function buildDynamicInstructions(projectName: string | null): string {
+  return wiki.redactPath(_buildDynamicInstructions(projectName));
+}
+
+function _buildDynamicInstructions(projectName: string | null): string {
   const config = core_config.loadConfig();
   const memory: any[] = core.loadMemory();
 
@@ -301,7 +306,7 @@ server.setRequestHandler(ReadResourceRequestSchema, async (request) => {
         {
           uri,
           mimeType: "application/json",
-          text: JSON.stringify(fragment, null, 2),
+          text: wiki.redactPath(JSON.stringify(fragment, null, 2)),
         },
       ],
     };
@@ -321,7 +326,7 @@ server.setRequestHandler(ReadResourceRequestSchema, async (request) => {
         {
           uri,
           mimeType: "application/json",
-          text: JSON.stringify(guide, null, 2),
+          text: wiki.redactPath(JSON.stringify(guide, null, 2)),
         },
       ],
     };

@@ -1,5 +1,6 @@
 import type { MemoryFragment, PromptContext } from "../types.js";
 import * as core from "../memory/index.js";
+import * as wiki from "../wiki/index.js";
 import { applyPromptModifiers } from "./hooks.js";
 
 const BASE_SYSTEM_PROMPT = `<system_prompt>
@@ -113,6 +114,10 @@ function processFragments(fragments: MemoryFragment[], limit: number): MemoryFra
 }
 
 export async function getDynamicSystemPrompt(projectName: string | null): Promise<string> {
+  return wiki.redactPath(await _getDynamicSystemPrompt(projectName));
+}
+
+async function _getDynamicSystemPrompt(projectName: string | null): Promise<string> {
   let prompt = BASE_SYSTEM_PROMPT;
   let memory: any[] = [];
 
