@@ -52,3 +52,8 @@
 **Vulnerability:** While array count and overall string length were validated, individual string items within arrays (e.g., technologies, lessons, entities) were not checked. An attacker could provide a valid number of items where each item was extremely large, leading to high memory usage or downstream processing issues.
 **Learning:** For MCP tools accepting arrays of strings, validating the total count of items is insufficient if the individual item size is not also capped.
 **Prevention:** Implement a `validateArrayItems` helper and apply it to all handlers that process array arguments, enforcing length limits on every element.
+
+## 2025-06-10 - Path Disclosure and Markdown Injection in Dynamic Context
+**Vulnerability:** Absolute home directory paths were leaked in dynamic LLM instructions (system prompt and tool descriptions) and JSON resource responses. Additionally, project names were not sanitized when used in Markdown headers, allowing for header injection.
+**Learning:** Redacting paths in tool outputs is insufficient if they are still leaked through other MCP channels like dynamic instructions or resources. User-controlled strings used in Markdown headers of system prompts must be sanitized to prevent instruction injection.
+**Prevention:** Apply `redactPath` to all LLM-facing strings and JSON resources. Sanitize any user-controlled metadata using `sanitizeMarkdownValue` before embedding it in Markdown structures.

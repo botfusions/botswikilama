@@ -1,5 +1,6 @@
 import type { MemoryFragment, PromptContext } from "../types.js";
 import * as core from "../memory/index.js";
+import * as wiki from "../wiki/index.js";
 import { applyPromptModifiers } from "./hooks.js";
 
 const BASE_SYSTEM_PROMPT = `<system_prompt>
@@ -64,6 +65,8 @@ function formatProjectContext(fragments: MemoryFragment[], projectName: string):
     return "";
   }
 
+  const safeProjectName = wiki.sanitizeMarkdownValue(projectName);
+
   const lines = fragments.map(frag => {
     const barCount = Math.round(frag.confidence / 0.2);
     const confidenceBar = "█".repeat(barCount) + "░".repeat(5 - barCount);
@@ -74,14 +77,14 @@ function formatProjectContext(fragments: MemoryFragment[], projectName: string):
     return `[${frag.id}] ${confidenceBar} (${sourceIcon}) ${frag.title}\n    ${summary}`;
   });
 
-  return `<project_context>
-## Project Context: ${projectName}
+  return wiki.redactPath(`<project_context>
+## Project Context: ${safeProjectName}
 
 You have ${fragments.length} saved memory fragment(s) for this project.
 Use \`memory_read\` to load full details or \`memory_read id="<id>"\` for specific fragment.
 
 ${lines.join("\n")}
-</project_context>`;
+</project_context>`);
 }
 
 function formatGlobalContext(fragments: MemoryFragment[]): string {
@@ -93,13 +96,13 @@ function formatGlobalContext(fragments: MemoryFragment[]): string {
     return `- **${frag.title}**: ${frag.description || frag.fragment.slice(0, 100)}`;
   });
 
-  return `<global_knowledge>
+  return wiki.redactPath(`<global_knowledge>
 ## Global Knowledge
 
 Cross-project learnings and preferences that apply everywhere:
 
 ${lines.join("\n")}
-</global_knowledge>`;
+</global_knowledge>`);
 }
 
 function processFragments(fragments: MemoryFragment[], limit: number): MemoryFragment[] {
