@@ -52,3 +52,8 @@
 **Vulnerability:** While array count and overall string length were validated, individual string items within arrays (e.g., technologies, lessons, entities) were not checked. An attacker could provide a valid number of items where each item was extremely large, leading to high memory usage or downstream processing issues.
 **Learning:** For MCP tools accepting arrays of strings, validating the total count of items is insufficient if the individual item size is not also capped.
 **Prevention:** Implement a `validateArrayItems` helper and apply it to all handlers that process array arguments, enforcing length limits on every element.
+
+## 2025-06-10 - Absolute Path Leakage in Dynamic Prompts and Resources
+**Vulnerability:** Absolute home directory paths were leaked in dynamic system prompts, tool descriptions, and MCP resources (instructions and JSON). While tool responses were redacted, the same paths were still exposed in the surrounding context provided to the LLM.
+**Learning:** Security redaction must be applied at the final output stage for ALL LLM-facing components, including dynamically generated instructions and resources. It's not enough to redact individual tool outputs if the underlying data or environment-derived strings still contain sensitive paths.
+**Prevention:** Centralize path redaction and apply it to the final concatenated strings of system prompts, tool descriptions, and resource contents before they are returned to the client.

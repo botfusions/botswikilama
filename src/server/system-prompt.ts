@@ -1,5 +1,6 @@
 import type { MemoryFragment, PromptContext } from "../types.js";
 import * as core from "../memory/index.js";
+import * as wiki from "../wiki/index.js";
 import { applyPromptModifiers } from "./hooks.js";
 
 const BASE_SYSTEM_PROMPT = `<system_prompt>
@@ -74,8 +75,10 @@ function formatProjectContext(fragments: MemoryFragment[], projectName: string):
     return `[${frag.id}] ${confidenceBar} (${sourceIcon}) ${frag.title}\n    ${summary}`;
   });
 
+  const sanitizedProjectName = wiki.sanitizeMarkdownValue(projectName);
+
   return `<project_context>
-## Project Context: ${projectName}
+## Project Context: ${sanitizedProjectName}
 
 You have ${fragments.length} saved memory fragment(s) for this project.
 Use \`memory_read\` to load full details or \`memory_read id="<id>"\` for specific fragment.
@@ -165,7 +168,7 @@ export async function getDynamicSystemPrompt(projectName: string | null): Promis
     console.error(`[Lemma] Prompt modifiers failed: ${(error as Error).message}`);
   }
 
-  return prompt;
+  return wiki.redactPath(prompt);
 }
 
 export { BASE_SYSTEM_PROMPT };

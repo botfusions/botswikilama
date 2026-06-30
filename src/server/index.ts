@@ -10,6 +10,7 @@ import {
 } from "@modelcontextprotocol/sdk/types.js";
 import * as core from "../memory/index.js";
 import * as guides from "../guides/index.js";
+import * as wiki from "../wiki/index.js";
 import * as virtualSession from "../sessions/virtual.js";
 import { BASE_SYSTEM_PROMPT } from "./system-prompt.js";
 import { TOOLS } from "./tools.js";
@@ -108,7 +109,7 @@ export function buildToolsWithMemory(): ToolDefinition[] {
   if (contextBlock) {
     tools[memoryIdx] = {
       ...tools[memoryIdx]!,
-      description: tools[memoryIdx]!.description + contextBlock,
+      description: wiki.redactPath(tools[memoryIdx]!.description + contextBlock),
     };
   }
 
@@ -199,7 +200,8 @@ export function buildDynamicInstructions(projectName: string | null): string {
   }
 
   if (projectName) {
-    instructions = `# Lemma — Your Memory (project: ${projectName})\n\n` + instructions;
+    const sanitizedProjectName = wiki.sanitizeMarkdownValue(projectName);
+    instructions = `# Lemma — Your Memory (project: ${sanitizedProjectName})\n\n` + instructions;
   } else {
     instructions = `# Lemma — Your Memory\n\n` + instructions;
   }
@@ -210,7 +212,7 @@ export function buildDynamicInstructions(projectName: string | null): string {
 
   instructions += `\n**RULE:** Call \`memory_add\` AFTER learning something new. If you skip this, the knowledge is lost forever — you will NOT remember it next session.`;
 
-  return instructions;
+  return wiki.redactPath(instructions);
 }
 
 server.setRequestHandler(InitializeRequestSchema, async (_request) => {
@@ -301,7 +303,7 @@ server.setRequestHandler(ReadResourceRequestSchema, async (request) => {
         {
           uri,
           mimeType: "application/json",
-          text: JSON.stringify(fragment, null, 2),
+          text: wiki.redactPath(JSON.stringify(fragment, null, 2)),
         },
       ],
     };
@@ -321,7 +323,7 @@ server.setRequestHandler(ReadResourceRequestSchema, async (request) => {
         {
           uri,
           mimeType: "application/json",
-          text: JSON.stringify(guide, null, 2),
+          text: wiki.redactPath(JSON.stringify(guide, null, 2)),
         },
       ],
     };

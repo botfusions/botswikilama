@@ -40,7 +40,7 @@ export function sanitizeYamlValue(value: any): string {
  */
 export function sanitizeMarkdownValue(value: any): string {
   if (value === null || value === undefined) return "";
-  return String(value).replace(/\r?\n|\r/g, " ").trim();
+  return String(value).replace(/\r?\n|\r/g, " ").replace(/[#*`]/g, "").trim();
 }
 
 const HOME_DIR = os.homedir();
