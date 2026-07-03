@@ -48,6 +48,11 @@
 **Learning:** Redacting paths in tool responses is insufficient if the same absolute paths are still stored in files generated or managed by those tools. Persistent storage must be sanitized with the same rigour as transient output to prevent Information Exposure.
 **Prevention:** Apply a shared `redactPath` utility to all user-controllable absolute paths before they are written to disk in persistent files or returned in responses.
 
+## 2025-06-07 - Information Exposure in Dynamic LLM-facing Components
+**Vulnerability:** Absolute home directory paths were leaked to the LLM via dynamically generated system prompts, tool descriptions, and MCP resources (like instructions and JSON fragments).
+**Learning:** Security redaction must be applied not only to tool results but also to any dynamic context injected into the LLM's workspace, such as system prompts, initialize instructions, and resource contents.
+**Prevention:** Wrap all dynamic string generation for LLM ingestion with a centralized `redactPath` utility at the point of egress in the server core.
+
 ## 2025-06-05 - DoS Protection via Individual Array Item Validation
 **Vulnerability:** While array count and overall string length were validated, individual string items within arrays (e.g., technologies, lessons, entities) were not checked. An attacker could provide a valid number of items where each item was extremely large, leading to high memory usage or downstream processing issues.
 **Learning:** For MCP tools accepting arrays of strings, validating the total count of items is insufficient if the individual item size is not also capped.

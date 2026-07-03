@@ -18,6 +18,7 @@ import { handleCallTool } from "./handlers.js";
 import { triggerHook, HookTypes } from "./hooks.js";
 import * as core_config from "../memory/config.js";
 import { setNotifyChange } from "./handlers.js";
+import * as wiki from "../wiki/index.js";
 
 export let detectedProject: string | null = null;
 
@@ -108,7 +109,7 @@ export function buildToolsWithMemory(): ToolDefinition[] {
   if (contextBlock) {
     tools[memoryIdx] = {
       ...tools[memoryIdx]!,
-      description: tools[memoryIdx]!.description + contextBlock,
+      description: wiki.redactPath(tools[memoryIdx]!.description + contextBlock),
     };
   }
 
@@ -210,7 +211,7 @@ export function buildDynamicInstructions(projectName: string | null): string {
 
   instructions += `\n**RULE:** Call \`memory_add\` AFTER learning something new. If you skip this, the knowledge is lost forever — you will NOT remember it next session.`;
 
-  return instructions;
+  return wiki.redactPath(instructions);
 }
 
 server.setRequestHandler(InitializeRequestSchema, async (_request) => {
@@ -301,7 +302,7 @@ server.setRequestHandler(ReadResourceRequestSchema, async (request) => {
         {
           uri,
           mimeType: "application/json",
-          text: JSON.stringify(fragment, null, 2),
+          text: wiki.redactPath(JSON.stringify(fragment, null, 2)),
         },
       ],
     };
@@ -321,7 +322,7 @@ server.setRequestHandler(ReadResourceRequestSchema, async (request) => {
         {
           uri,
           mimeType: "application/json",
-          text: JSON.stringify(guide, null, 2),
+          text: wiki.redactPath(JSON.stringify(guide, null, 2)),
         },
       ],
     };
