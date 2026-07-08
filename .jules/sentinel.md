@@ -52,3 +52,8 @@
 **Vulnerability:** While array count and overall string length were validated, individual string items within arrays (e.g., technologies, lessons, entities) were not checked. An attacker could provide a valid number of items where each item was extremely large, leading to high memory usage or downstream processing issues.
 **Learning:** For MCP tools accepting arrays of strings, validating the total count of items is insufficient if the individual item size is not also capped.
 **Prevention:** Implement a `validateArrayItems` helper and apply it to all handlers that process array arguments, enforcing length limits on every element.
+
+## 2025-06-10 - Information Exposure in Dynamic MCP Components
+**Vulnerability:** Absolute home directory paths were exposed through dynamic MCP components: tool descriptions, system prompts, initialize instructions, and JSON resources. While tool outputs were redacted, these metadata fields were overlooked.
+**Learning:** In MCP servers, security boundaries must extend beyond tool execution results. Any field that can contain user-influenced data (like memory fragments) and is returned to the LLM or client must be sanitized.
+**Prevention:** Centralize path redaction and apply it to all LLM-facing strings, including tool descriptions, resource contents, and instructions, before they are sent over the MCP protocol.
