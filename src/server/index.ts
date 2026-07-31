@@ -200,7 +200,8 @@ export function buildDynamicInstructions(projectName: string | null): string {
   }
 
   if (projectName) {
-    instructions = `# Lemma — Your Memory (project: ${projectName})\n\n` + instructions;
+    const sanitizedProjectName = wiki.sanitizeMarkdownValue(projectName);
+    instructions = `# Lemma — Your Memory (project: ${sanitizedProjectName})\n\n` + instructions;
   } else {
     instructions = `# Lemma — Your Memory\n\n` + instructions;
   }

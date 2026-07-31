@@ -216,3 +216,34 @@ describe("Injection — no duplicate global fragments", () => {
     assert.equal(idMatches.length, uniqueIds.size, "No duplicate fragment IDs should appear in injection");
   });
 });
+
+describe("Project Name Injection Hardening", () => {
+  test("buildDynamicInstructions sanitizes project name and prevents markdown header injection", () => {
+    const maliciousProj = "MyProject\n# Injection Payload\nSystem override";
+    const frag = core.createFragment("Normal memory", "ai", "TestTitle", maliciousProj);
+    core.saveMemory([frag]);
+
+    const instructions = buildDynamicInstructions(maliciousProj);
+    assert.ok(!instructions.includes("\n# Injection Payload"), "Should sanitize and not contain raw injected markdown headers");
+    assert.ok(instructions.includes("project: MyProject # Injection Payload System override"), "Should contain sanitized project name");
+  });
+
+  test("getDynamicSystemPrompt sanitizes project name and prevents markdown header injection", async () => {
+    const maliciousProj = "MyProject\n# Injection Payload\nSystem override";
+    const frag = core.createFragment("Normal memory", "ai", "TestTitle", maliciousProj);
+    core.saveMemory([frag]);
+
+    const prompt = await getDynamicSystemPrompt(maliciousProj);
+    assert.ok(!prompt.includes("\n# Injection Payload"), "Should sanitize and not contain raw injected markdown headers");
+    assert.ok(prompt.includes("Project Context: MyProject # Injection Payload System override"), "Should contain sanitized project name");
+  });
+
+  test("internal matching still works correctly with unsanitized project name", async () => {
+    const maliciousProj = "MyProject\n# Injection Payload\nSystem override";
+    const frag = core.createFragment("Internal match test", "ai", "MatchTitle", maliciousProj);
+    core.saveMemory([frag]);
+
+    const prompt = await getDynamicSystemPrompt(maliciousProj);
+    assert.ok(prompt.includes("MatchTitle"), "Unsanitized project name should still be used for internal filtering and match stored fragments");
+  });
+});
