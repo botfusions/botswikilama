@@ -75,8 +75,10 @@ function formatProjectContext(fragments: MemoryFragment[], projectName: string):
     return `[${frag.id}] ${confidenceBar} (${sourceIcon}) ${frag.title}\n    ${summary}`;
   });
 
+  const sanitizedProjectName = wiki.sanitizeMarkdownValue(projectName);
+
   return `<project_context>
-## Project Context: ${projectName}
+## Project Context: ${sanitizedProjectName}
 
 You have ${fragments.length} saved memory fragment(s) for this project.
 Use \`memory_read\` to load full details or \`memory_read id="<id>"\` for specific fragment.

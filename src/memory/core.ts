@@ -79,7 +79,7 @@ export function findSimilarFragment(fragments: MemoryFragment[], fragmentText: s
 
   const fuse = new Fuse(scopedFragments, {
     keys: ['fragment', 'title'],
-    threshold: 0.3,
+    threshold: 0.9,
     includeScore: true,
     ignoreLocation: true,
   });
