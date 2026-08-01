@@ -57,3 +57,8 @@
 **Vulnerability:** Absolute home directory paths were exposed through dynamic MCP components: tool descriptions, system prompts, initialize instructions, and JSON resources. While tool outputs were redacted, these metadata fields were overlooked.
 **Learning:** In MCP servers, security boundaries must extend beyond tool execution results. Any field that can contain user-influenced data (like memory fragments) and is returned to the LLM or client must be sanitized.
 **Prevention:** Centralize path redaction and apply it to all LLM-facing strings, including tool descriptions, resource contents, and instructions, before they are sent over the MCP protocol.
+
+## 2025-06-15 - Markdown Header and Prompt Injection via Project Names
+**Vulnerability:** User-provided or directory-derived `projectName` strings containing newlines and markdown characters (such as `#`) were directly embedded into markdown headers in instructions and system prompts. This allowed attackers to break structural boundaries and perform prompt injection attacks on the LLM client.
+**Learning:** Metadata derived from untrusted source names (like local directories or input parameters) can break markdown layout and headers. Display headers must always be sanitized to remove newlines, while internal lookup logic must still use the original identifier for correct data query matching.
+**Prevention:** Apply `wiki.sanitizeMarkdownValue` to the display text of `projectName` inside system prompts and instructions, while keeping the original string for internal project lookup.
