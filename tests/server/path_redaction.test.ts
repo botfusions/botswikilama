@@ -2,6 +2,7 @@ import { test, describe } from "node:test";
 import assert from "node:assert";
 import os from "os";
 import { handleCallTool } from "../../src/server/handlers.js";
+import { redactPath } from "../../src/wiki/index.js";
 
 describe("Path Redaction Security", () => {
   const homeDir = os.homedir();
@@ -47,5 +48,21 @@ describe("Path Redaction Security", () => {
         assert.ok(item.text.includes("~"), `Error message should contain redacted tilde path: ${item.text}`);
       }
     }
+  });
+
+  test("should redact home directory case-insensitively and slash-agnostically", () => {
+    const rawHome = os.homedir();
+
+    // Generate mixed casing and mixed slashes of home directory
+    const upperHome = rawHome.toUpperCase();
+    const lowerHome = rawHome.toLowerCase();
+    const forwardHome = rawHome.replace(/\\/g, "/");
+    const backHome = rawHome.replace(/\//g, "\\");
+
+    // Assert that redactPath is case-insensitive and slash-agnostic
+    assert.ok(redactPath(upperHome).includes("~"), `Should redact uppercase home directory: ${upperHome}`);
+    assert.ok(redactPath(lowerHome).includes("~"), `Should redact lowercase home directory: ${lowerHome}`);
+    assert.ok(redactPath(`${forwardHome}/subdir`).includes("~"), `Should redact forward-slash home directory: ${forwardHome}`);
+    assert.ok(redactPath(`${backHome}\\subdir`).includes("~"), `Should redact backslash home directory: ${backHome}`);
   });
 });

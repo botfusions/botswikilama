@@ -57,3 +57,8 @@
 **Vulnerability:** Absolute home directory paths were exposed through dynamic MCP components: tool descriptions, system prompts, initialize instructions, and JSON resources. While tool outputs were redacted, these metadata fields were overlooked.
 **Learning:** In MCP servers, security boundaries must extend beyond tool execution results. Any field that can contain user-influenced data (like memory fragments) and is returned to the LLM or client must be sanitized.
 **Prevention:** Centralize path redaction and apply it to all LLM-facing strings, including tool descriptions, resource contents, and instructions, before they are sent over the MCP protocol.
+
+## 2025-06-12 - Information Exposure via Case-Sensitive and Slash-Dependent Path Redaction
+**Vulnerability:** Path redaction using simple, case-sensitive string matching or rigid backslash/forward-slash regex matching fails on platforms with case-insensitive filesystems (Windows/macOS) or when tools format paths with mixed slashes. This allows full host home directory paths to bypass redaction and leak sensitive internal structure/username.
+**Learning:** Paths on Windows, macOS, and even some Linux environments can have variable casing or mixed slashes depending on how they are constructed. Redaction mechanisms must match absolute directories case-insensitively and normalize/support both forward and backward slashes as equivalent path separators.
+**Prevention:** Build regular expressions for path redaction using case-insensitive flags ('gi') and replace any forward or backward slash sequences in absolute targets (like `HOME_DIR`) with a pattern (e.g., `[\\\\/]+`) matching both separator characters.

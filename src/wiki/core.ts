@@ -55,12 +55,15 @@ export function redactPath(text: string): string {
   // Escape special characters in HOME_DIR for regex
   const escapedHome = HOME_DIR.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
+  // Replace backslashes and forward slashes with a pattern matching either separator (one or more times)
+  const pathPattern = escapedHome.replace(/[\\\\/]+/g, "[\\\\/]+");
+
   /**
-   * Use a regex to ensure we only redact when HOME_DIR is a full path component.
-   * This prevents redacting /home/user_extra when HOME_DIR is /home/user.
-   * We look for HOME_DIR followed by a path separator, space, quote, close parenthesis, or end of string.
+   * Use a regex with 'gi' flags to support case-insensitive and slash-agnostic matching.
+   * This ensures home directory path variations are matched across all platforms (Windows/macOS/Linux).
+   * We look for the match followed by a path separator, space, quote, close parenthesis, or end of string.
    */
-  const regex = new RegExp(escapedHome + "(?=[\\\\/\\s\"'\\)]|$)", "g");
+  const regex = new RegExp(pathPattern + "(?=[\\\\/\\s\"'\\)]|$)", "gi");
   return text.replace(regex, "~");
 }
 
