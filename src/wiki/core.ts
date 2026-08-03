@@ -48,19 +48,27 @@ const HOME_DIR = os.homedir();
 /**
  * Redacts absolute paths to the user's home directory by replacing them with '~'.
  * This prevents leaking the server's internal directory structure.
+ * Supports case-insensitive and slash-agnostic (handles both backslashes and forward slashes)
+ * path matching to ensure robust home directory redaction on all filesystems.
  */
 export function redactPath(text: string): string {
   if (!HOME_DIR || !text) return text;
 
-  // Escape special characters in HOME_DIR for regex
-  const escapedHome = HOME_DIR.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  // Escape special characters in HOME_DIR for regex, making slash and backslash interchangeable
+  const escapedHome = HOME_DIR.replace(/[.*+?^${}()|[\]\\\/]/g, (char) => {
+    if (char === "\\" || char === "/") {
+      return "[\\\\/]";
+    }
+    return "\\" + char;
+  });
 
   /**
    * Use a regex to ensure we only redact when HOME_DIR is a full path component.
    * This prevents redacting /home/user_extra when HOME_DIR is /home/user.
    * We look for HOME_DIR followed by a path separator, space, quote, close parenthesis, or end of string.
+   * Use 'gi' flags for case-insensitive and global matching.
    */
-  const regex = new RegExp(escapedHome + "(?=[\\\\/\\s\"'\\)]|$)", "g");
+  const regex = new RegExp(escapedHome + "(?=[\\\\/\\s\"'\\)]|$)", "gi");
   return text.replace(regex, "~");
 }
 
