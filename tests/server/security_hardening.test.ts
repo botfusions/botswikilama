@@ -3,6 +3,7 @@ import assert from "node:assert";
 import {
   handleSessionStats,
   handleSessionStart,
+  handleMemoryUpdate,
 } from "../../src/server/handlers.js";
 
 describe("Security Hardening - handleSessionStats", () => {
@@ -25,10 +26,24 @@ describe("Security Hardening - handleSessionStats", () => {
     assert.match(result.content[0].text, /Error: 'count' must be a number/);
   });
 
+  test("handleSessionStats rejects NaN count", async () => {
+    const result = await handleSessionStats({ count: NaN });
+    assert.strictEqual(result.isError, true);
+    assert.match(result.content[0].text, /Error: 'count' must be a number/);
+  });
+
   test("handleSessionStats defaults to 10 if count is undefined", async () => {
     const result = await handleSessionStats({});
     assert.strictEqual(result.isError, undefined);
     assert.match(result.content[0].text, /## Session Stats/);
+  });
+});
+
+describe("Security Hardening - handleMemoryUpdate", () => {
+  test("handleMemoryUpdate rejects NaN confidence", async () => {
+    const result = await handleMemoryUpdate({ id: "m123", confidence: NaN });
+    assert.strictEqual(result.isError, true);
+    assert.match(result.content[0].text, /Error: 'confidence' must be a number between 0 and 1/);
   });
 });
 
