@@ -10,7 +10,18 @@ export function validateVaultPath(vaultPath: string): string {
     resolvedPath = path.join(homeDir, vaultPath.slice(1));
   }
 
-  const absolutePath = path.resolve(resolvedPath);
+  let absolutePath = path.resolve(resolvedPath);
+
+  // Harden against symbolic links that might point outside the home directory
+  try {
+    let exists = false;
+    try {
+      exists = fs.existsSync(absolutePath) || fs.lstatSync(absolutePath).isSymbolicLink();
+    } catch {}
+    if (exists) {
+      absolutePath = fs.realpathSync(absolutePath);
+    }
+  } catch {}
 
   if (!absolutePath.startsWith(homeDir + path.sep) && absolutePath !== homeDir) {
     throw new Error(`Access denied: Path must be within home directory (${homeDir})`);
