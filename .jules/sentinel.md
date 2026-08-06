@@ -57,3 +57,8 @@
 **Vulnerability:** Absolute home directory paths were exposed through dynamic MCP components: tool descriptions, system prompts, initialize instructions, and JSON resources. While tool outputs were redacted, these metadata fields were overlooked.
 **Learning:** In MCP servers, security boundaries must extend beyond tool execution results. Any field that can contain user-influenced data (like memory fragments) and is returned to the LLM or client must be sanitized.
 **Prevention:** Centralize path redaction and apply it to all LLM-facing strings, including tool descriptions, resource contents, and instructions, before they are sent over the MCP protocol.
+
+## 2025-06-15 - Symlink Path Traversal in Vault Path Validation
+**Vulnerability:** Although `validateVaultPath` checked that the path started with the home directory using `path.resolve`, symbolic links pointing outside the home directory were followed during subsequent read/write operations by the filesystem APIs. This allowed bypass of the home directory sandbox.
+**Learning:** Path normalization using `path.resolve` or `path.normalize` does NOT resolve symbolic links. If the target path is a symlink, the application can still write/read from the actual symlink target location.
+**Prevention:** Use `fs.realpathSync` to resolve symbolic links on paths before verifying their location relative to safe roots. Ensure `try-catch` handles nonexistent paths or fallback resolution gracefully.
