@@ -25,6 +25,12 @@ describe("Security Hardening - handleSessionStats", () => {
     assert.match(result.content[0].text, /Error: 'count' must be a number/);
   });
 
+  test("handleSessionStats rejects NaN count", async () => {
+    const result = await handleSessionStats({ count: NaN });
+    assert.strictEqual(result.isError, true);
+    assert.match(result.content[0].text, /Error: 'count' must be a number/);
+  });
+
   test("handleSessionStats defaults to 10 if count is undefined", async () => {
     const result = await handleSessionStats({});
     assert.strictEqual(result.isError, undefined);
