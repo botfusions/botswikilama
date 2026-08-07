@@ -547,7 +547,7 @@ export async function handleMemoryUpdate(args?: MemoryUpdateArgs): Promise<ToolR
   }
 
   if (confidence !== undefined) {
-    if (typeof confidence !== "number" || confidence < 0 || confidence > 1) {
+    if (typeof confidence !== "number" || Number.isNaN(confidence) || confidence < 0 || confidence > 1) {
       return {
         content: [{ type: "text", text: "Error: 'confidence' must be a number between 0 and 1" }],
         isError: true,
@@ -1059,7 +1059,7 @@ export async function handleMemoryAudit(_args?: Record<string, unknown>): Promis
 
 export async function handleSessionStats(args?: SessionStatsArgs): Promise<ToolResult> {
   if (args?.count !== undefined) {
-    if (typeof args.count !== "number") {
+    if (typeof args.count !== "number" || Number.isNaN(args.count)) {
       return {
         content: [{ type: "text", text: "Error: 'count' must be a number" }],
         isError: true,
