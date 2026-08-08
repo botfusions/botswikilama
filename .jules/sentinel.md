@@ -57,3 +57,8 @@
 **Vulnerability:** Absolute home directory paths were exposed through dynamic MCP components: tool descriptions, system prompts, initialize instructions, and JSON resources. While tool outputs were redacted, these metadata fields were overlooked.
 **Learning:** In MCP servers, security boundaries must extend beyond tool execution results. Any field that can contain user-influenced data (like memory fragments) and is returned to the LLM or client must be sanitized.
 **Prevention:** Centralize path redaction and apply it to all LLM-facing strings, including tool descriptions, resource contents, and instructions, before they are sent over the MCP protocol.
+
+## 2025-06-11 - Symlink-based Sandbox Escape via Vault Root Path Validation
+**Vulnerability:** The `validateVaultPath` utility normalized paths using `path.resolve`, which did not resolve symbolic links. This allowed a vault root path containing symbolic links pointing outside the user's home directory (e.g. `~/.lemma/test-symlink` pointing to `/etc`) to bypass home directory path verification checks when the target subdirectory did not yet exist.
+**Learning:** Traditional path verification with `path.resolve` followed by `startsWith` is vulnerable to symlink-based path traversal, especially when validating newly created directory paths that do not yet exist, as standard `fs.realpathSync` throws an error on non-existent targets.
+**Prevention:** Walk recursively up parent directory trees to find the closest existing ancestor, resolve its real path using `fs.realpathSync`, and append the remaining unresolved relative path before validating boundaries.
