@@ -305,6 +305,13 @@ export async function handleSessionEnd(args?: SessionEndArgs): Promise<ToolResul
     };
   }
 
+  if (outcome !== "success" && outcome !== "partial" && outcome !== "failure" && outcome !== "abandoned") {
+    return {
+      content: [{ type: "text", text: "Error: 'outcome' must be one of 'success', 'partial', 'failure', or 'abandoned'" }],
+      isError: true,
+    };
+  }
+
   const allSessions = sessions.loadSessions();
   const session = activeSessionId
     ? sessions.findSession(allSessions, activeSessionId)
@@ -455,7 +462,14 @@ export async function handleMemoryAdd(args?: MemoryAddArgs): Promise<ToolResult>
   const title = args?.title || null;
   const description = args?.description || null;
   const project = args?.project === undefined ? null : args.project;
-  const source = (args?.source || "ai") as "user" | "ai";
+  const source = args?.source || "ai";
+
+  if (source !== "user" && source !== "ai") {
+    return {
+      content: [{ type: "text", text: "Error: 'source' must be either 'user' or 'ai'" }],
+      isError: true,
+    };
+  }
 
   if (!fragment || typeof fragment !== "string") {
     return {

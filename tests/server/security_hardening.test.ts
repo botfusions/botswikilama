@@ -1,9 +1,27 @@
-import { test, describe } from "node:test";
+import { test, describe, beforeEach, afterEach } from "node:test";
 import assert from "node:assert";
+import fs from "fs";
+import path from "path";
+import os from "os";
+import * as core from "../../src/memory/index.js";
 import {
   handleSessionStats,
   handleSessionStart,
+  handleMemoryAdd,
+  handleSessionEnd,
 } from "../../src/server/handlers.js";
+
+let TMPDIR: string;
+
+beforeEach(() => {
+  TMPDIR = fs.mkdtempSync(path.join(os.tmpdir(), "lemma-test-hardening-"));
+  core.setMemoryDir(TMPDIR);
+});
+
+afterEach(() => {
+  core.setMemoryDir(path.join(os.homedir(), ".lemma"));
+  fs.rmSync(TMPDIR, { recursive: true, force: true });
+});
 
 describe("Security Hardening - handleSessionStats", () => {
   test("handleSessionStats rejects count > 100", async () => {
@@ -40,5 +58,40 @@ describe("Security Hardening - Array Item Validation", () => {
     });
     assert.strictEqual(result.isError, true);
     assert.match(result.content[0].text, /Error: Individual 'technologies' item exceeds maximum length of 100 characters/);
+  });
+});
+
+describe("Security Hardening - Source and Outcome Parameter Hardening", () => {
+  test("handleMemoryAdd rejects invalid source parameter", async () => {
+    const result = await handleMemoryAdd({
+      fragment: "test content",
+      source: "invalid_source"
+    });
+    assert.strictEqual(result.isError, true);
+    assert.match(result.content[0].text, /Error: 'source' must be either 'user' or 'ai'/);
+  });
+
+  test("handleMemoryAdd accepts 'user' as source parameter", async () => {
+    const resultUser = await handleMemoryAdd({
+      fragment: "test content from user",
+      source: "user"
+    });
+    assert.strictEqual(resultUser.isError, undefined);
+  });
+
+  test("handleMemoryAdd accepts 'ai' as source parameter", async () => {
+    const resultAi = await handleMemoryAdd({
+      fragment: "test content from AI",
+      source: "ai"
+    });
+    assert.strictEqual(resultAi.isError, undefined);
+  });
+
+  test("handleSessionEnd rejects invalid outcome parameter", async () => {
+    const result = await handleSessionEnd({
+      outcome: "invalid_outcome"
+    });
+    assert.strictEqual(result.isError, true);
+    assert.match(result.content[0].text, /Error: 'outcome' must be one of 'success', 'partial', 'failure', or 'abandoned'/);
   });
 });
