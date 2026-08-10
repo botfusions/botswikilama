@@ -1,3 +1,8 @@
+## 2025-06-15 - Symlink Path Traversal Protection in Vault Path Validation
+**Vulnerability:** Although `validateVaultPath` resolved paths lexically, it did not follow filesystem symbolic links when checking if the path was within the home directory. This could allow an attacker to pass a `vault_path` parameter containing a symbolic link pointing outside of the home directory, leading to files being written/read outside the home directory sandbox.
+**Learning:** Checking for prefix boundaries lexically via `path.resolve` does not account for filesystem-level symlinks. To be secure, the real physical path of any existing directories/files in the path must be resolved using `fs.realpathSync`.
+**Prevention:** Walk up from the target path to find the deepest existing ancestor, resolve its real path using `fs.realpathSync`, and resolve the remaining subsegments relative to it before performing home directory boundary checks.
+
 ## 2025-05-15 - Wiki Path Traversal Protection
 **Vulnerability:** Unrestricted `vault_path` in wiki tools allowed reading and writing files anywhere on the filesystem.
 **Learning:** MCP servers that handle local file paths must explicitly sandbox operations to a safe root (like the user's home directory) to prevent traversal attacks, especially when the LLM can influence path parameters.
