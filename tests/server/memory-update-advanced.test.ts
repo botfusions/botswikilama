@@ -73,6 +73,15 @@ describe("handleMemoryUpdate — confidence", () => {
     assert.equal(result.isError, true);
     assert.ok(result.content[0].text.includes("confidence"));
   });
+
+  test("rejects NaN confidence", async () => {
+    const f = core.createFragment("text", "ai", "Title", null);
+    core.saveMemory([f]);
+
+    const result = await handlers.handleMemoryUpdate({ id: f.id, confidence: NaN });
+    assert.equal(result.isError, true);
+    assert.ok(result.content[0].text.includes("confidence"));
+  });
 });
 
 describe("handleMemoryUpdate — type validation", () => {
