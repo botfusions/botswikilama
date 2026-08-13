@@ -57,3 +57,8 @@
 **Vulnerability:** Absolute home directory paths were exposed through dynamic MCP components: tool descriptions, system prompts, initialize instructions, and JSON resources. While tool outputs were redacted, these metadata fields were overlooked.
 **Learning:** In MCP servers, security boundaries must extend beyond tool execution results. Any field that can contain user-influenced data (like memory fragments) and is returned to the LLM or client must be sanitized.
 **Prevention:** Centralize path redaction and apply it to all LLM-facing strings, including tool descriptions, resource contents, and instructions, before they are sent over the MCP protocol.
+
+## 2025-06-15 - Symlink Traversal Protection on Vault Root Path
+**Vulnerability:** The vault_path parameter in wiki tools was validated only by resolving relative path segments with path.resolve, allowing symbolic links pointing to folders outside the home directory to pass prefix checks and trigger out-of-sandbox file reads/writes.
+**Learning:** Checking paths using path.resolve is insufficient when handling directory targets because it does not resolve symbolic links. Symbolic link resolution via fs.realpathSync must be performed on the path or its parent directories before running prefix security checks.
+**Prevention:** Always use fs.realpathSync (or resolve the existing portion of parent directories) to fully expand symlinks before validating that the path lies within designated sandbox boundaries.
