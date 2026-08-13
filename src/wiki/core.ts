@@ -17,14 +17,16 @@ export function validateVaultPath(vaultPath: string): string {
     if (fs.existsSync(absolutePath)) {
       absolutePath = fs.realpathSync(absolutePath);
     } else {
-      let parent = path.dirname(absolutePath);
-      while (parent && parent !== path.dirname(parent)) {
-        if (fs.existsSync(parent)) {
-          const resolvedParent = fs.realpathSync(parent);
-          absolutePath = path.join(resolvedParent, path.basename(absolutePath));
+      let current = absolutePath;
+      let missingParts: string[] = [];
+      while (current && current !== path.dirname(current)) {
+        if (fs.existsSync(current)) {
+          const resolvedCurrent = fs.realpathSync(current);
+          absolutePath = path.join(resolvedCurrent, ...missingParts.reverse());
           break;
         }
-        parent = path.dirname(parent);
+        missingParts.push(path.basename(current));
+        current = path.dirname(current);
       }
     }
   } catch {
