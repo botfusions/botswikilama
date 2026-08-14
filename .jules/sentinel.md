@@ -57,3 +57,8 @@
 **Vulnerability:** Absolute home directory paths were exposed through dynamic MCP components: tool descriptions, system prompts, initialize instructions, and JSON resources. While tool outputs were redacted, these metadata fields were overlooked.
 **Learning:** In MCP servers, security boundaries must extend beyond tool execution results. Any field that can contain user-influenced data (like memory fragments) and is returned to the LLM or client must be sanitized.
 **Prevention:** Centralize path redaction and apply it to all LLM-facing strings, including tool descriptions, resource contents, and instructions, before they are sent over the MCP protocol.
+
+## 2025-06-12 - Numeric NaN Bypass in Input Range Validation
+**Vulnerability:** Numeric parameters (`confidence` in `handleMemoryUpdate` and `count` in `handleSessionStats`) lacked validation for `NaN`. Since `typeof NaN` is `"number"`, but any comparison operation with `NaN` evaluates to `false`, malformed or malicious `NaN` inputs successfully bypassed lower and upper bounds checks, allowing invalid values to propagate.
+**Learning:** Checking `typeof param === "number"` is insufficient to validate numeric parameters in JavaScript/TypeScript if bounds checks are used. An explicit `Number.isNaN(param)` check must be performed. Additionally, sensitive validations must use a fail-fast pattern, executing at the very beginning of the function before any state lookups or database operations.
+**Prevention:** Always combine `typeof` check with `Number.isNaN()` for numeric validations, and place validation logic at the top of the request handler.

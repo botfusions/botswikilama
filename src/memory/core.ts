@@ -77,9 +77,10 @@ export function findSimilarFragment(fragments: MemoryFragment[], fragmentText: s
   const scopedFragments = filterByProject(fragments, project);
   if (scopedFragments.length === 0) return null;
 
+  const fuseThreshold = Math.min(1.0, Math.max(0.0, 1 - threshold));
   const fuse = new Fuse(scopedFragments, {
     keys: ['fragment', 'title'],
-    threshold: 0.3,
+    threshold: fuseThreshold,
     includeScore: true,
     ignoreLocation: true,
   });

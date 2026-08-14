@@ -508,6 +508,16 @@ export async function handleMemoryUpdate(args?: MemoryUpdateArgs): Promise<ToolR
   const fragment = args?.fragment;
   const confidence = args?.confidence;
 
+  // Fail-fast validation of the numeric confidence parameter to prevent bypasses and state lookup overhead
+  if (confidence !== undefined) {
+    if (typeof confidence !== "number" || Number.isNaN(confidence) || confidence < 0 || confidence > 1) {
+      return {
+        content: [{ type: "text", text: "Error: 'confidence' must be a number between 0 and 1" }],
+        isError: true,
+      };
+    }
+  }
+
   if (!id || typeof id !== "string") {
     return {
       content: [{ type: "text", text: "Error: 'id' parameter is required and must be a string" }],
@@ -547,12 +557,6 @@ export async function handleMemoryUpdate(args?: MemoryUpdateArgs): Promise<ToolR
   }
 
   if (confidence !== undefined) {
-    if (typeof confidence !== "number" || confidence < 0 || confidence > 1) {
-      return {
-        content: [{ type: "text", text: "Error: 'confidence' must be a number between 0 and 1" }],
-        isError: true,
-      };
-    }
     memory[targetIndex].confidence = confidence;
   }
 
@@ -1059,7 +1063,7 @@ export async function handleMemoryAudit(_args?: Record<string, unknown>): Promis
 
 export async function handleSessionStats(args?: SessionStatsArgs): Promise<ToolResult> {
   if (args?.count !== undefined) {
-    if (typeof args.count !== "number") {
+    if (typeof args.count !== "number" || Number.isNaN(args.count)) {
       return {
         content: [{ type: "text", text: "Error: 'count' must be a number" }],
         isError: true,
