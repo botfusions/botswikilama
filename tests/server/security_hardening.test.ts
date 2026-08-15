@@ -3,7 +3,14 @@ import assert from "node:assert";
 import {
   handleSessionStats,
   handleSessionStart,
+  handleMemoryUpdate,
+  handleMemoryAdd,
+  handleMemoryRead,
 } from "../../src/server/handlers.js";
+import * as core from "../../src/memory/index.js";
+import fs from "fs";
+import path from "path";
+import os from "os";
 
 describe("Security Hardening - handleSessionStats", () => {
   test("handleSessionStats rejects count > 100", async () => {
@@ -25,10 +32,35 @@ describe("Security Hardening - handleSessionStats", () => {
     assert.match(result.content[0].text, /Error: 'count' must be a number/);
   });
 
+  test("handleSessionStats rejects NaN count", async () => {
+    const result = await handleSessionStats({ count: NaN });
+    assert.strictEqual(result.isError, true);
+    assert.match(result.content[0].text, /Error: 'count' must be a number/);
+  });
+
   test("handleSessionStats defaults to 10 if count is undefined", async () => {
     const result = await handleSessionStats({});
     assert.strictEqual(result.isError, undefined);
     assert.match(result.content[0].text, /## Session Stats/);
+  });
+});
+
+describe("Security Hardening - handleMemoryUpdate NaN Confidence", () => {
+  test("handleMemoryUpdate rejects NaN confidence", async () => {
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "lemma-sec-test-"));
+    core.setMemoryDir(tmpDir);
+    try {
+      const addRes = await handleMemoryAdd({ fragment: "test fragment for nan confidence", title: "nan test" });
+      const memory = core.loadMemory();
+      const id = memory[0].id;
+
+      const result = await handleMemoryUpdate({ id, confidence: NaN });
+      assert.strictEqual(result.isError, true);
+      assert.match(result.content[0].text, /Error: 'confidence' must be a number between 0 and 1/);
+    } finally {
+      core.setMemoryDir(path.join(os.homedir(), ".lemma"));
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    }
   });
 });
 
