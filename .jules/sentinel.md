@@ -57,3 +57,8 @@
 **Vulnerability:** Absolute home directory paths were exposed through dynamic MCP components: tool descriptions, system prompts, initialize instructions, and JSON resources. While tool outputs were redacted, these metadata fields were overlooked.
 **Learning:** In MCP servers, security boundaries must extend beyond tool execution results. Any field that can contain user-influenced data (like memory fragments) and is returned to the LLM or client must be sanitized.
 **Prevention:** Centralize path redaction and apply it to all LLM-facing strings, including tool descriptions, resource contents, and instructions, before they are sent over the MCP protocol.
+
+## 2025-06-15 - Fuse.js Threshold Inversion Mismatch
+**Vulnerability:** Fuse.js search option `threshold` was hardcoded to `0.3` while `findSimilarFragment` expected similarity values `1 - score`. This inverted scale caused Fuse.js to pre-filter items with similarity below 0.7, bypassing similarity detection when custom thresholds were specified.
+**Learning:** Fuse.js score represents distance (0 is exact match, 1 is total mismatch), which is inverted relative to similarity scores (1 is exact match, 0 is total mismatch). Hardcoding Fuse options threshold without mapping it from requested similarity threshold (`1 - threshold`) causes pre-filtering to drop valid candidates before scoring.
+**Prevention:** Always convert similarity thresholds to Fuse distance thresholds (`Math.min(1.0, Math.max(0.0, 1 - threshold))`) when initializing Fuse instances.
