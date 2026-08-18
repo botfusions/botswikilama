@@ -12,7 +12,23 @@ export function validateVaultPath(vaultPath: string): string {
 
   const absolutePath = path.resolve(resolvedPath);
 
-  if (!absolutePath.startsWith(homeDir + path.sep) && absolutePath !== homeDir) {
+  let curr = absolutePath;
+  const missingSegments: string[] = [];
+
+  while (!fs.existsSync(curr) && curr !== path.dirname(curr)) {
+    missingSegments.unshift(path.basename(curr));
+    curr = path.dirname(curr);
+  }
+
+  let realPath = absolutePath;
+  if (fs.existsSync(curr)) {
+    const realParent = fs.realpathSync(curr);
+    realPath = missingSegments.length > 0
+      ? path.join(realParent, ...missingSegments)
+      : realParent;
+  }
+
+  if (!realPath.startsWith(homeDir + path.sep) && realPath !== homeDir) {
     throw new Error(`Access denied: Path must be within home directory (${homeDir})`);
   }
 
