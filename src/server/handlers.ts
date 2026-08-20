@@ -1137,7 +1137,7 @@ export async function handleWikiSetup(args?: WikiSetupArgs): Promise<ToolResult>
       content: [{ type: "text", text: `Wiki vault created at ${vaultPath}\nProject: ${projectName}\nLanguage: ${language}\nFolders created: ${result.folders}\nFiles created: ${result.files}` }],
     };
   } catch (error) {
-    return { content: [{ type: "text", text: `Error: ${(error as Error).message}` }], isError: true };
+    return { content: [{ type: "text", text: wiki.redactPath(`Error: ${(error as Error).message}`) }], isError: true };
   }
 }
 
@@ -1248,7 +1248,7 @@ export async function handleWikiIngest(args?: WikiIngestArgs): Promise<ToolResul
       content: [{ type: "text", text: `Ingested: ${title || "Untitled"}\nPages created: ${pagesCreated}\nFiles:\n${createdPages.map((p) => `  - ${p}`).join("\n")}\nEntities: ${entities.length} | Concepts: ${concepts.length} | Decisions: ${decisions.length}` }],
     };
   } catch (error) {
-    return { content: [{ type: "text", text: `Error: ${(error as Error).message}` }], isError: true };
+    return { content: [{ type: "text", text: wiki.redactPath(`Error: ${(error as Error).message}`) }], isError: true };
   }
 }
 
@@ -1298,7 +1298,7 @@ export async function handleWikiQuery(args?: WikiQueryArgs): Promise<ToolResult>
 
     return { content: [{ type: "text", text: response }] };
   } catch (error) {
-    return { content: [{ type: "text", text: `Error: ${(error as Error).message}` }], isError: true };
+    return { content: [{ type: "text", text: wiki.redactPath(`Error: ${(error as Error).message}`) }], isError: true };
   }
 }
 
@@ -1346,7 +1346,7 @@ export async function handleWikiLint(args?: WikiLintArgs): Promise<ToolResult> {
 
     return { content: [{ type: "text", text: report }] };
   } catch (error) {
-    return { content: [{ type: "text", text: `Error: ${(error as Error).message}` }], isError: true };
+    return { content: [{ type: "text", text: wiki.redactPath(`Error: ${(error as Error).message}`) }], isError: true };
   }
 }
 
