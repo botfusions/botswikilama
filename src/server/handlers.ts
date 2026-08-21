@@ -1128,7 +1128,7 @@ export async function handleWikiSetup(args?: WikiSetupArgs): Promise<ToolResult>
     if (wiki.detectVault(vaultPath)) {
       const stats = wiki.getVaultStats(vaultPath);
       return {
-        content: [{ type: "text", text: `Wiki vault already exists at ${vaultPath}\nStats: ${JSON.stringify(stats, null, 2)}` }],
+        content: [{ type: "text", text: wiki.redactPath(`Wiki vault already exists at ${vaultPath}\nStats: ${JSON.stringify(stats, null, 2)}`) }],
       };
     }
 
@@ -1137,7 +1137,7 @@ export async function handleWikiSetup(args?: WikiSetupArgs): Promise<ToolResult>
       content: [{ type: "text", text: `Wiki vault created at ${vaultPath}\nProject: ${projectName}\nLanguage: ${language}\nFolders created: ${result.folders}\nFiles created: ${result.files}` }],
     };
   } catch (error) {
-    return { content: [{ type: "text", text: `Error: ${(error as Error).message}` }], isError: true };
+    return { content: [{ type: "text", text: wiki.redactPath(`Error: ${(error as Error).message}`) }], isError: true };
   }
 }
 
@@ -1183,7 +1183,7 @@ export async function handleWikiIngest(args?: WikiIngestArgs): Promise<ToolResul
     vaultPath = wiki.validateVaultPath(vaultPath);
 
     if (!wiki.detectVault(vaultPath)) {
-      return { content: [{ type: "text", text: `Error: No wiki vault found at ${vaultPath}. Run wiki_setup first.` }], isError: true };
+      return { content: [{ type: "text", text: wiki.redactPath(`Error: No wiki vault found at ${vaultPath}. Run wiki_setup first.`) }], isError: true };
     }
 
     const date = new Date().toISOString().split("T")[0];
@@ -1248,7 +1248,7 @@ export async function handleWikiIngest(args?: WikiIngestArgs): Promise<ToolResul
       content: [{ type: "text", text: `Ingested: ${title || "Untitled"}\nPages created: ${pagesCreated}\nFiles:\n${createdPages.map((p) => `  - ${p}`).join("\n")}\nEntities: ${entities.length} | Concepts: ${concepts.length} | Decisions: ${decisions.length}` }],
     };
   } catch (error) {
-    return { content: [{ type: "text", text: `Error: ${(error as Error).message}` }], isError: true };
+    return { content: [{ type: "text", text: wiki.redactPath(`Error: ${(error as Error).message}`) }], isError: true };
   }
 }
 
@@ -1270,7 +1270,7 @@ export async function handleWikiQuery(args?: WikiQueryArgs): Promise<ToolResult>
     vaultPath = wiki.validateVaultPath(vaultPath);
 
     if (!wiki.detectVault(vaultPath)) {
-      return { content: [{ type: "text", text: `Error: No wiki vault found at ${vaultPath}. Run wiki_setup first.` }], isError: true };
+      return { content: [{ type: "text", text: wiki.redactPath(`Error: No wiki vault found at ${vaultPath}. Run wiki_setup first.`) }], isError: true };
     }
 
     const results = wiki.searchWiki(vaultPath, query);
@@ -1298,7 +1298,7 @@ export async function handleWikiQuery(args?: WikiQueryArgs): Promise<ToolResult>
 
     return { content: [{ type: "text", text: response }] };
   } catch (error) {
-    return { content: [{ type: "text", text: `Error: ${(error as Error).message}` }], isError: true };
+    return { content: [{ type: "text", text: wiki.redactPath(`Error: ${(error as Error).message}`) }], isError: true };
   }
 }
 
@@ -1316,7 +1316,7 @@ export async function handleWikiLint(args?: WikiLintArgs): Promise<ToolResult> {
     vaultPath = wiki.validateVaultPath(vaultPath);
 
     if (!wiki.detectVault(vaultPath)) {
-      return { content: [{ type: "text", text: `Error: No wiki vault found at ${vaultPath}. Run wiki_setup first.` }], isError: true };
+      return { content: [{ type: "text", text: wiki.redactPath(`Error: No wiki vault found at ${vaultPath}. Run wiki_setup first.`) }], isError: true };
     }
 
     const findings = wiki.lintWiki(vaultPath);
@@ -1346,7 +1346,7 @@ export async function handleWikiLint(args?: WikiLintArgs): Promise<ToolResult> {
 
     return { content: [{ type: "text", text: report }] };
   } catch (error) {
-    return { content: [{ type: "text", text: `Error: ${(error as Error).message}` }], isError: true };
+    return { content: [{ type: "text", text: wiki.redactPath(`Error: ${(error as Error).message}`) }], isError: true };
   }
 }
 
