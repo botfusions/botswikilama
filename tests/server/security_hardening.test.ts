@@ -3,19 +3,27 @@ import assert from "node:assert";
 import {
   handleSessionStats,
   handleSessionStart,
+  handleMemoryUpdate,
+  handleMemoryAdd,
 } from "../../src/server/handlers.js";
 
 describe("Security Hardening - handleSessionStats", () => {
+  test("handleSessionStats rejects NaN count", async () => {
+    const result = await handleSessionStats({ count: NaN });
+    assert.strictEqual(result.isError, true);
+    assert.match(result.content[0].text, /Error: 'count' must be a number/);
+  });
+
   test("handleSessionStats rejects count > 100", async () => {
     const result = await handleSessionStats({ count: 101 });
     assert.strictEqual(result.isError, true);
-    assert.match(result.content[0].text, /Error: 'count' must be between 1 and 100/);
+    assert.match(result.content[0].text, /Error: 'count' must be a number/);
   });
 
   test("handleSessionStats rejects count < 1", async () => {
     const result = await handleSessionStats({ count: 0 });
     assert.strictEqual(result.isError, true);
-    assert.match(result.content[0].text, /Error: 'count' must be between 1 and 100/);
+    assert.match(result.content[0].text, /Error: 'count' must be a number between 1 and 100/);
   });
 
   test("handleSessionStats rejects non-numeric count", async () => {
@@ -29,6 +37,19 @@ describe("Security Hardening - handleSessionStats", () => {
     const result = await handleSessionStats({});
     assert.strictEqual(result.isError, undefined);
     assert.match(result.content[0].text, /## Session Stats/);
+  });
+});
+
+describe("Security Hardening - handleMemoryUpdate", () => {
+  test("handleMemoryUpdate rejects NaN confidence", async () => {
+    // Add a memory fragment first to update
+    const addRes = await handleMemoryAdd({ fragment: "Test fragment for NaN confidence" });
+    const match = addRes.content[0].text.match(/\[(m[a-z0-9]+)\]/);
+    const id = match ? match[1] : "m123";
+
+    const result = await handleMemoryUpdate({ id, confidence: NaN });
+    assert.strictEqual(result.isError, true);
+    assert.match(result.content[0].text, /Error: 'confidence' must be a number between 0 and 1/);
   });
 });
 
