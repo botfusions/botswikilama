@@ -455,7 +455,7 @@ export function auditMemory(fragments: MemoryFragment[]): AuditResult {
     }
     ids.add(f.id);
 
-    if (typeof f.confidence !== "number" || f.confidence < 0 || f.confidence > 1) {
+    if (typeof f.confidence !== "number" || Number.isNaN(f.confidence) || f.confidence < 0 || f.confidence > 1) {
       issues.push(`Fragment [${f.id}] has invalid confidence: ${f.confidence}`);
     }
 
