@@ -3,6 +3,7 @@ import assert from "node:assert";
 import {
   handleSessionStats,
   handleSessionStart,
+  handleMemoryUpdate,
 } from "../../src/server/handlers.js";
 
 describe("Security Hardening - handleSessionStats", () => {
@@ -40,5 +41,20 @@ describe("Security Hardening - Array Item Validation", () => {
     });
     assert.strictEqual(result.isError, true);
     assert.match(result.content[0].text, /Error: Individual 'technologies' item exceeds maximum length of 100 characters/);
+  });
+});
+
+describe("Security Hardening - handleMemoryUpdate Fail-Fast Validation", () => {
+  test("rejects invalid confidence before checking fragment id existence", async () => {
+    // @ts-ignore
+    const result = await handleMemoryUpdate({ id: "non-existent-id", confidence: 1.5 });
+    assert.strictEqual(result.isError, true);
+    assert.match(result.content[0].text, /Error: 'confidence' must be a number between 0 and 1/);
+  });
+
+  test("rejects NaN confidence early", async () => {
+    const result = await handleMemoryUpdate({ id: "non-existent-id", confidence: NaN });
+    assert.strictEqual(result.isError, true);
+    assert.match(result.content[0].text, /Error: 'confidence' must be a number between 0 and 1/);
   });
 });
