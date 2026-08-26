@@ -3,6 +3,8 @@ import assert from "node:assert";
 import {
   handleSessionStats,
   handleSessionStart,
+  handleMemoryAdd,
+  handleSessionEnd,
 } from "../../src/server/handlers.js";
 
 describe("Security Hardening - handleSessionStats", () => {
@@ -40,5 +42,29 @@ describe("Security Hardening - Array Item Validation", () => {
     });
     assert.strictEqual(result.isError, true);
     assert.match(result.content[0].text, /Error: Individual 'technologies' item exceeds maximum length of 100 characters/);
+  });
+});
+
+describe("Security Hardening - Enum Validation", () => {
+  test("handleMemoryAdd rejects invalid source parameter", async () => {
+    // @ts-ignore
+    const result = await handleMemoryAdd({
+      fragment: "test fragment",
+      source: "invalid_source"
+    });
+    assert.strictEqual(result.isError, true);
+    assert.match(result.content[0].text, /Error: 'source' must be 'user' or 'ai'/);
+  });
+
+  test("handleSessionEnd rejects invalid outcome parameter", async () => {
+    // First start a session so handleSessionEnd reaches outcome validation
+    await handleSessionStart({ task_type: "test" });
+
+    // @ts-ignore
+    const result = await handleSessionEnd({
+      outcome: "invalid_outcome"
+    });
+    assert.strictEqual(result.isError, true);
+    assert.match(result.content[0].text, /Error: 'outcome' must be one of 'success', 'partial', 'failure', or 'abandoned'/);
   });
 });
