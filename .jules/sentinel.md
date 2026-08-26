@@ -57,3 +57,8 @@
 **Vulnerability:** Absolute home directory paths were exposed through dynamic MCP components: tool descriptions, system prompts, initialize instructions, and JSON resources. While tool outputs were redacted, these metadata fields were overlooked.
 **Learning:** In MCP servers, security boundaries must extend beyond tool execution results. Any field that can contain user-influenced data (like memory fragments) and is returned to the LLM or client must be sanitized.
 **Prevention:** Centralize path redaction and apply it to all LLM-facing strings, including tool descriptions, resource contents, and instructions, before they are sent over the MCP protocol.
+
+## 2025-06-15 - Runtime Enum Parameter Validation in Handlers
+**Vulnerability:** String arguments corresponding to domain enums (`source` in `handleMemoryAdd`, `outcome` in `handleSessionEnd`) lacked explicit runtime validation against allowed enum sets.
+**Learning:** TypeScript type assertions or optional types do not prevent invalid or arbitrary strings from being passed at runtime through JSON-RPC MCP requests.
+**Prevention:** Strictly validate string parameters that represent enum choices against an explicit allowed array at the beginning of the handler.

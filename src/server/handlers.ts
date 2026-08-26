@@ -305,6 +305,13 @@ export async function handleSessionEnd(args?: SessionEndArgs): Promise<ToolResul
     };
   }
 
+  if (!["success", "partial", "failure", "abandoned"].includes(outcome)) {
+    return {
+      content: [{ type: "text", text: "Error: 'outcome' must be one of 'success', 'partial', 'failure', or 'abandoned'" }],
+      isError: true,
+    };
+  }
+
   const allSessions = sessions.loadSessions();
   const session = activeSessionId
     ? sessions.findSession(allSessions, activeSessionId)
@@ -450,6 +457,13 @@ export async function handleMemoryAdd(args?: MemoryAddArgs): Promise<ToolResult>
     project: MAX_LENGTHS.project
   });
   if (v) return v;
+
+  if (args?.source !== undefined && args.source !== "user" && args.source !== "ai") {
+    return {
+      content: [{ type: "text", text: "Error: 'source' must be 'user' or 'ai'" }],
+      isError: true,
+    };
+  }
 
   const fragment = args?.fragment;
   const title = args?.title || null;
