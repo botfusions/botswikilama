@@ -298,9 +298,17 @@ export async function handleSessionEnd(args?: SessionEndArgs): Promise<ToolResul
   const finalApproach = args?.final_approach || null;
   const lessons = args?.lessons || [];
 
-  if (!outcome) {
+  if (!outcome || typeof outcome !== "string") {
     return {
-      content: [{ type: "text", text: "Error: 'outcome' parameter is required" }],
+      content: [{ type: "text", text: "Error: 'outcome' parameter is required and must be a string" }],
+      isError: true,
+    };
+  }
+
+  const validOutcomes = ["success", "failure", "partial", "abandoned"];
+  if (!validOutcomes.includes(outcome)) {
+    return {
+      content: [{ type: "text", text: `Error: 'outcome' must be one of: ${validOutcomes.join(", ")}` }],
       isError: true,
     };
   }
@@ -455,7 +463,15 @@ export async function handleMemoryAdd(args?: MemoryAddArgs): Promise<ToolResult>
   const title = args?.title || null;
   const description = args?.description || null;
   const project = args?.project === undefined ? null : args.project;
-  const source = (args?.source || "ai") as "user" | "ai";
+  const rawSource = args?.source;
+
+  if (rawSource !== undefined && (typeof rawSource !== "string" || !["user", "ai"].includes(rawSource))) {
+    return {
+      content: [{ type: "text", text: "Error: 'source' must be 'user' or 'ai'" }],
+      isError: true,
+    };
+  }
+  const source = (rawSource || "ai") as "user" | "ai";
 
   if (!fragment || typeof fragment !== "string") {
     return {

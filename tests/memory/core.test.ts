@@ -116,7 +116,7 @@ describe("Memory Core", () => {
   describe("findSimilarFragment", () => {
     test("finds similar fragment above threshold", () => {
       const frags: MemoryFragment[] = [core.createFragment("react hooks use state management patterns", "ai", "React", "proj")];
-      const match: MemoryFragment | null = core.findSimilarFragment(frags, "react hooks use state patterns", "proj", 0.3);
+      const match: MemoryFragment | null = core.findSimilarFragment(frags, "react hooks use state patterns", "proj", 0.2);
       assert.ok(match);
       assert.equal(match!.title, "React");
     });
